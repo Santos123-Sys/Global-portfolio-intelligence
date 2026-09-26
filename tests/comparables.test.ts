@@ -43,4 +43,17 @@ describe('deterministic comparable-company analysis', () => {
     expect(() => comparableCompanyAnalysis({ companyName: 'Target', currency: 'CHF', revenue: 50 }, peers.slice(0, 5)))
       .toThrow(/6 to 10 peers/);
   });
+  it('preserves enterprise value while withholding equity value when target debt is unknown', () => {
+    const result = comparableCompanyAnalysis({ companyName: 'Target', currency: 'CHF', revenue: 50, netIncome: 8, sharesOutstanding: 5 }, peers);
+    const ev = result.impliedValuations.find(value => value.multiple === 'EV / Revenue')!;
+    expect(ev.impliedEnterpriseValue).toBeGreaterThan(0);
+    expect(ev.impliedEquityValue).toBeNull();
+    expect(ev.impliedValuePerShare).toBeNull();
+    expect(result.impliedValuations.find(value => value.multiple === 'P / E')!.impliedValuePerShare).toBeGreaterThan(0);
+    expect(result.caveats.join(' ')).toContain('no zero-debt assumption');
+  });
+  it('rejects non-finite target values', () => {
+    expect(() => comparableCompanyAnalysis({ companyName: 'Target', currency: 'CHF', revenue: Infinity }, peers)).toThrow(/finite/);
+  });
+
 });

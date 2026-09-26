@@ -304,6 +304,10 @@ describe('deterministic DCF', () => {
     expect(dcfReportFileName('NESN / XSWX')).toBe('nesn-xswx-three-scenario-dcf.pdf');
   });
 
+  it('rejects numerical overflow instead of returning a non-finite valuation', () => {
+    expect(() => discountedCashFlow({ currency: 'CHF', startingFreeCashFlow: 1e308, forecastYears: 10, annualGrowthRate: 0.5, discountRate: 0.10, terminalGrowthRate: 0.02, netDebt: 0, sharesOutstanding: 1, dataAsOf: '2025-12-31', sourceReferences: ['verified-fcff'] })).toThrow(/finite/);
+  });
+
   it('routes financial institutions away from an automatic FCFF DCF', () => {
     expect(assessDcfSuitability('Financial Services', ['free_cash_flow']).status)
       .toBe('alternative_method_recommended');

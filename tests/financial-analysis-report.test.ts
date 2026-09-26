@@ -30,4 +30,23 @@ describe('embedded financial report and optional PDF', () => {
     expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
     expect(pdf.length).toBeGreaterThan(1000);
   });
+  it('withholds growth across noncomparable fiscal dates and distinguishes retrieval time', () => {
+    const report = buildFinancialAnalysisReport(input([
+      fact('revenue', 100, '2024-12-31', 'https://filing.test/2024'),
+      fact('revenue', 120, '2025-06-30', 'https://filing.test/2025'),
+    ]));
+    expect(report.periods[1].revenueGrowth).toBeNull();
+    expect(report.periods[1].comparisonNote).toContain('Growth withheld');
+    expect(report.periods[1].retrievedAt).toBe('2026-09-25T00:00:00.000Z');
+    expect(report.status).toBe('partial_data');
+  });
+  it('rejects impossible or future fiscal dates rather than displaying them as history', () => {
+    const report = buildFinancialAnalysisReport(input([
+      fact('revenue', 100, '2025-02-30', 'https://filing.test/invalid'),
+      fact('revenue', 120, '2027-12-31', 'https://filing.test/future'),
+    ]));
+    expect(report.periods).toEqual([]);
+    expect(report.status).toBe('evidence_required');
+  });
+
 });

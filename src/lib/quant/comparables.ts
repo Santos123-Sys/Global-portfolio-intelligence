@@ -157,14 +157,14 @@ function impliedValue(
   if (base == null || base <= 0) return null;
   const equityValue = multipleName === 'P / E'
     ? multipleValue * base
-    : multipleValue * base - (target.netDebt ?? 0);
+    : target.netDebt == null ? null : multipleValue * base - target.netDebt;
   return {
     multiple: multipleName,
     statistic,
     multipleValue,
     impliedEnterpriseValue: multipleName === 'P / E' ? null : multipleValue * base,
     impliedEquityValue: equityValue,
-    impliedValuePerShare: target.sharesOutstanding && target.sharesOutstanding > 0 ? equityValue / target.sharesOutstanding : null,
+    impliedValuePerShare: equityValue != null && target.sharesOutstanding && target.sharesOutstanding > 0 ? equityValue / target.sharesOutstanding : null,
   };
 }
 
@@ -173,6 +173,10 @@ export function comparableCompanyAnalysis(
   peers: ComparablePeerInput[]
 ): ComparableResult {
   if (!/^[A-Z]{3}$/.test(target.currency)) throw new QuantError('Comparable-company currency must be an ISO 4217 code');
+  for (const [name, value] of Object.entries(target)) {
+    if (typeof value === 'number') finite(`target ${name}`, value);
+  }
+  if (target.sharesOutstanding != null && target.sharesOutstanding <= 0) throw new QuantError('Target shares outstanding must be positive');
   if (peers.length < 6 || peers.length > 10) throw new QuantError('Comparable-company analysis requires 6 to 10 peers');
   const tickers = new Set<string>();
   const normalizedPeers = peers.map((peer) => {
@@ -264,6 +268,7 @@ export function comparableCompanyAnalysis(
     impliedValuations,
     methodology: 'Comparable-company analysis: enterprise value equals market capitalization plus net debt, minority interest, and preferred stock. LTM and, when sourced, NTM multiples and summary statistics are calculated deterministically from the human-reviewed peer inputs.',
     caveats: [
+      ...(target.netDebt == null ? ['Target net debt is missing. Enterprise-value multiples cannot be converted to equity or per-share values; no zero-debt assumption is used.'] : []),
       'Peer selection and source quality remain a human judgment; this calculator does not certify comparability.',
       'Outlier flags use the 1.5x interquartile-range rule and are a review prompt, not an automatic exclusion.',
       'Implied values are scenario outputs, not market-price predictions or trade instructions.',

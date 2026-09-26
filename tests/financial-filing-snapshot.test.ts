@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { selectFilingSnapshot } from '../src/lib/financial-filing-snapshot';
 
 const row = (metricName: string, observationDate: string, sourceUrl: string, currency = 'BRL') => ({
-  metricName, observationDate, sourceUrl, currency, provider: 'investor-relations', retrievedAt: new Date('2026-09-25'),
+  valueNumeric: '100', metricName, observationDate, sourceUrl, currency, provider: 'investor-relations', retrievedAt: new Date('2026-09-25'),
 });
 const metrics = ['free_cash_flow', 'total_debt', 'cash_and_equivalents', 'shares_outstanding'];
 
