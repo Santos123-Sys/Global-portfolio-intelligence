@@ -11,6 +11,7 @@ test('thesis-matched discovery remains reviewable through approval and report ac
   const token = await signSessionPayload(payload, 'browser-test-only-session-secret-at-least-32-characters');
   await context.addCookies([{ name: 'portfolio_session', value: token, url: 'http://127.0.0.1:3100' }]);
 
+  await page.setViewportSize({ width: 390, height: 844 });
   let started = false;
   let approved = false;
   const candidate = () => ({
@@ -21,7 +22,7 @@ test('thesis-matched discovery remains reviewable through approval and report ac
     analysisRunError: null, analysisErrorMessage: null, reportUrl: approved ? '/api/integrations/agentic/reports?externalRunId=analysis-1' : null,
     analysisMode: 'limited_research_risk', dcfLocked: true, dcfLockReason: 'Statements unavailable',
     latestPrice: null, decisionJournal: null, risk: null, analysis: null, valuation: null,
-    evidenceScorecard: { assessment: 'developing', verifiedSourceCount: 1, groundedFactCount: 2, informationGapCount: 2, marketPriceStatus: 'unavailable', summary: 'Initial evidence; gaps remain.' },
+    evidenceScorecard: { assessment: 'developing', sourceUrlCount: 1, groundingFieldCount: 2, informationGapCount: 2, conflictCount: 0, marketPriceStatus: 'unavailable', summary: 'Initial evidence; gaps remain.' },
     discoveryJson: { thesisAlignmentScore: 81, rationale: 'Matches the quality mandate.', matchedCriteria: ['Swiss listing'], violatedCriteria: [], informationGaps: ['Check cash generation'], groundedIn: ['identity:ticker', 'identity:exchange'], sourceUrls: ['https://example.org/issuer'] },
   });
   await page.route('**/api/**', async (route) => {
@@ -35,7 +36,7 @@ test('thesis-matched discovery remains reviewable through approval and report ac
       { label: 'Brazilian B3 universe', detail: '25 securities available', status: 'ready' },
     ] } });
     if (pathname === '/api/discovery/runs' && method === 'POST') { started = true; return json({ run: { id: runId } }, 202); }
-    if (pathname === '/api/discovery/runs') return json({ runs: started ? [{ id: runId, status: 'completed', requestedAt: '2026-09-23T11:00:00.000Z', candidateCount: 1, portfolioCandidateCounts: [], resultJson: null }] : [] });
+    if (pathname === '/api/discovery/runs') return json({ runs: started ? [{ id: runId, status: 'completed', requestedAt: '2026-09-23T11:00:00.000Z', candidateCount: 1, portfolioCandidateCounts: [{ portfolioId: 'swiss', portfolioName: 'Swiss Quality', count: 1, status: 'candidates_found', reason: 'One research lead' }], universeCoverage: { records: 25, truncated: true, unranked: true, providers: ['finnhub'], recordsByPortfolio: [{ portfolioId: 'swiss', count: 25 }] }, resultJson: { limitations: ['Web research unavailable for XSWX:OTHER. Partial assessment.'] } }] : [] });
     if (pathname === '/api/discovery/candidates' && method === 'POST') {
       const body = route.request().postDataJSON();
       expect(body.decision).toBe('approved');
@@ -54,8 +55,13 @@ test('thesis-matched discovery remains reviewable through approval and report ac
   await expect(page.getByText('Brazilian B3 universe')).toBeVisible();
   await page.getByRole('button', { name: 'Find thesis-matched stocks' }).click();
   await expect(page.getByRole('button', { name: 'Review latest candidates' })).toBeVisible();
+  await expect(page.getByText(/this shortlist does not represent a ranked search/)).toBeVisible();
+  await page.getByText('Research limitations and retrieval failures', { exact: true }).click();
+  await expect(page.getByText(/Web research unavailable for XSWX:OTHER/)).toBeVisible();
   await page.getByRole('button', { name: 'Review latest candidates' }).click();
   await expect(page.getByRole('heading', { name: /Nestle SA/ })).toBeVisible();
+  await expect(page.getByText('2 grounding fields', { exact: true })).toBeVisible();
+  await expect(page.getByText(/not independently verified investment facts/)).toBeVisible();
   await page.getByLabel('Why does this fit the thesis?').fill('A durable competitive advantage warrants deeper analysis.');
   await page.getByLabel('Expected holding period').fill('Five years');
   await page.getByLabel('Current valuation view').fill('Test normalized cash flows before investing.');

@@ -1,5 +1,7 @@
 'use client';
 
+import type { DiscoveryEvidenceScorecard } from '@/lib/discovery-evidence';
+
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { ValuationWorkbench } from '@/components/valuation-workbench';
@@ -92,14 +94,7 @@ interface Candidate {
     sourceUrl: string | null;
   } | null;
   decisionJournal: DecisionJournalDraft | null;
-  evidenceScorecard: {
-    assessment: 'sufficient' | 'developing' | 'limited';
-    verifiedSourceCount: number;
-    groundedFactCount: number;
-    informationGapCount: number;
-    marketPriceStatus: 'available' | 'unavailable';
-    summary: string;
-  };
+  evidenceScorecard: DiscoveryEvidenceScorecard;
   discoveryJson: {
     thesisAlignmentScore: number;
     rationale: string;
@@ -503,16 +498,20 @@ export default function AIStockDiscoveryPage() {
                   <summary>Read the full research explanation</summary>
                   <p>{portfolio.reason}</p>
                 </details>}
-                {portfolio.status === 'no_candidates' && latestRun!.universeCoverage &&
+                {latestRun!.universeCoverage &&
                   (latestRun!.universeCoverage.truncated || latestRun!.universeCoverage.unranked) && <p className="run-coverage-warning">
-                    This result covers {latestRun!.universeCoverage.recordsByPortfolio.find((item) => item.portfolioId === portfolio.portfolioId)?.count ?? 0} provider records
+                    This result covers {latestRun!.universeCoverage.recordsByPortfolio.find((item) => item.portfolioId === portfolio.portfolioId)?.count ?? 0} supplied records
                     {latestRun!.universeCoverage.providers.length ? ` from ${latestRun!.universeCoverage.providers.join(', ')}` : ''}.
                     {latestRun!.universeCoverage.truncated ? ' The list was truncated' : ''}
                     {latestRun!.universeCoverage.truncated && latestRun!.universeCoverage.unranked ? ' and' : ''}
-                    {latestRun!.universeCoverage.unranked ? ' not ranked' : ''}; zero matches here do not establish that the full market has no eligible companies.
+                    {latestRun!.universeCoverage.unranked ? ' not ranked' : ''}; this shortlist does not represent a ranked search of the full market. Missing matches do not establish market-wide ineligibility.
                   </p>}
               </div>)}
             </div>
+            {!!latestRun!.resultJson?.limitations?.length && <details className="run-outcome-details">
+              <summary>{t('researchLimits')}</summary>
+              <ul>{latestRun!.resultJson.limitations.map((limitation, index) => <li key={index}>{limitation}</li>)}</ul>
+            </details>}
             {latestRun!.status === 'completed' && latestRun!.candidateCount > 0 && <button
               className="action-button"
               type="button"
@@ -554,18 +553,19 @@ export default function AIStockDiscoveryPage() {
               <section className="evidence-scorecard" aria-label={t('evidence')}>
                 <div className="evidence-scorecard-heading">
                   <strong>{t('evidence')}</strong>
-                  <span className={`badge ${candidate.evidenceScorecard.assessment === 'sufficient' ? 'ok' : candidate.evidenceScorecard.assessment === 'developing' ? 'watch' : 'breach'}`}>
+                  <span className={`badge ${candidate.evidenceScorecard.assessment === 'developing' ? 'watch' : 'breach'}`}>
                     {t(candidate.evidenceScorecard.assessment)}
                   </span>
                 </div>
                 <div className="evidence-scorecard-grid">
-                  <span>{candidate.evidenceScorecard.verifiedSourceCount} {t('sources')}</span>
-                  <span>{candidate.evidenceScorecard.groundedFactCount} {t('facts')}</span>
+                  <span>{candidate.evidenceScorecard.sourceUrlCount} {t('sources')}</span>
+                  <span>{candidate.evidenceScorecard.groundingFieldCount} {t('facts')}</span>
                   <span>{candidate.evidenceScorecard.informationGapCount} {t('gaps')}</span>
                   <span>{t('price')} {t(candidate.evidenceScorecard.marketPriceStatus)}</span>
+                  <span>{candidate.evidenceScorecard.conflictCount} {t('conflicts')}</span>
                 </div>
-                <p>{t(candidate.evidenceScorecard.assessment === 'sufficient' ? 'sufficientDetail' : candidate.evidenceScorecard.assessment === 'developing' ? 'developingDetail' : 'limitedDetail')}</p>
-                {candidate.decision !== 'approved' && candidate.evidenceScorecard.assessment !== 'sufficient' && <p className="note">{t('continueResearch')}</p>}
+                <p>{t(candidate.evidenceScorecard.assessment === 'developing' ? 'developingDetail' : 'limitedDetail')}</p>
+                {candidate.decision !== 'approved' && <p className="note">{t('continueResearch')}</p>}
                 {candidate.decision === 'approved' && <p className="note">{t('snapshotDetail')}</p>}
               </section>
               <p className="note"><strong>{t('matched')}:</strong> {discovery.matchedCriteria.join(' · ') || t('none')}</p>

@@ -2,41 +2,31 @@ import type { DiscoveryCandidate } from '@portfolio-intelligence/agentic-contrac
 import type { DiscoveryLatestPrice } from './discovery-market-data';
 
 export type DiscoveryEvidenceScorecard = {
-  assessment: 'sufficient' | 'developing' | 'limited';
-  verifiedSourceCount: number;
-  groundedFactCount: number;
+  assessment: 'developing' | 'limited';
+  sourceUrlCount: number;
+  groundingFieldCount: number;
   informationGapCount: number;
+  conflictCount: number;
   marketPriceStatus: 'available' | 'unavailable';
   summary: string;
 };
 
-/**
- * Transparent evidence coverage, deliberately not an opaque numerical score.
- * It tells the user what is present and absent before asking for a decision.
- */
+/** Counts describe the saved discovery snapshot, not truth, independence or sufficiency. */
 export function scoreDiscoveryEvidence(
-  candidate: Pick<DiscoveryCandidate, 'sourceUrls' | 'groundedIn' | 'informationGaps'>,
+  candidate: Pick<DiscoveryCandidate, 'sourceUrls' | 'groundedIn' | 'informationGaps' | 'violatedCriteria'>,
   latestPrice: DiscoveryLatestPrice | null
 ): DiscoveryEvidenceScorecard {
-  const verifiedSourceCount = new Set(candidate.sourceUrls).size;
-  const groundedFactCount = new Set(candidate.groundedIn).size;
+  const sourceUrlCount = new Set(candidate.sourceUrls).size;
+  const groundingFieldCount = new Set(candidate.groundedIn).size;
   const informationGapCount = candidate.informationGaps.length;
-  const assessment = verifiedSourceCount >= 2 && groundedFactCount >= 2 && informationGapCount <= 1
-    ? 'sufficient'
-    : verifiedSourceCount >= 1 && groundedFactCount >= 1
-      ? 'developing'
-      : 'limited';
-  const summary = assessment === 'sufficient'
-    ? 'Source coverage is adequate for a human review; confirm the remaining gap before relying on valuation.'
-    : assessment === 'developing'
-      ? 'Useful initial evidence is present, but the recorded gaps should shape the decision and next research step.'
-      : 'Evidence is limited. Treat this as a research lead, not an investment-ready conclusion.';
+  const conflictCount = candidate.violatedCriteria.length;
   return {
-    assessment,
-    verifiedSourceCount,
-    groundedFactCount,
+    assessment: sourceUrlCount && groundingFieldCount ? 'developing' : 'limited',
+    sourceUrlCount,
+    groundingFieldCount,
     informationGapCount,
+    conflictCount,
     marketPriceStatus: latestPrice ? 'available' : 'unavailable',
-    summary,
+    summary: 'Source links and grounding fields are recorded references, not independently verified investment facts. Review unresolved criteria and conflicts before proceeding.',
   };
 }
