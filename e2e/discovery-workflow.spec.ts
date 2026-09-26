@@ -1,6 +1,8 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { buildFinancialAnalysisReport } from '../src/lib/financial-analysis-report';
+import { threeCaseDiscountedCashFlow } from '../src/lib/quant/dcf';
+import { deriveFcff } from '../src/lib/quant/fcff';
 import { signSessionPayload } from '../src/lib/session-token';
 
 const runId = '11111111-1111-4111-8111-111111111111';
@@ -13,6 +15,8 @@ test('thesis-matched discovery remains reviewable through approval and report ac
   await context.addCookies([{ name: 'portfolio_session', value: token, url: 'http://127.0.0.1:3100' }]);
 
   await page.setViewportSize({ width: 390, height: 844 });
+  const financialInputs = { operating_income: 200, depreciation_and_amortization: 20, capital_expenditure: 50, pre_tax_income: 200, income_tax_expense: 40 };
+  let savedDcf = false;
   let started = false;
   let approved = false;
   const candidate = () => ({
@@ -31,7 +35,18 @@ test('thesis-matched discovery remains reviewable through approval and report ac
     const method = route.request().method();
     const json = (value: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) });
     if (pathname === '/api/auth/session') return json({ account: { isPlatformAdmin: true } });
-    if (pathname === '/api/discovery/valuations' || pathname === '/api/discovery/comparables') return json({ error: 'Verified FCFF required before automatic DCF.' }, 409);
+    if (pathname === '/api/discovery/valuations' && method === 'POST') {
+      const { review } = route.request().postDataJSON();
+      expect(review.financialPeriodEnd).toBe('2025-12-31');
+      expect(review.scenarios.base_case.discountRate).toBe(.10);
+      expect(review.fcff.workingCapitalInvestment).toBe(20);
+      const fcffDerivation = deriveFcff(financialInputs, review.fcff);
+      const assumptions = Object.fromEntries(Object.entries(review.scenarios).map(([name, rates]) => [name, { ...(rates as object), currency: 'CHF', startingFreeCashFlow: fcffDerivation.value, forecastYears: 5, netDebt: 30, sharesOutstanding: 10, dataAsOf: '2025-12-31', sourceReferences: [review.sourceUrl] }])) as Parameters<typeof threeCaseDiscountedCashFlow>[0];
+      savedDcf = true;
+      return json({ scenario: { id: '33333333-3333-4333-8333-333333333333' }, result: { ...threeCaseDiscountedCashFlow(assumptions), fcffDerivation, review } }, 201);
+    }
+    if (pathname === '/api/discovery/valuations') return json({ financialInputs, suitability: { status: 'insufficient_data', rationale: 'Review FCFF inputs.', missingFields: [] }, defaults: { currency: 'CHF', dataAsOf: '2025-12-31', netDebt: 30, sharesOutstanding: 10, sourceReferences: [] }, automaticReadiness: { ready: false, missingFinancialRecords: ['free_cash_flow_to_firm'], missingScenarioDrivers: ['review assumptions'], message: 'Review assumptions to calculate DCF.' }, latestScenario: null });
+    if (pathname === '/api/discovery/comparables') return json({ error: 'Peers not yet reviewed.' }, 409);
     if (pathname === '/api/discovery/financial-report') return json(buildFinancialAnalysisReport({ companyName: 'Nestle SA', ticker: 'NESN', exchange: 'XSWX', currency: 'CHF', now: new Date('2026-09-26'), observations: ['2024-12-31', '2025-06-30'].map((observationDate, index) => ({ metricName: 'revenue', valueNumeric: String(100 + index * 20), observationDate, currency: 'CHF', sourceUrl: `https://example.test/${observationDate}`, sourceName: 'Annual filing', provider: 'investor-relations', status: 'OK', retrievedAt: new Date('2026-09-25') })) }));
     if (pathname === '/api/accounts') return json({ accounts: [], activeAccountId: '' });
     if (pathname === '/api/discovery/preflight') return json({ preflight: { ready: true, checkedAt: '2026-09-23T11:00:00.000Z', provider: 'finnhub', checks: [
@@ -78,4 +93,31 @@ test('thesis-matched discovery remains reviewable through approval and report ac
   await expect(page.getByText(/Growth withheld:/)).toBeVisible();
   await expect(page.getByText('Retrieved 2026-09-25', { exact: false }).first()).toBeVisible();
   await expect(page.getByRole('link', { name: 'Download PDF', exact: true })).toHaveAttribute('href', /financial-report\/pdf/);
+  await expect(page.getByRole('heading', { name: 'DCF & peer valuation' })).toBeVisible();
+  const generate = page.getByRole('button', { name: 'Generate three-case DCF' });
+  await expect(generate).toBeDisabled();
+  await page.getByLabel('FCFF method').selectOption('ebit');
+  await page.getByLabel('Non-cash working-capital investment — optional').fill('20');
+  for (const name of ['worst case', 'base case', 'optimistic case']) {
+    const group = page.getByRole('group', { name, exact: true });
+    await group.getByLabel('Annual FCFF growth (%)').fill('4');
+    await group.getByLabel('WACC (%)').fill('10');
+    await group.getByLabel('Terminal growth (%)').fill('2');
+  }
+  await page.getByLabel('Assumptions reviewed as of').fill('2026-09-25');
+  await page.getByLabel('Source / assumptions memo URL').fill('https://example.test/review');
+  await page.getByLabel('Rationale and sources for rates and accounting adjustments').fill('Reviewed annual report and currency-consistent cost of capital.');
+  await page.getByLabel('I reviewed the source, financial period').check();
+  await expect(page.getByText('Computed FCFF: CHF 110', { exact: true })).toBeVisible();
+  await expect(generate).toBeEnabled();
+  await generate.click();
+  await expect(page.getByRole('link', { name: 'Open DCF PDF report' })).toBeVisible();
+  expect(savedDcf).toBe(true);
+  await page.getByText('Base-case sensitivity: WACC and terminal growth', { exact: true }).click();
+  await expect(page.getByRole('table').filter({ has: page.getByText('Value per share (CHF); unavailable cells violate model constraints.') })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'DCF and peers: compare the evidence' })).toBeVisible();
+  const overflow = await page.evaluate(() => [...document.querySelectorAll('body *')].filter(element => element.getBoundingClientRect().right > window.innerWidth + 1).map(element => `${element.tagName}.${element.className}: ${Math.round(element.getBoundingClientRect().width)}`).slice(0, 25));
+  await page.screenshot({ path: '/tmp/fcff-workspace.png', fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), JSON.stringify(overflow)).toBe(true);
+
 });

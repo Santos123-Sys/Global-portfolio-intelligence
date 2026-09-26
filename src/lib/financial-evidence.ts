@@ -7,4 +7,4 @@ export function isSupportedFiscalDate(value: string | null, now = new Date()): v
 }
 
 export const FCFF_METRIC = 'free_cash_flow_to_firm';
-export const FCFF_EVIDENCE_NOTE = 'Automatic FCFF valuation requires explicitly verified free cash flow to the firm. Operating cash flow minus capital expenditure is not automatically FCFF; no conversion or financing assumption is inferred.';
+export const FCFF_EVIDENCE_NOTE = 'FCFF may be explicitly reported or derived from a coherent filing using EBIT or interest-adjusted CFO. Generic CFO minus capex is not automatically FCFF; missing inputs and accounting classifications require review.';

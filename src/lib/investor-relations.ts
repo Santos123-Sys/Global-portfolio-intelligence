@@ -10,6 +10,14 @@ export interface InvestorRelationsFundamentals {
 }
 
 const XBRL_METRICS: Record<string, string> = {
+  'us-gaap:DepreciationDepletionAndAmortization': 'depreciation_and_amortization',
+  'us-gaap:InterestExpense': 'interest_expense',
+  'ifrs-full:DepreciationAndAmortisationExpense': 'depreciation_and_amortization',
+  'ifrs-full:InterestExpense': 'interest_expense',
+  'ifrs-full:IncomeTaxExpenseContinuingOperations': 'income_tax_expense',
+  'ifrs-full:ProfitLossBeforeTax': 'pre_tax_income',
+  'ifrs-full:ProfitLossFromOperatingActivities': 'operating_income',
+  'ifrs-full:CashFlowsFromUsedInOperatingActivities': 'operating_cash_flow',
   'us-gaap:Revenues': 'revenue',
   'us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax': 'revenue',
   'us-gaap:GrossProfit': 'gross_profit',

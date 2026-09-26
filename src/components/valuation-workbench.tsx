@@ -1,10 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { DcfAssumptionReview } from './dcf-assumption-review';
+import { deriveFcff, type FcffDerivation } from '@/lib/quant/fcff';
+import type { ValuationReview } from '@/lib/valuation-review';
 import { FinancialDocumentReview } from './financial-document-review';
 import { FinancialAnalysisReport } from './financial-analysis-report';
 
 interface ValuationSetup {
+  financialInputs?: Record<string, number>;
+  fcffDerivation?: FcffDerivation;
   suitability: {
     status: 'alternative_method_recommended' | 'insufficient_data' | 'review_required';
     rationale: string;
@@ -32,6 +37,8 @@ interface ValuationSetup {
 }
 
 interface ThreeCaseDcfResult {
+  review?: ValuationReview | null;
+  fcffDerivation?: FcffDerivation;
   method: 'three_case_two_stage_fcff';
   currency: string;
   scenarios: Array<{
@@ -45,6 +52,7 @@ interface ThreeCaseDcfResult {
 }
 
 interface DcfResult {
+  terminalPresentValue: number;
   currency: string;
   fairValuePerShare: number;
   enterpriseValue: number;
@@ -52,6 +60,7 @@ interface DcfResult {
   methodology: string;
   caveats: string[];
   assumptions: {
+    dataAsOf?: string;
     annualGrowthRate: number;
     discountRate: number;
     terminalGrowthRate: number;
@@ -79,6 +88,8 @@ interface ComparableSetup {
 }
 
 interface ComparableResult {
+  dataAsOf?: string | null;
+  computedAt?: string;
   currency: string;
   peers: Array<{ companyName: string; ticker: string; enterpriseValue: number; evRevenue: number | null; evEbitda: number | null; pe: number | null; evNtmRevenue: number | null; evNtmEbitda: number | null; ntmPe: number | null; ebitdaMargin: number | null; netMargin: number | null; ntmRevenueGrowth: number | null; ntmEbitdaGrowth: number | null; netDebtEbitda: number | null; grossMargin: number | null; operatingMargin: number | null; returnOnEquity: number | null; priceToBook: number | null; interestCoverage: number | null; debtToEquity: number | null; roic: number | null; outlierMultiples: string[] }>;
   statistics: Record<'evRevenue' | 'evEbitda' | 'pe' | 'evNtmRevenue' | 'evNtmEbitda' | 'ntmPe', { count: number; mean: number | null; median: number | null; percentile25: number | null; percentile75: number | null }>;
@@ -110,6 +121,8 @@ interface PeerForm {
   ntmNetIncome: string;
   sourceUrl: string;
   forecastSourceUrl: string;
+  financialPeriodEnd: string;
+  marketDataAsOf: string;
   researchNote: string;
 }
 
@@ -141,10 +154,12 @@ interface PeerResearchResponse {
 }
 
 function emptyPeer(): PeerForm {
-  return { companyName: '', ticker: '', exchange: '', currency: '', marketCapitalization: '', netDebt: '', totalDebt: '', revenue: '', ebitda: '', netIncome: '', grossProfit: '', operatingIncome: '', totalEquity: '', interestExpense: '', cashAndEquivalents: '', incomeTaxExpense: '', preTaxIncome: '', ntmRevenue: '', ntmEbitda: '', ntmNetIncome: '', sourceUrl: '', forecastSourceUrl: '', researchNote: '' };
+  return { companyName: '', ticker: '', exchange: '', currency: '', marketCapitalization: '', netDebt: '', totalDebt: '', revenue: '', ebitda: '', netIncome: '', grossProfit: '', operatingIncome: '', totalEquity: '', interestExpense: '', cashAndEquivalents: '', incomeTaxExpense: '', preTaxIncome: '', ntmRevenue: '', ntmEbitda: '', ntmNetIncome: '', sourceUrl: '', forecastSourceUrl: '', financialPeriodEnd: '', marketDataAsOf: '', researchNote: '' };
 }
 
 export function ValuationWorkbench({ candidateId, exchange, currency, country, onSaved }: { candidateId: string; exchange: string; currency: string; country: string | null; onSaved: () => void }) {
+  const [reviewStarted, setReviewStarted] = useState(false);
+  const [review, setReview] = useState<ValuationReview | null>(null);
   const [setup, setSetup] = useState<ValuationSetup | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -167,6 +182,9 @@ export function ValuationWorkbench({ candidateId, exchange, currency, country, o
     const controller = new AbortController();
     setBusy(true);
     setError(null);
+    setSetup(null);
+    setReview(null);
+    setReviewStarted(false);
     setAutomaticResult(null);
     setAutomaticScenarioId(null);
     fetch(`/api/discovery/valuations?candidateId=${encodeURIComponent(candidateId)}`, { signal: controller.signal })
@@ -192,6 +210,9 @@ export function ValuationWorkbench({ candidateId, exchange, currency, country, o
     const controller = new AbortController();
     setCompsBusy(true);
     setCompsError(null);
+    setCompsSetup(null);
+    setCompsResult(null);
+    setPeers(Array.from({ length: 6 }, emptyPeer));
     fetch(`/api/discovery/comparables?candidateId=${encodeURIComponent(candidateId)}`, { signal: controller.signal })
       .then(async (response) => {
         const body = await response.json() as ComparableSetup & { error?: string };
@@ -216,7 +237,7 @@ export function ValuationWorkbench({ candidateId, exchange, currency, country, o
       const response = await fetch('/api/discovery/valuations', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ candidateId, automatic: true }),
+        body: JSON.stringify({ candidateId, automatic: true, ...(review ? { review } : {}) }),
       });
       const body = await response.json().catch(() => ({})) as { error?: string; result?: ThreeCaseDcfResult; scenario?: { id: string } };
       if (!response.ok || !body.result) throw new Error(body.error ?? `DCF failed (${response.status})`);
@@ -247,8 +268,11 @@ export function ValuationWorkbench({ candidateId, exchange, currency, country, o
           peers: peers.map((peer) => ({
             companyName: peer.companyName,
             ticker: peer.ticker,
+            currency: peer.currency,
+            financialPeriodEnd: peer.financialPeriodEnd,
+            marketDataAsOf: peer.marketDataAsOf,
             marketCapitalization: Number(peer.marketCapitalization),
-            netDebt: Number(peer.netDebt),
+            netDebt: peer.netDebt.trim() === '' ? undefined : Number(peer.netDebt),
             totalDebt: peer.totalDebt === '' ? undefined : Number(peer.totalDebt),
             revenue: peer.revenue === '' ? undefined : Number(peer.revenue),
             ebitda: peer.ebitda === '' ? undefined : Number(peer.ebitda),
@@ -423,6 +447,8 @@ export function ValuationWorkbench({ candidateId, exchange, currency, country, o
     finally { setPrimarySourceBusy(false); }
   }
 
+  const reviewedReady = Boolean(review && setup && setup.suitability.status !== 'alternative_method_recommended' && setup.defaults.netDebt != null && (setup.defaults.sharesOutstanding ?? 0) > 0 && (deriveFcff(setup.financialInputs ?? {}, review.fcff).value ?? 0) > 0);
+
   if (busy && !setup && compsBusy && !compsSetup) return <p className="note">Loading valuation evidence…</p>;
   if (!setup && !compsSetup && !busy && !compsBusy) return <>
     <FinancialAnalysisReport candidateId={candidateId} reloadToken={reloadToken} />
@@ -431,7 +457,8 @@ export function ValuationWorkbench({ candidateId, exchange, currency, country, o
   return (
     <section className="valuation-panel">
       <p className="analysis-eyebrow">4. Valuation</p>
-      <h3>Valuation workspace</h3>
+      <h3>DCF &amp; peer valuation</h3>
+      <nav aria-label="Valuation sections" className="comps-actions"><a href="#dcf-model">DCF model</a><a href="#peer-analysis">Peer analysis</a><a href="#valuation-comparison">Compare methods</a></nav>
       <p className="note">Use a DCF only with structured financial statements. Use comparable companies to triangulate value from a sourced, human-reviewed peer set. Neither output is a trade instruction.</p>
       <div className="primary-source-cta">
         <div><strong>Primary-source financials</strong><p>Retrieve available inline-XBRL annual-report or 10-K values from investor-relations or regulatory filing pages. The system retains the filing URL and will only unlock the DCF when required financial records and scenario drivers are sourced.</p></div>
@@ -450,20 +477,21 @@ export function ValuationWorkbench({ candidateId, exchange, currency, country, o
         && <FinancialDocumentReview candidateId={candidateId} onApproved={() => setReloadToken((current) => current + 1)} />}
       <FinancialAnalysisReport candidateId={candidateId} reloadToken={reloadToken} />
       {!setup ? <section className="dcf-unavailable">
-        <h4>Strict automatic DCF</h4>
+        <h4 id="dcf-model">Automatic FCFF DCF</h4>
         <p className="caveat">{busy ? 'Checking structured financial-statement evidence…' : error ?? 'DCF cannot be prepared from the current evidence.'}</p>
         <p className="note">This does not block comparable-company analysis. It prevents a DCF from using unsupported cash-flow, debt, or share-count inputs.</p>
       </section> : <>
-      <h4>Strict automatic DCF</h4>
+      <h4 id="dcf-model">Automatic FCFF DCF</h4>
       <p className={setup.suitability.status === 'review_required' ? 'note' : 'caveat'}>{setup.suitability.rationale}</p>
       <p className="note">Currency: {setup.defaults.currency} · Financial evidence as of {setup.defaults.dataAsOf ? new Date(setup.defaults.dataAsOf).toLocaleDateString() : 'unknown'}.</p>
-      <p className={setup.automaticReadiness.ready ? 'note' : 'caveat'}>{setup.automaticReadiness.message}</p>
-      {setup.automaticReadiness.missingFinancialRecords.length > 0 && <p className="caveat">Missing primary-source financial records: {setup.automaticReadiness.missingFinancialRecords.join(', ')}.</p>}
-      {setup.automaticReadiness.missingScenarioDrivers.length > 0 && <p className="caveat">Missing source-linked scenario driver records: {setup.automaticReadiness.missingScenarioDrivers.join(', ')}.</p>}
-      <p className="note">The model applies only retained evidence to a five-year FCFF forecast, WACC, and terminal growth for Worst Case, Base Case, and Optimistic Case. It does not provide editable fallback assumptions.</p>
+      <p className={setup.automaticReadiness.ready ? 'note' : 'caveat'}>{reviewedReady ? 'Reviewed inputs are ready for server validation and calculation.' : setup.automaticReadiness.message}</p>
+      {!reviewedReady && setup.automaticReadiness.missingFinancialRecords.length > 0 && <p className="caveat">Missing primary-source financial records: {setup.automaticReadiness.missingFinancialRecords.join(', ')}.</p>}
+      {!reviewedReady && setup.automaticReadiness.missingScenarioDrivers.length > 0 && <p className="caveat">Missing {setup.automaticReadiness.missingScenarioDrivers.length} sourced scenario rates. Complete the review below to supply explicit assumptions.</p>}
+      <p className="note">The model calculates a five-year FCFF forecast for three scenarios. Use existing sourced drivers or review explicit assumptions below.</p>
+      {setup.financialInputs && <DcfAssumptionReview key={`${candidateId}:${reloadToken}`} facts={setup.financialInputs} currency={setup.defaults.currency} period={setup.defaults.dataAsOf} onChange={value => { setReviewStarted(true); setReview(value); }} />}
       {error && <p className="login-error" role="alert">{error}</p>}
-      <button className="action-button" type="button" onClick={() => void generateAutomaticDcf()} disabled={busy || !setup.automaticReadiness.ready}>
-        {busy ? 'Generating…' : 'Generate strict three-case DCF'}
+      <button className="action-button" type="button" onClick={() => void generateAutomaticDcf()} disabled={busy || !(reviewedReady || (!reviewStarted && setup.automaticReadiness.ready))}>
+        {busy ? 'Generating…' : 'Generate three-case DCF'}
       </button>
       {automaticResult && (
         <div className="valuation-result">
@@ -471,8 +499,12 @@ export function ValuationWorkbench({ candidateId, exchange, currency, country, o
             <p className="analysis-eyebrow">{scenario.label}</p>
             <p className="big">{automaticResult.currency} {scenario.result.fairValuePerShare.toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="cur">per share</span></p>
             <p className="note">FCF growth {(scenario.result.assumptions.annualGrowthRate * 100).toFixed(1)}% · WACC {(scenario.result.assumptions.discountRate * 100).toFixed(1)}% · Terminal growth {(scenario.result.assumptions.terminalGrowthRate * 100).toFixed(1)}%</p>
+            <p className="note">Terminal value contribution: {scenario.result.enterpriseValue > 0 ? `${(100 * scenario.result.terminalPresentValue / scenario.result.enterpriseValue).toFixed(1)}%` : 'Unavailable'}</p>
             <p className="note">Enterprise value {automaticResult.currency} {scenario.result.enterpriseValue.toLocaleString()} · Equity value {automaticResult.currency} {scenario.result.equityValue.toLocaleString()}</p>
           </article>)}</div>
+          {automaticResult.review && <details><summary>Saved assumption review · {automaticResult.review.asOf}</summary><p>{automaticResult.review.rationale}</p><a href={automaticResult.review.sourceUrl} target="_blank" rel="noopener noreferrer">Review source</a><p>Filing {automaticResult.review.financialPeriodEnd} · {automaticResult.review.currency}</p></details>}
+          {automaticResult.fcffDerivation && <p className="note">{automaticResult.fcffDerivation.formula} · FCFF {automaticResult.currency} {automaticResult.fcffDerivation.value?.toLocaleString()}</p>}
+          <details><summary>Base-case sensitivity: WACC and terminal growth</summary><div className="table-scroll"><table><caption>Value per share ({automaticResult.currency}); unavailable cells violate model constraints.</caption><thead><tr><th scope="col">WACC</th><th scope="col">Terminal growth</th><th scope="col">Value / share</th></tr></thead><tbody>{automaticResult.scenarios.find(scenario => scenario.name === 'base_case')?.result.sensitivity?.map((cell, index) => <tr key={index}><td>{(cell.discountRate * 100).toFixed(1)}%</td><td>{(cell.terminalGrowthRate * 100).toFixed(1)}%</td><td>{cell.fairValuePerShare?.toFixed(2) ?? 'Unavailable'}</td></tr>)}</tbody></table></div></details>
           <p className="note">{automaticResult.methodology}</p>
           <ul className="caveat">{automaticResult.caveats.map((caveat) => <li key={caveat}>{caveat}</li>)}</ul>
           {automaticScenarioId && <a className="secondary-button report-download" href={`/api/discovery/valuations/${automaticScenarioId}/report`} target="_blank" rel="noreferrer">Open DCF PDF report</a>}
@@ -480,12 +512,12 @@ export function ValuationWorkbench({ candidateId, exchange, currency, country, o
       )}
       </>}
 
-      <section className="comps-panel">
+      <section className="comps-panel" id="peer-analysis">
         <h4>Comparable-company analysis</h4>
         {compsBusy && !compsSetup ? <p className="note">Checking target financial data…</p> : compsError && !compsSetup ? <p className="caveat">{compsError}</p> : compsSetup && <>
           <p className="note">Target: <strong>{compsSetup.target.companyName}</strong> · {compsSetup.target.currency} · data as of {compsSetup.dataAsOf ? new Date(compsSetup.dataAsOf).toLocaleDateString() : 'unknown'}.</p>
           {compsSetup.missing.length > 0 && <p className="caveat">Target metrics unavailable: {compsSetup.missing.join(', ')}. A comparable result can use only metrics that are sourced for the target.</p>}
-          <p className="note">Start with peer discovery, then review why each company was suggested. The system researches available public financial statements, market data, and explicitly labelled forward guidance/estimates. It never treats an incomplete search snippet as a fact.</p>
+          <p className="note">Start with peer discovery, then review why each company was suggested. Confirm each peer’s financial period and market-data date; all amounts within a peer must use its stated currency and full units. The system researches available public financial statements, market data, and explicitly labelled forward guidance/estimates. It never treats an incomplete search snippet as a fact.</p>
           <div className="comps-actions">
             <button className="secondary-button" type="button" onClick={() => void suggestPeers()} disabled={compsBusy}>Find peer candidates from web research</button>
             <button className="secondary-button" type="button" onClick={() => void researchPeers()} disabled={compsBusy}>Research and prefill selected peers</button>
@@ -507,7 +539,7 @@ export function ValuationWorkbench({ candidateId, exchange, currency, country, o
                 <td><input type="number" value={peer.ntmRevenue} onChange={(event) => updatePeer(index, 'ntmRevenue', event.target.value)} /></td>
                 <td><input type="number" value={peer.ntmEbitda} onChange={(event) => updatePeer(index, 'ntmEbitda', event.target.value)} /></td>
                 <td><input type="number" value={peer.ntmNetIncome} onChange={(event) => updatePeer(index, 'ntmNetIncome', event.target.value)} /></td>
-                <td><input value={peer.sourceUrl} onChange={(event) => updatePeer(index, 'sourceUrl', event.target.value)} placeholder="Historical source URL" />
+                <td><label>Financial period end<input aria-label={`Peer ${index + 1} financial period end`} type="date" value={peer.financialPeriodEnd} onChange={event => updatePeer(index, 'financialPeriodEnd', event.target.value)} /></label><label>Market data as of<input aria-label={`Peer ${index + 1} market data as of`} type="date" value={peer.marketDataAsOf} onChange={event => updatePeer(index, 'marketDataAsOf', event.target.value)} /></label><input value={peer.sourceUrl} onChange={(event) => updatePeer(index, 'sourceUrl', event.target.value)} placeholder="Historical source URL" />
                   <input value={peer.forecastSourceUrl} onChange={(event) => updatePeer(index, 'forecastSourceUrl', event.target.value)} placeholder="Forward-data source URL" />
                   {peer.researchNote && <p className="note peer-research-note">{peer.researchNote}</p>}</td>
               </tr>)}</tbody>
@@ -550,6 +582,16 @@ export function ValuationWorkbench({ candidateId, exchange, currency, country, o
             <ul className="caveat">{compsResult.caveats.map((caveat) => <li key={caveat}>{caveat}</li>)}</ul>
           </div>}
         </>}
+      </section>
+      <section id="valuation-comparison" className="comps-panel">
+        <h4>DCF and peers: compare the evidence</h4>
+        <p className="note">DCF estimates intrinsic value; peer multiples reflect relative market pricing. Differences are a prompt to revisit growth, margins, risk, and peer selection. Results are not averaged into a single target.</p>
+        <div className="table-scroll"><table><caption>Independent valuation estimates per share</caption><thead><tr><th scope="col">Method</th><th scope="col">Value per share</th><th scope="col">Financial period</th></tr></thead><tbody>
+          {automaticResult?.scenarios.map(scenario => <tr key={scenario.name}><th scope="row">DCF · {scenario.label}</th><td>{automaticResult.currency} {scenario.result.fairValuePerShare.toFixed(2)}</td><td>{scenario.result.assumptions.dataAsOf ?? 'Unknown'}</td></tr>)}
+          {compsResult?.impliedValuations.filter(value => value.statistic.toLowerCase() === 'median').map(value => <tr key={value.multiple}><th scope="row">Peers · median {value.multiple}</th><td>{value.impliedValuePerShare == null ? 'Unavailable — incomplete equity bridge' : `${compsResult.currency} ${value.impliedValuePerShare.toFixed(2)}`}</td><td>{compsResult.dataAsOf ?? 'Unknown'}</td></tr>)}
+        </tbody></table></div>
+        {(!automaticResult || !compsResult) && <p className="note">Generate both methods to complete this comparison. Missing methods remain unavailable.</p>}
+        <p className="caveat">Saved models are independent snapshots. Check their financial periods, valuation dates, currencies, and peer accounting definitions before comparing. No automatic currency conversion is applied.</p>
       </section>
     </section>
   );

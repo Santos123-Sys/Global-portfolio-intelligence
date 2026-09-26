@@ -944,3 +944,20 @@ html { scroll-padding-top: 11rem; }
 
 button.nav-link { border: 1px solid transparent; background: transparent; cursor: pointer; }
 button.nav-link:hover, button.nav-link[aria-expanded="true"] { background: var(--bg); color: var(--text); }
+
+.dcf-review { padding: 1rem; border: 1px solid var(--border, #64748b); border-radius: 12px; margin-block: 1rem; }
+.dcf-review summary { cursor: pointer; font-weight: 600; }
+.dcf-review-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 1rem; margin-block: 1rem; }
+.dcf-review label { display: block; margin-block: .6rem; }
+.dcf-review input:not([type=checkbox]), .dcf-review select, .dcf-review textarea { display: block; width: 100%; padding: .6rem; }
+.dcf-review fieldset { min-width: 0; padding: .8rem; }
+.dcf-review textarea { min-height: 90px; }
+
+.valuation-panel, .dcf-review, .dcf-review-grid > * { min-width: 0; overflow-wrap: anywhere; }
+.valuation-panel input, .valuation-panel select, .valuation-panel textarea { box-sizing: border-box; max-width: 100%; }
+.candidate-list > .candidate-card, .candidate-actions > .analysis-stage { min-width: 0; max-width: 100%; }
+.candidate-actions > .analysis-stage { flex: 1 1 100%; box-sizing: border-box; }
+.dcf-review input:not([type=checkbox]), .dcf-review select, .dcf-review textarea { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font: inherit; }
+.dcf-review fieldset { border: 1px solid var(--border); border-radius: 8px; }
+.dcf-review legend { text-transform: capitalize; padding-inline: .3rem; }
+.dcf-review summary { padding-block: .5rem; }

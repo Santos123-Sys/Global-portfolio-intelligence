@@ -45,7 +45,7 @@ export async function renderDcfReportPdf(input: DcfReportInput): Promise<Buffer>
     document.fillColor(ink).font('Helvetica-Bold').fontSize(24).text(`${clean(input.companyName)}\nDCF valuation`, 52, 94, { width: contentWidth, lineGap: 3 });
     document.fillColor(muted).font('Helvetica').fontSize(10).text(`${clean(input.ticker)} | ${clean(input.exchange)} | Generated ${date(input.result.computedAt)}`, 52, 167);
     document.moveTo(52, 194).lineTo(170, 194).lineWidth(3).strokeColor(gold).stroke();
-    document.fillColor(muted).fontSize(9.2).text('Strict automatic model: all financial and scenario drivers were retained as source-linked records. Missing data stops generation; it is not substituted with an unsourced default.', 52, 215, { width: contentWidth, lineGap: 3 });
+    document.fillColor(muted).fontSize(9.2).text('FCFF model: financial evidence and forecast assumptions are retained with this scenario. Forecast rates may be explicitly reviewed analyst assumptions. Missing financial inputs are not replaced with defaults.', 52, 215, { width: contentWidth, lineGap: 3 });
 
     document.fillColor(navy).font('Helvetica-Bold').fontSize(12).text('Scenario summary', 52, 286);
     const columns = [52, 218, 384];
@@ -110,6 +110,30 @@ export async function renderDcfReportPdf(input: DcfReportInput): Promise<Buffer>
     document.fillColor(ink).font('Helvetica').fontSize(8.5).text(clean(input.result.methodology), 52, 621, { width: contentWidth, lineGap: 2.5 });
     document.fillColor(muted).fontSize(7.5).text(`Evidence keys retained in the authenticated platform: ${input.sourceReferences.map(clean).join(', ') || 'none'}.`, 52, 680, { width: contentWidth, lineGap: 2 });
     document.fillColor(muted).fontSize(7.2).text('This is a scenario analysis for human review. It is not investment advice, a price target, or an instruction to trade.', 52, 742, { width: contentWidth });
+    if (input.result.fcffDerivation || input.result.review) {
+      document.addPage();
+      document.fillColor(navy).font('Helvetica-Bold').fontSize(18).text('FCFF calculation and assumption review');
+      document.moveDown();
+      document.font('Helvetica').fontSize(10).fillColor(ink);
+      const derivation = input.result.fcffDerivation;
+      if (derivation) {
+        document.text(clean(derivation.formula).replaceAll('−', '-').replaceAll('×', 'x'));
+        document.moveDown();
+        for (const [key, value] of Object.entries(derivation.components)) document.text(`${key.replaceAll('_', ' ')}: ${value.toLocaleString('en-US')}`);
+        document.text(`Computed FCFF: ${amount(input.result.currency, derivation.value ?? 0)}`);
+        document.moveDown();
+        for (const caveat of derivation.caveats) document.text(clean(caveat), { paragraphGap: 5 });
+      }
+      if (input.result.review) {
+        const review = input.result.review;
+        document.moveDown();
+        document.font('Helvetica-Bold').text(`Assumptions reviewed ${review.asOf}`);
+        document.font('Helvetica').text(`Financial period: ${review.financialPeriodEnd} | ${review.currency}`);
+        document.text(clean(review.sourceUrl));
+        document.moveDown();
+        document.text(clean(review.rationale));
+      }
+    }
     document.end();
   });
 }
