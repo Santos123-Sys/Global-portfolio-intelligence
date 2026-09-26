@@ -12,7 +12,8 @@ import { assertSameOrigin } from '@/lib/auth';
 import { authenticateRequest } from '@/lib/api-auth';
 import { excludeThesisVersion, ThesisVersionNotFoundError } from '@/lib/services/thesis-exclusion';
 import { startDiscoveryAfterThesisConfirmation } from '@/lib/thesis-discovery-transition';
-import { normalizeThesisCriteriaCurrencies } from '@/lib/thesis-currency';
+import { assessThesisReview } from '@/lib/thesis-review';
+import { readBoundedJson } from '@/lib/request-body';
 import { portfoliosRequiredByThesis, ThesisPortfolioConfigurationError } from '@/lib/thesis-portfolios';
 
 export const runtime = 'nodejs';
@@ -21,6 +22,7 @@ const thesisMutationSchema = z.object({
   externalExtractionId: z.string().min(1).optional(),
   rawDocument: z.string().min(1).max(100_000).optional(),
   criteriaJson: ThesisCriteria,
+  reviewNotes: z.string().trim().max(4000).optional(),
 }).strict();
 
 export async function GET(req: Request) {
@@ -44,9 +46,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Cross-origin mutation rejected' }, { status: 403 });
   }
 
-  const parsed = thesisMutationSchema.safeParse(await req.json().catch(() => ({})));
+  const body = await readBoundedJson(req, 128 * 1024);
+  if (!body.ok) return NextResponse.json({ error: body.error }, { status: body.status });
+  const parsed = thesisMutationSchema.safeParse(body.value);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  const criteriaJson = normalizeThesisCriteriaCurrencies(parsed.data.criteriaJson);
+  const review = assessThesisReview(parsed.data.criteriaJson);
+  if (review.errors.length) return NextResponse.json({ error: review.errors.join(' '), review }, { status: 422 });
+  const criteriaJson = review.criteria;
 
   try {
     const version = await db.transaction(async (tx) => {
@@ -65,6 +71,7 @@ export async function POST(req: Request) {
       }
 
       let extractionId: string | null = null;
+      let sourceReview: ThesisExtractionResult | null = null;
       if (parsed.data.externalExtractionId) {
         const [extraction] = await tx.select().from(externalThesisExtractions).where(and(
           eq(externalThesisExtractions.externalExtractionId, parsed.data.externalExtractionId),
@@ -78,6 +85,10 @@ export async function POST(req: Request) {
         if (!extracted.success || extracted.data.criteria.version !== nextVersion || extraction.requestedVersion !== nextVersion) {
           throw new ConfirmationError('Extraction version does not match the next canonical thesis version');
         }
+        if ((extracted.data.ambiguousPoints.length || extracted.data.unmappedContent.length) && (parsed.data.reviewNotes?.length ?? 0) < 20) {
+          throw new ConfirmationError('Explain how ambiguous or unmapped content was corrected, retained or deferred (at least 20 characters).');
+        }
+        sourceReview = extracted.data;
         extractionId = extraction.id;
       }
 
@@ -110,6 +121,10 @@ export async function POST(req: Request) {
         actor: session.auth.email,
         metadata: {
           supersededVersionId: active?.id ?? null,
+          reviewNotes: parsed.data.reviewNotes ?? null,
+          reviewWarnings: review.warnings,
+          originalExtraction: sourceReview,
+          confirmedCriteria: criteriaJson,
           externalExtractionId: parsed.data.externalExtractionId ?? null,
         },
       });
