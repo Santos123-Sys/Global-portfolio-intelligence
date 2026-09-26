@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ThesisCriteria, ThesisExtractionResult } from '@portfolio-intelligence/agentic-contract';
+import { assessThesisReview } from '@/lib/thesis-review';
+import { ThesisCriteriaEditor } from '@/components/thesis-criteria-editor';
 import { canDismissThesisExtraction } from '@/lib/thesis-extraction-lifecycle';
 import { normalizeThesisMandateCurrency } from '@/lib/thesis-currency';
 
@@ -63,6 +65,7 @@ export default function InvestmentThesisPage() {
   const [versions, setVersions] = useState<ThesisVersionRow[]>([]);
   const [extractions, setExtractions] = useState<ExtractionRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [reviewNotes, setReviewNotes] = useState('');
   const [criteriaDraft, setCriteriaDraft] = useState<ThesisCriteria | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,6 +116,9 @@ export default function InvestmentThesisPage() {
     return () => window.clearInterval(interval);
   }, [pendingExtractionIds]);
 
+  useEffect(() => { setReviewNotes(''); }, [selectedId]);
+
+  const draftReview = criteriaDraft ? assessThesisReview(criteriaDraft) : null;
   const selected = extractions.find((item) => item.id === selectedId) ?? null;
 
   useEffect(() => {
@@ -173,6 +179,7 @@ export default function InvestmentThesisPage() {
   }
 
   function review(extraction: ExtractionRow) {
+    setReviewNotes('');
     setSelectedId(extraction.id);
     setCriteriaDraft(extraction.resultJson ? structuredClone(extraction.resultJson.criteria) : null);
     setError(null);
@@ -188,7 +195,7 @@ export default function InvestmentThesisPage() {
       const response = await fetch('/api/thesis', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ externalExtractionId: selected.externalExtractionId, criteriaJson: criteriaDraft }),
+        body: JSON.stringify({ externalExtractionId: selected.externalExtractionId, criteriaJson: draftReview?.criteria, reviewNotes }),
       });
       const body = await response.json().catch(() => ({})) as {
         error?: string;
@@ -394,7 +401,7 @@ export default function InvestmentThesisPage() {
       {selected?.resultJson && (
         <section className="card">
           <h2>4. Human confirmation</h2>
-          <p className="note">Extraction confidence: {(selected.resultJson.extractionConfidence * 100).toFixed(0)}%. Review the source-derived mandate below, then confirm. Only markets supported by configured discovery providers can start automated market research.</p>
+          <p className="note">Model-reported extraction confidence (not a correctness guarantee): {(selected.resultJson.extractionConfidence * 100).toFixed(0)}%. Review the source-derived mandate below, then confirm. Only markets supported by configured discovery providers can start automated market research.</p>
           {selected.resultJson.ambiguousPoints.length > 0 && (
             <div className="caveat">
               <strong>Ambiguities requiring judgment</strong>
@@ -406,14 +413,18 @@ export default function InvestmentThesisPage() {
           {selected.resultJson.unmappedContent.length > 0 && (
             <p className="note">Unmapped content: {selected.resultJson.unmappedContent.join(' · ')}</p>
           )}
-          {criteriaDraft && <ThesisSummary criteria={criteriaDraft} editable onCurrencyChange={(index, currency) => {
-            setCriteriaDraft((current) => current && {
-              ...current,
-              portfolios: current.portfolios.map((portfolio, portfolioIndex) => portfolioIndex === index ? { ...portfolio, currency } : portfolio),
-            });
-          }} />}
+          <details><summary>Compare with the original extraction</summary><ThesisSummary criteria={selected.resultJson.criteria} /></details>
+          {criteriaDraft && <ThesisCriteriaEditor criteria={criteriaDraft} onChange={setCriteriaDraft} />}
+          {draftReview && <div aria-live="polite">
+            {draftReview.errors.length > 0 && <div className="workflow-error"><strong>Correct before confirmation</strong><ul>{draftReview.errors.map(error => <li key={error}>{error}</li>)}</ul></div>}
+            {draftReview.warnings.length > 0 && <details><summary>Review considerations ({draftReview.warnings.length})</summary><ul>{draftReview.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></details>}
+          </div>}
+          <label className="setup-form">Review decision
+            <textarea value={reviewNotes} maxLength={4000} onChange={event => setReviewNotes(event.target.value)} placeholder="Explain what you corrected, retained or deferred and why." />
+          </label>
+          <p className="note">A review note of at least 20 characters is required when extraction contains ambiguities or unmapped content. The original extraction, your edits and this note are retained in the confirmation audit.</p>
           <p className="note">Every portfolio destination needs a native three-letter currency. Swiss Quality and Brazilian Growth use CHF and BRL respectively; for every other mandate, set the source currency here before confirmation.</p>
-          <button className="action-button" type="button" onClick={() => void confirm()} disabled={busy || !criteriaDraft}>
+          <button className="action-button" type="button" onClick={() => void confirm()} disabled={busy || !criteriaDraft || !!draftReview?.errors.length || (!!(selected.resultJson.ambiguousPoints.length || selected.resultJson.unmappedContent.length) && reviewNotes.trim().length < 20) || !!selected.confirmedAt}>
             Confirm thesis version {selected.requestedVersion} &amp; start market research
           </button>
         </section>
@@ -436,6 +447,10 @@ export default function InvestmentThesisPage() {
               >
                 Exclude version
               </button>
+              <button type="button" className="secondary-button" onClick={() => {
+                const url = URL.createObjectURL(new Blob([JSON.stringify({ thesisVersionId: thesis.id, effectiveDate: thesis.effectiveDate, criteria: thesis.criteriaJson }, null, 2)], { type: 'application/json' }));
+                const link = document.createElement('a'); link.href = url; link.download = `thesis-version-${thesis.versionNumber}.json`; link.click(); URL.revokeObjectURL(url);
+              }}>Download confirmed criteria (JSON)</button>
               <ThesisSummary criteria={thesis.criteriaJson as ThesisCriteria} />
             </article>
           ))}</div>
