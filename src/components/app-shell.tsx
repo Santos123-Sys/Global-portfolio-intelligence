@@ -5,17 +5,23 @@ import { PortfolioProvider } from '@/lib/portfolio-context';
 import { Header } from './header';
 import { ErrorBoundary } from './error-boundary';
 import { usePathname } from 'next/navigation';
-import { LanguageProvider } from '@/lib/i18n';
+import { LanguageProvider, useLanguage } from '@/lib/i18n';
+
+function SkipLink() {
+  const { t } = useLanguage();
+  return <a className="skip-link" href="#workspace-content">{t('nav.skipContent')}</a>;
+}
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  if (pathname === '/login') return <>{children}</>;
+  if (pathname === '/login' || pathname === '/register') return <>{children}</>;
   return (
     <LanguageProvider>
       <PortfolioProvider>
         <div className="app-shell">
+          <SkipLink />
           <Header />
-          <section className="content">
+          <section className="content" id="workspace-content" tabIndex={-1}>
             <ErrorBoundary>{children}</ErrorBoundary>
           </section>
         </div>

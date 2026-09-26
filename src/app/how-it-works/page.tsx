@@ -1,15 +1,39 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = { title: 'Research workspace · Portfolio Intelligence' };
+
+const workspaces = [
+  { number: '01', title: 'Define your thesis', description: 'Set your objectives, markets and exclusions. Confirm the criteria before starting research.', href: '/investment-thesis', action: 'Open thesis', detail: 'Your investment framework' },
+  { number: '02', title: 'Discover and evaluate', description: 'Find candidates, review evidence and risks, then explore valuations in one research workspace.', href: '/ai-stock-discovery', action: 'Open discovery', detail: 'Research → analysis → valuation' },
+  { number: '03', title: 'Monitor your portfolio', description: 'Manage your holdings and review allocation, concentration and portfolio risk.', href: '/positions', action: 'Open positions', detail: 'Holdings and ongoing oversight' },
+] as const;
 
 export default function HowItWorksPage() {
-  return <main>
-    <h1>How Portfolio Intelligence works</h1>
-    <p className="sub">A human-led investment research workflow. The system organizes evidence and calculations; it does not make investment decisions for you.</p>
-    <div className="workflow-guide">
-      <section className="card"><p className="analysis-eyebrow">1. Define</p><h2>Investment thesis</h2><p>Upload or create the mandate, then confirm the extracted criteria. The thesis determines what the research system is allowed to screen for.</p><Link className="action-button inline-action" href="/investment-thesis">Open thesis</Link></section>
-      <section className="card"><p className="analysis-eyebrow">2. Discover</p><h2>Market research</h2><p>Build a provider-backed universe, apply mandate filters, and review only the candidates returned by that specific run. Approving a candidate starts research; it does not add a holding.</p><Link className="action-button inline-action" href="/ai-stock-discovery">Open discovery</Link></section>
-      <section className="card"><p className="analysis-eyebrow">3. Analyze</p><h2>Research and risk</h2><p>Open the latest shortlist and approve a candidate for deeper company research. Review catalysts, risks, information gaps, price-risk metrics, and the research report there. Evidence gaps remain visible rather than becoming assumptions.</p><Link className="action-button inline-action" href="/ai-stock-discovery#candidate-review">Review candidates</Link></section>
-      <section className="card"><p className="analysis-eyebrow">4. Value</p><h2>DCF and comparables</h2><p>After analysis, open an approved candidate’s valuation workspace. Retrieve primary-source financials, confirm DCF scenario inputs, and compare a reviewed peer group. Comparable data is sourced where available; peer selection remains your responsibility.</p><Link className="action-button inline-action" href="/ai-stock-discovery#candidate-review">Review approved candidates</Link></section>
-      <section className="card"><p className="analysis-eyebrow">5. Own and monitor</p><h2>Portfolio</h2><p>Add positions only after your decision. Portfolio risk appears once holdings and sufficient market history exist; it is separate from candidate-level research risk.</p><Link className="action-button inline-action" href="/positions">Open positions</Link></section>
+  return <main className="workspace-home">
+    <section className="workspace-hero" aria-labelledby="workspace-title">
+      <div><p className="analysis-eyebrow">Your investment workspace</p>
+        <h1 id="workspace-title">Clarity at every decision.</h1>
+        <p className="workspace-intro">Turn an investment thesis into research you can evaluate, decisions you can explain, and a portfolio you can monitor.</p>
+        <Link className="action-button workspace-primary" href="/ai-stock-discovery#candidate-review">Continue candidate review <span aria-hidden="true">↗</span></Link>
+      </div>
+      <aside className="workspace-principle"><span className="workspace-orbit" aria-hidden="true">◎</span><h2>Evidence first.<br />{' '}Your decision.</h2><p>Review the sources, challenge the assumptions, and approve the next step.</p></aside>
+    </section>
+    <section aria-labelledby="workspace-actions">
+      <div className="workspace-section-heading"><h2 id="workspace-actions">Choose your next step</h2><span className="note">Start with a thesis if you’re new here</span></div>
+      <div className="workspace-action-grid">{workspaces.map((item) => <article className="workspace-action-card" key={item.number}>
+        <span className="workspace-step" aria-hidden="true">{item.number}</span><p className="analysis-eyebrow">{item.detail}</p><h3>{item.title}</h3><p>{item.description}</p><Link className="action-button inline-action" href={item.href}>{item.action} <span aria-hidden="true">→</span></Link>
+      </article>)}</div>
+    </section>
+    <div className="workspace-help-grid">
+      <section className="card"><h2>Make the workspace yours</h2><p>Create a portfolio or update its mandate and base currency before adding holdings.</p><Link className="text-link" href="/portfolio-setup">Manage portfolios</Link></section>
+      <details className="card workspace-guide"><summary>How the research workflow works</summary><ol>
+        <li><strong>Define:</strong> Upload or create your thesis and confirm its extracted criteria.</li>
+        <li><strong>Discover:</strong> Screen a sourced universe against the confirmed mandate.</li>
+        <li><strong>Analyze:</strong> Approve candidates for company research, source review and price-risk analysis.</li>
+        <li><strong>Value:</strong> Review primary-source financials, DCF assumptions and comparable companies in the candidate workspace.</li>
+        <li><strong>Monitor:</strong> Add holdings after your decision and review portfolio-level risk when enough history exists.</li>
+      </ol><p className="note">Approving research does not create a holding. Missing evidence stays visible throughout the workflow.</p></details>
     </div>
   </main>;
 }
