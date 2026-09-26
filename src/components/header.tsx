@@ -152,7 +152,8 @@ export function Header() {
   const pathname = usePathname();
   const { viewing } = usePortfolioBreadcrumb();
   const { language, setLanguage, t } = useLanguage();
-  const [openMenu, setOpenMenu] = useState<'review' | 'more' | 'settings' | null>(null);
+  const [openMenu, setOpenMenu] = useState<'review' | 'more' | 'settings' | 'search' | null>(null);
+  const [pageQuery, setPageQuery] = useState('');
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const navigationRef = useRef<HTMLElement>(null);
@@ -179,8 +180,8 @@ export function Header() {
       const submenuButton = (document.activeElement as HTMLElement | null)?.closest('.nav-more')?.querySelector('button');
       setOpenMenu(null);
       setMobileNavigationOpen(false);
-      if (submenuButton instanceof HTMLElement) submenuButton.focus();
-      else if (navigationRef.current?.contains(document.activeElement)) mobileToggleRef.current?.focus();
+      if (mobileNavigationOpen) mobileToggleRef.current?.focus();
+      else if (submenuButton instanceof HTMLElement) submenuButton.focus();
     }
     document.addEventListener('pointerdown', dismissOnOutsideClick);
     document.addEventListener('keydown', dismissOnEscape);
@@ -196,6 +197,7 @@ export function Header() {
   const reviewActive = REVIEW_NAV.some(([href]) => pathname === href);
   const supportActive = SUPPORT_NAV.some(([href]) => pathname === href);
   const settingsActive = SETTINGS_NAV.some(([href]) => pathname === href);
+  const pageMatches = [...WORKFLOW_NAV, ...reviewNav, ...supportNav, ...settingsNav].filter(([href, key]) => `${t(key)} ${href}`.toLocaleLowerCase().includes(pageQuery.toLocaleLowerCase()));
 
   return (
     <header className="app-header">
@@ -228,6 +230,17 @@ export function Header() {
         </button>
 
         <nav ref={navigationRef} id="primary-navigation" aria-label={t('nav.mainNavigation')} className={`primary-nav${mobileNavigationOpen ? ' is-open' : ''}`}>
+          <div className="nav-more page-finder">
+            <button type="button" className="nav-link" aria-expanded={openMenu === 'search'} aria-controls="page-finder" onClick={() => setOpenMenu(openMenu === 'search' ? null : 'search')}>{t('nav.findPage')}</button>
+            {openMenu === 'search' && <div id="page-finder" className="nav-more-panel page-finder-panel">
+              <label htmlFor="page-query">{t('nav.findPage')}</label>
+              <input id="page-query" type="search" value={pageQuery} onChange={(event) => setPageQuery(event.target.value)} />
+              <div className="page-finder-results">
+                {pageMatches.map(([href, key]) => <Link key={href} href={href} className="nav-link" onClick={() => { setOpenMenu(null); setMobileNavigationOpen(false); setPageQuery(''); }}>{t(key)}</Link>)}
+              </div>
+              {pageMatches.length === 0 && <p role="status">{t('nav.noResults')}</p>}
+            </div>}
+          </div>
           {WORKFLOW_NAV.map(([href, labelKey]) => (
             <Link
               key={href}

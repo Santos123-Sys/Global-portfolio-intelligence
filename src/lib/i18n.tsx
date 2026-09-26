@@ -6,6 +6,9 @@ export type Language = 'en' | 'pt' | 'es' | 'de';
 
 const translations = {
   en: {
+    'nav.findPage': 'Find a page',
+    'nav.noResults': 'No matching pages',
+    'nav.skipContent': 'Skip to content',
     'nav.howItWorks': 'How it works',
     'nav.thesis': '1. Thesis',
     'nav.discover': '2. Discover',
@@ -36,6 +39,9 @@ const translations = {
     'portfolio.noneSelected': 'No portfolio selected',
   },
   pt: {
+    'nav.findPage': 'Encontrar página',
+    'nav.noResults': 'Nenhuma página encontrada',
+    'nav.skipContent': 'Ir para o conteúdo',
     'nav.howItWorks': 'Como funciona',
     'nav.thesis': '1. Tese',
     'nav.discover': '2. Descobrir',
@@ -66,6 +72,9 @@ const translations = {
     'portfolio.noneSelected': 'Nenhum portfólio selecionado',
   },
   es: {
+    'nav.findPage': 'Buscar página',
+    'nav.noResults': 'No hay páginas coincidentes',
+    'nav.skipContent': 'Saltar al contenido',
     'nav.howItWorks': 'Cómo funciona',
     'nav.thesis': '1. Tesis',
     'nav.discover': '2. Descubrir',
@@ -96,6 +105,9 @@ const translations = {
     'portfolio.noneSelected': 'Ninguna cartera seleccionada',
   },
   de: {
+    'nav.findPage': 'Seite finden',
+    'nav.noResults': 'Keine passenden Seiten',
+    'nav.skipContent': 'Zum Inhalt springen',
     'nav.howItWorks': 'So funktioniert es',
     'nav.thesis': '1. These',
     'nav.discover': '2. Entdecken',
