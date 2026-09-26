@@ -6,6 +6,8 @@ import { authenticateRequest } from '@/lib/api-auth';
 import { db } from '@/lib/db';
 import { discoveryCandidates, marketDataObservations, valuationScenarios } from '@/lib/db/workflow-schema';
 import { comparableCompanyAnalysis } from '@/lib/quant/comparables';
+import { selectFilingSnapshot } from '@/lib/financial-filing-snapshot';
+import { isSupportedFiscalDate } from '@/lib/financial-evidence';
 import { readBoundedJson } from '@/lib/request-body';
 
 export const runtime = 'nodejs';
@@ -13,6 +15,9 @@ export const runtime = 'nodejs';
 const peerSchema = z.object({
   companyName: z.string().trim().min(1).max(120),
   ticker: z.string().trim().min(1).max(30),
+  currency: z.string().regex(/^[A-Z]{3}$/),
+  financialPeriodEnd: z.string().refine(value => isSupportedFiscalDate(value)),
+  marketDataAsOf: z.string().refine(value => isSupportedFiscalDate(value)),
   marketCapitalization: z.number().positive(),
   netDebt: z.number().finite(),
   totalDebt: z.number().finite().optional(),
@@ -58,8 +63,7 @@ async function context(ownerId: string, candidateId: string) {
     eq(marketDataObservations.observationType, 'fundamental'),
     eq(marketDataObservations.status, 'OK')
   )).orderBy(desc(marketDataObservations.retrievedAt));
-  const latest = new Map<string, typeof observations[number]>();
-  for (const observation of observations) if (!latest.has(observation.metricName)) latest.set(observation.metricName, observation);
+  const latest = selectFilingSnapshot(observations, candidate.currency, ['revenue', 'ebitda', 'net_income', 'total_debt', 'cash_and_equivalents', 'shares_outstanding']);
   const debt = numeric(latest.get('total_debt'));
   const cash = numeric(latest.get('cash_and_equivalents'));
   return {
@@ -75,7 +79,7 @@ async function context(ownerId: string, candidateId: string) {
       sharesOutstanding: numeric(latest.get('shares_outstanding')),
     },
     sourceReferences: [...latest.values()].map((row) => `fundamental:${row.metricName}:${row.id}`),
-    dataAsOf: observations[0]?.retrievedAt.toISOString() ?? null,
+    dataAsOf: [...latest.values()][0]?.observationDate ?? null,
   };
 }
 
@@ -112,11 +116,12 @@ export async function POST(req: Request) {
   const body = await readBoundedJson(req, 64 * 1024);
   if (!body.ok) return NextResponse.json({ error: body.error }, { status: body.status });
   const parsed = requestSchema.safeParse(body.value);
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: 'Review 6–10 peers: each needs a currency, financial period, market-data date, market cap, explicit net debt, and source URL.', details: parsed.error.flatten() }, { status: 400 });
   const data = await context(session.auth.userId, parsed.data.candidateId);
   if (!data) return NextResponse.json({ error: 'Complete the approved security analysis before comparable-company valuation' }, { status: 409 });
   try {
-    const result = comparableCompanyAnalysis(data.target, parsed.data.peers);
+    const result = { ...comparableCompanyAnalysis(data.target, parsed.data.peers), dataAsOf: data.dataAsOf };
+    result.caveats.push('Peer multiples use each peer’s stated currency; all amounts within a peer must share that currency and unit. Financial periods and market-data dates can differ and require review.');
     const [scenario] = await db.insert(valuationScenarios).values({
       ownerId: session.auth.userId,
       candidateId: data.candidate.id,
@@ -125,7 +130,7 @@ export async function POST(req: Request) {
       status: 'human_confirmed',
       assumptionsJson: { target: data.target, peers: parsed.data.peers, dataAsOf: data.dataAsOf },
       resultJson: result,
-      sourceReferences: parsed.data.peers.flatMap((peer) => [peer.sourceUrl, peer.forecastSourceUrl].filter((url): url is string => Boolean(url))),
+      sourceReferences: [...data.sourceReferences, ...parsed.data.peers.flatMap((peer) => [peer.sourceUrl, peer.forecastSourceUrl].filter((url): url is string => Boolean(url)))],
       approvedBy: session.auth.email,
     }).returning();
     return NextResponse.json({ scenario, result }, { status: 201 });

@@ -35,3 +35,11 @@ describe('SEC Company Facts', () => {
     expect(extractSecAnnualFilings(conflicting, 'Apple Inc', 'USD')[1].fundamentals.revenue).toBeUndefined();
   });
 });
+
+it('retains annual FCFF ingredients without silently relabeling CFO-minus-capex', () => {
+  const fixture = structuredClone(data);
+  Object.assign(fixture.facts['us-gaap'], Object.fromEntries(Object.entries({ DepreciationDepletionAndAmortization: 5, InterestExpense: 2, IncomeTaxExpenseBenefit: 4, IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest: 20 }).map(([tag, val]) => [tag, { units: { USD: [annual(val, '2025-09-27', accn25, '2025-11-01', '10-K', '2024-09-29')] } }])));
+  const facts = extractSecAnnualFilings(fixture, 'Apple Inc', 'USD')[1].fundamentals;
+  expect(facts).toMatchObject({ depreciation_and_amortization: 5, interest_expense: 2, income_tax_expense: 4, pre_tax_income: 20, free_cash_flow: 20 });
+  expect(facts.free_cash_flow_to_firm).toBeUndefined();
+});

@@ -4,6 +4,10 @@ const SEC_ORIGIN = 'https://data.sec.gov';
 const REGISTRY_URL = 'https://www.sec.gov/files/company_tickers.json';
 const METRICS: Record<string, string[]> = {
   revenue: ['us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax', 'us-gaap:Revenues', 'ifrs-full:Revenue'],
+  depreciation_and_amortization: ['us-gaap:DepreciationDepletionAndAmortization', 'ifrs-full:DepreciationAndAmortisationExpense'],
+  interest_expense: ['us-gaap:InterestExpense', 'ifrs-full:InterestExpense'],
+  income_tax_expense: ['us-gaap:IncomeTaxExpenseBenefit', 'ifrs-full:IncomeTaxExpenseContinuingOperations'],
+  pre_tax_income: ['us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest', 'ifrs-full:ProfitLossBeforeTax'],
   gross_profit: ['us-gaap:GrossProfit', 'ifrs-full:GrossProfit'],
   operating_income: ['us-gaap:OperatingIncomeLoss', 'ifrs-full:ProfitLossFromOperatingActivities'],
   operating_cash_flow: ['us-gaap:NetCashProvidedByUsedInOperatingActivities', 'ifrs-full:CashFlowsFromUsedInOperatingActivities'],

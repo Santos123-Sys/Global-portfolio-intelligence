@@ -683,7 +683,7 @@ export default function AIStockDiscoveryPage() {
                       </div>
                       <a className="action-button inline-action" href={candidate.reportUrl} target="_blank" rel="noreferrer">{t('openReport')}</a>
                     </div>}
-                    {candidate.dcfLocked && <p className="caveat"><strong>{t('dcfLocked')}.</strong> {candidate.dcfLockReason}</p>}
+                    {candidate.dcfLocked && <p className="note">The original analysis had limited financial data. Open valuation to check current filings, derive FCFF, and review assumptions.</p>}
                     <button className="action-button" type="button" onClick={() => setValuationCandidateId((current) => current === candidate.id ? null : candidate.id)}>
                       {valuationCandidateId === candidate.id ? t('closeValuation') : candidate.valuation ? t('reviewValuation') : t('openValuation')}
                     </button>

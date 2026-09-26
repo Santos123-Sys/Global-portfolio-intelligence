@@ -12,7 +12,6 @@ const railway = readFileSync('.railway/railway.ts', 'utf8');
 const discoveryPage = readFileSync('src/app/ai-stock-discovery/page.tsx', 'utf8');
 const discoveryRoute = readFileSync('src/app/api/discovery/runs/route.ts', 'utf8');
 const refreshRoute = readFileSync('src/app/api/cron/refresh/route.ts', 'utf8');
-const valuationRoute = readFileSync('src/app/api/discovery/valuations/route.ts', 'utf8');
 
 describe('low-cost provider architecture', () => {
   it('separates discovery from EODHD validation', () => {
@@ -33,12 +32,7 @@ describe('low-cost provider architecture', () => {
     expect(agenticPipeline).toContain('state that DCF remains locked');
   });
 
-  it('locks DCF in both the candidate UI and valuation API', () => {
-    expect(discoveryPage).toContain('candidate.dcfLocked');
-    expect(discoveryPage).toContain("<strong>{t('dcfLocked')}.</strong>");
-    expect(valuationRoute.match(/isDcfLocked\(data\.analysisMode\)/g)).toHaveLength(2);
-    expect(valuationRoute).toContain('LIMITED_DATA_DCF_LOCK_REASON');
-  });
+  // Runtime valuation-readiness tests cover evidence gates and reviewed FCFF derivation.
 
   it('has a real cached-universe path instead of a synthetic fallback', () => {
     expect(discovery).toContain('discoveryUniverseSnapshots');

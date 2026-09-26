@@ -1,3 +1,5 @@
+import type { FcffDerivation } from './fcff';
+import type { ValuationReview } from '../valuation-review';
 import { FCFF_METRIC } from '../financial-evidence';
 import { QuantError } from './types';
 
@@ -47,10 +49,12 @@ export type DcfScenarioName = 'worst_case' | 'base_case' | 'optimistic_case';
 
 /**
  * A complete three-case valuation. The engine receives every driver as a
- * source-backed record; it deliberately does not manufacture a "reasonable"
+ * source-backed record or an explicitly reviewed modeling assumption; it deliberately does not manufacture a "reasonable"
  * WACC, growth rate, or terminal rate when evidence is absent.
  */
 export interface ThreeCaseDcfResult {
+  fcffDerivation?: FcffDerivation;
+  review?: ValuationReview | null;
   method: 'three_case_two_stage_fcff';
   currency: string;
   scenarios: Array<{
