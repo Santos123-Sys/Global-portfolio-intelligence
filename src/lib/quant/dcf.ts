@@ -1,3 +1,4 @@
+import { FCFF_METRIC } from '../financial-evidence';
 import { QuantError } from './types';
 
 export interface DcfAssumptions {
@@ -133,6 +134,8 @@ export function discountedCashFlow(input: DcfAssumptions): DcfResult {
   const equityValue = enterpriseValue - input.netDebt;
   const fairValuePerShare = equityValue / input.sharesOutstanding;
 
+  for (const [name, value] of Object.entries({ terminalValue, terminalPresentValue, enterpriseValue, equityValue, fairValuePerShare })) assertFinite(name, value);
+
   const sensitivity: DcfSensitivityCell[] = [];
   for (const discountDelta of [-0.02, -0.01, 0, 0.01, 0.02]) {
     for (const terminalDelta of [-0.01, -0.005, 0, 0.005, 0.01]) {
@@ -147,6 +150,7 @@ export function discountedCashFlow(input: DcfAssumptions): DcfResult {
   }
 
   const caveats = [
+    'This FCFF model requires unlevered cash flows and a consistent cost of capital; generic reported free cash flow is not automatically FCFF.',
     'DCF is assumption-sensitive and is not a market-price prediction.',
     'The model uses one explicit growth stage followed by a perpetual-growth terminal value.',
     'All assumptions require human confirmation; no LLM arithmetic enters this result.',
@@ -206,7 +210,7 @@ export function assessDcfSuitability(sector: string | null, availableFields: Ite
   const normalized = (sector ?? '').toLowerCase();
   const methodMismatch = /bank|financial|insurance|reit|real estate/.test(normalized);
   const available = new Set(availableFields);
-  const missing = ['free_cash_flow', 'total_debt', 'cash_and_equivalents', 'shares_outstanding']
+  const missing = [FCFF_METRIC, 'total_debt', 'cash_and_equivalents', 'shares_outstanding']
     .filter((field) => !available.has(field));
   return {
     status: methodMismatch ? 'alternative_method_recommended' as const

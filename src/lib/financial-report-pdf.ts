@@ -20,6 +20,8 @@ export function renderFinancialReportPdf(report: FinancialAnalysisReport): Promi
     doc.fontSize(13).text('Financial analysis report');
     doc.fillColor('#607080').font('Helvetica').fontSize(9)
       .text(`${safe(report.ticker)} · ${safe(report.exchange)} · ${safe(report.currency)} · Generated ${report.generatedAt.slice(0, 10)}`);
+    doc.moveDown(0.7);
+    doc.text(`Evidence status: ${report.status.replaceAll('_', ' ')}. Figures use retained financial evidence; ratios and growth are calculations. Valuation scenarios are separate estimates.`);
     doc.moveDown(1.5);
     if (!report.periods.length) doc.fillColor('#A34B38').text('Evidence required: no supported annual financial facts have been imported.');
     for (const row of report.periods) {
@@ -31,7 +33,9 @@ export function renderFinancialReportPdf(report: FinancialAnalysisReport): Promi
         .text(`Net income: ${fmt(row.metrics.net_income, report.currency)}   Margin: ${pct(row.netMargin)}`)
         .text(`Free cash flow: ${fmt(row.metrics.free_cash_flow, report.currency)}   FCF / revenue: ${pct(row.cashConversion)}`)
         .text(`Total debt: ${fmt(row.metrics.total_debt, report.currency)}   Cash: ${fmt(row.metrics.cash_and_equivalents, report.currency)}`);
-      doc.fillColor('#607080').fontSize(8).text(`Source: ${safe(row.sourceName)} · ${safe(row.sourceUrl)}`, { width, link: row.sourceUrl });
+      doc.fillColor('#607080').fontSize(8).text(`Retrieved: ${row.retrievedAt.slice(0, 10)}`)
+        .text(`Source: ${safe(row.sourceName)} · ${safe(row.sourceUrl)}`, { width, link: row.sourceUrl });
+      if (row.comparisonNote) doc.fillColor('#A34B38').text(safe(row.comparisonNote));
       if (row.gaps.length) doc.fillColor('#A34B38').text(`Missing or conflicting: ${row.gaps.join(', ')}`);
       doc.moveDown(1.2);
     }

@@ -16,6 +16,7 @@ import {
   LIMITED_DATA_DCF_LOCK_REASON,
 } from '@/lib/integrations/analysis-mode';
 import { assessDcfSuitability, threeCaseDiscountedCashFlow } from '@/lib/quant/dcf';
+import { FCFF_METRIC, FCFF_EVIDENCE_NOTE } from '@/lib/financial-evidence';
 import { selectFilingSnapshot } from '@/lib/financial-filing-snapshot';
 
 export const runtime = 'nodejs';
@@ -43,7 +44,7 @@ const SCENARIO_DRIVERS = {
   },
 } as const;
 
-const REQUIRED_AUTOMATIC_FINANCIALS = ['free_cash_flow', 'total_debt', 'cash_and_equivalents', 'shares_outstanding'] as const;
+const REQUIRED_AUTOMATIC_FINANCIALS = [FCFF_METRIC, 'total_debt', 'cash_and_equivalents', 'shares_outstanding'] as const;
 const REQUIRED_AUTOMATIC_DRIVERS = Object.values(SCENARIO_DRIVERS).flatMap((scenario) => Object.values(scenario));
 
 async function context(ownerId: string, candidateId: string) {
@@ -95,12 +96,14 @@ function automaticReadiness(data: NonNullable<Awaited<ReturnType<typeof context>
     return value == null || data.latest.get(metric)?.provider !== 'investor-relations';
   });
   const missingScenarioDrivers = REQUIRED_AUTOMATIC_DRIVERS.filter((metric) => numeric(data.latest.get(metric)) == null);
+  const suitability = assessDcfSuitability(data.candidate.sector, data.latest.keys());
+  const methodSupported = suitability.status !== 'alternative_method_recommended';
   return {
-    ready: missingFinancialRecords.length === 0 && missingScenarioDrivers.length === 0,
+    ready: methodSupported && missingFinancialRecords.length === 0 && missingScenarioDrivers.length === 0,
     missingFinancialRecords,
     missingScenarioDrivers,
-    message: missingFinancialRecords.length || missingScenarioDrivers.length
-      ? 'Strict automatic DCF is paused because source-linked financial records or scenario-driver records are missing. The platform will not insert an estimated growth, discount, or terminal rate.'
+    message: !methodSupported ? suitability.rationale : missingFinancialRecords.length || missingScenarioDrivers.length
+      ? `Strict automatic DCF is paused because source-linked financial records or scenario-driver records are missing. ${FCFF_EVIDENCE_NOTE} The platform will not insert an estimated growth, discount, or terminal rate.`
       : 'All source-linked financial and scenario-driver records are present. The native three-scenario DCF can be generated.',
   };
 }
@@ -113,7 +116,7 @@ export async function GET(req: Request) {
   const data = await context(session.auth.userId, candidateId);
   if (!data) return NextResponse.json({ error: 'Analyzed discovery candidate not found' }, { status: 404 });
   if (isDcfLocked(data.analysisMode) && !hasCompletePrimarySourceDcf(data)) {
-    return NextResponse.json({ error: LIMITED_DATA_DCF_LOCK_REASON }, { status: 409 });
+    return NextResponse.json({ error: `${LIMITED_DATA_DCF_LOCK_REASON} ${FCFF_EVIDENCE_NOTE}` }, { status: 409 });
   }
   const suitability = assessDcfSuitability(data.candidate.sector, data.latest.keys());
   const debt = numeric(data.latest.get('total_debt'));
@@ -126,7 +129,7 @@ export async function GET(req: Request) {
   return NextResponse.json({
     suitability,
     defaults: {
-      startingFreeCashFlow: numeric(data.latest.get('free_cash_flow')),
+      startingFreeCashFlow: numeric(data.latest.get(FCFF_METRIC)),
       netDebt: debt != null && cash != null ? debt - cash : null,
       sharesOutstanding: numeric(data.latest.get('shares_outstanding')),
       forecastYears: 5,
@@ -134,7 +137,7 @@ export async function GET(req: Request) {
       discountRate: null,
       terminalGrowthRate: null,
       currency: data.candidate.currency,
-      dataAsOf: data.observations[0]?.retrievedAt.toISOString() ?? null,
+      dataAsOf: data.latest.get(FCFF_METRIC)?.observationDate ?? null,
       sourceReferences,
     },
     automaticReadiness: automaticReadiness(data),
@@ -160,14 +163,14 @@ export async function POST(req: Request) {
   const candidateId = parsed.data.candidateId;
   const data = await context(session.auth.userId, candidateId);
   if (data && isDcfLocked(data.analysisMode) && !hasCompletePrimarySourceDcf(data)) {
-    return NextResponse.json({ error: LIMITED_DATA_DCF_LOCK_REASON }, { status: 409 });
+    return NextResponse.json({ error: `${LIMITED_DATA_DCF_LOCK_REASON} ${FCFF_EVIDENCE_NOTE}` }, { status: 409 });
   }
   if (!data || !data.candidate.analysisId) {
     return NextResponse.json({ error: 'Complete the approved security analysis before valuation' }, { status: 409 });
   }
   const readiness = automaticReadiness(data);
   if (!readiness.ready) return NextResponse.json({ error: readiness.message, readiness }, { status: 409 });
-  const freeCashFlow = numeric(data.latest.get('free_cash_flow'))!;
+  const freeCashFlow = numeric(data.latest.get(FCFF_METRIC))!;
   const totalDebt = numeric(data.latest.get('total_debt'))!;
   const cash = numeric(data.latest.get('cash_and_equivalents'))!;
   const sharesOutstanding = numeric(data.latest.get('shares_outstanding'))!;
@@ -185,7 +188,7 @@ export async function POST(req: Request) {
       terminalGrowthRate: numeric(data.latest.get(drivers.terminalGrowthRate))!,
       netDebt: totalDebt - cash,
       sharesOutstanding,
-      dataAsOf: data.observations[0]?.retrievedAt.toISOString() ?? new Date().toISOString(),
+      dataAsOf: data.latest.get(FCFF_METRIC)!.observationDate!,
       sourceReferences: references,
     }])) as Parameters<typeof threeCaseDiscountedCashFlow>[0];
     const result = threeCaseDiscountedCashFlow(assumptions);

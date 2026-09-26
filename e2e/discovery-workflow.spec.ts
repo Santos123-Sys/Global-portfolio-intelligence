@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
+import { buildFinancialAnalysisReport } from '../src/lib/financial-analysis-report';
 import { signSessionPayload } from '../src/lib/session-token';
 
 const runId = '11111111-1111-4111-8111-111111111111';
@@ -21,7 +22,7 @@ test('thesis-matched discovery remains reviewable through approval and report ac
     analysisRunStatus: approved ? 'completed' : null, externalAnalysisRunId: approved ? 'analysis-1' : null,
     analysisRunError: null, analysisErrorMessage: null, reportUrl: approved ? '/api/integrations/agentic/reports?externalRunId=analysis-1' : null,
     analysisMode: 'limited_research_risk', dcfLocked: true, dcfLockReason: 'Statements unavailable',
-    latestPrice: null, decisionJournal: null, risk: null, analysis: null, valuation: null,
+    latestPrice: null, decisionJournal: null, risk: null, analysis: approved ? { investmentScore: 60, thesisAlignmentScore: 70, confidenceScore: 40, qualityScore: null, growthScore: null, riskScore: null, dividendScore: null, investmentThesis: 'Research lead with incomplete financial evidence.', fundamentalSummary: 'Partial annual filings.', keyCatalysts: [], keyRisks: ['Evidence gaps'], thesisBreakers: [], informationGaps: ['FCFF unavailable'], groundedIn: ['identity:ticker'], researchFramework: null } : null, valuation: null,
     evidenceScorecard: { assessment: 'developing', sourceUrlCount: 1, groundingFieldCount: 2, informationGapCount: 2, conflictCount: 0, marketPriceStatus: 'unavailable', summary: 'Initial evidence; gaps remain.' },
     discoveryJson: { thesisAlignmentScore: 81, rationale: 'Matches the quality mandate.', matchedCriteria: ['Swiss listing'], violatedCriteria: [], informationGaps: ['Check cash generation'], groundedIn: ['identity:ticker', 'identity:exchange'], sourceUrls: ['https://example.org/issuer'] },
   });
@@ -30,6 +31,8 @@ test('thesis-matched discovery remains reviewable through approval and report ac
     const method = route.request().method();
     const json = (value: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) });
     if (pathname === '/api/auth/session') return json({ account: { isPlatformAdmin: true } });
+    if (pathname === '/api/discovery/valuations' || pathname === '/api/discovery/comparables') return json({ error: 'Verified FCFF required before automatic DCF.' }, 409);
+    if (pathname === '/api/discovery/financial-report') return json(buildFinancialAnalysisReport({ companyName: 'Nestle SA', ticker: 'NESN', exchange: 'XSWX', currency: 'CHF', now: new Date('2026-09-26'), observations: ['2024-12-31', '2025-06-30'].map((observationDate, index) => ({ metricName: 'revenue', valueNumeric: String(100 + index * 20), observationDate, currency: 'CHF', sourceUrl: `https://example.test/${observationDate}`, sourceName: 'Annual filing', provider: 'investor-relations', status: 'OK', retrievedAt: new Date('2026-09-25') })) }));
     if (pathname === '/api/accounts') return json({ accounts: [], activeAccountId: '' });
     if (pathname === '/api/discovery/preflight') return json({ preflight: { ready: true, checkedAt: '2026-09-23T11:00:00.000Z', provider: 'finnhub', checks: [
       { label: 'Swiss SIX universe', detail: '25 securities available', status: 'ready' },
@@ -69,4 +72,10 @@ test('thesis-matched discovery remains reviewable through approval and report ac
   await page.getByLabel('What would invalidate the view?').fill('Sustained loss of pricing power.');
   await page.getByRole('button', { name: 'Approve & analyze' }).click();
   await expect(page.getByRole('link', { name: 'Open PDF report' })).toHaveAttribute('href', /reports\?externalRunId=analysis-1/);
+  await page.getByRole('button', { name: 'Open embedded financial report' }).click();
+  await expect(page.getByRole('heading', { name: 'Company financial report' })).toBeVisible();
+  await expect(page.getByText(/Evidence status: Partial/)).toBeVisible();
+  await expect(page.getByText(/Growth withheld:/)).toBeVisible();
+  await expect(page.getByText('Retrieved 2026-09-25', { exact: false }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Download PDF', exact: true })).toHaveAttribute('href', /financial-report\/pdf/);
 });

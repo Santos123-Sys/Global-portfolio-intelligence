@@ -29,14 +29,15 @@ export function FinancialAnalysisReport({ candidateId, reloadToken }: { candidat
     year: period.periodEnd.slice(0, 4), revenue: period.metrics.revenue ?? null,
     operatingIncome: period.metrics.operating_income ?? null, freeCashFlow: period.metrics.free_cash_flow ?? null,
   })) ?? [];
-  return <section className="financial-report" id={`financial-report-${candidateId}`} aria-labelledby="financial-report-heading">
+  return <section className="financial-report" id={`financial-report-${candidateId}`} aria-labelledby={`financial-report-heading-${candidateId}`}>
     <div className="financial-report-header"><div><p className="analysis-eyebrow">Source-backed financial analysis</p>
-      <h4 id="financial-report-heading">Company financial report</h4>
+      <h4 id={`financial-report-heading-${candidateId}`}>Company financial report</h4>
       <p className="note">The report appears here after analysis. Downloading a PDF is optional.</p></div>
       {report && <a className="secondary-button" href={`/api/discovery/financial-report/pdf?candidateId=${encodeURIComponent(candidateId)}`}>Download PDF</a>}
     </div>
     {loading ? <p className="note" role="status">Loading financial evidence…</p> : error ? <p className="caveat" role="alert">{error}</p> : report && <>
       <p className="note">{report.companyName} · {report.ticker} · {report.currency} · {report.periods.length} annual periods · report generated {new Date(report.generatedAt).toLocaleDateString()}</p>
+      <p className="note">Figures use retained financial evidence; margins and growth are calculated. Valuation scenarios are separate estimates. Evidence status: {report.status === 'partial_data' ? 'Partial - review missing or conflicting metrics' : report.status === 'evidence_required' ? 'Evidence required' : 'Required metrics present'}.</p>
       {report.periods.length >= 2 && <div className="financial-chart" role="img" aria-label="Historical revenue, operating income, and free cash flow by annual period">
         <ResponsiveContainer width="100%" height={280}><LineChart data={series} margin={{ top: 12, right: 16, bottom: 8, left: 16 }}>
           <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="year" /><YAxis tickFormatter={(value: number) => new Intl.NumberFormat('en-US', { notation: 'compact' }).format(value)} />
@@ -48,10 +49,10 @@ export function FinancialAnalysisReport({ candidateId, reloadToken }: { candidat
       </div>}
       {report.periods.length > 0 && <div className="table-scroll"><table><thead><tr><th>Annual period</th><th>Revenue</th><th>Growth</th><th>Operating margin</th><th>Net margin</th><th>FCF / revenue</th><th>Source and gaps</th></tr></thead>
         <tbody>{report.periods.map((period) => <tr key={period.periodEnd}><th>{period.periodEnd}</th>
-          <td>{currencyValue(period.metrics.revenue, report.currency)}</td><td>{percent(period.revenueGrowth)}</td>
+          <td>{currencyValue(period.metrics.revenue, report.currency)}</td><td>{percent(period.revenueGrowth)}{period.comparisonNote && <span className="financial-gaps">{period.comparisonNote}</span>}</td>
           <td>{percent(period.operatingMargin)}</td><td>{percent(period.netMargin)}</td><td>{percent(period.cashConversion)}</td>
-          <td><a href={period.sourceUrl} target="_blank" rel="noopener noreferrer">{period.sourceName}</a>
-            {period.gaps.length > 0 && <span className="financial-gaps">Missing: {period.gaps.join(', ')}</span>}</td></tr>)}</tbody></table></div>}
+          <td><a href={period.sourceUrl} target="_blank" rel="noopener noreferrer">{period.sourceName}</a><span className="note"> Retrieved {period.retrievedAt.slice(0, 10)}</span>
+            {period.gaps.length > 0 && <span className="financial-gaps">Missing or conflicting: {period.gaps.join(', ')}</span>}</td></tr>)}</tbody></table></div>}
       {report.limitations.map((limitation) => <p className="caveat" key={limitation}>{limitation}</p>)}
     </>}
   </section>;
