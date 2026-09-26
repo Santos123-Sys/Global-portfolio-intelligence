@@ -13,6 +13,7 @@ import OpenAI, {
 } from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { z, ZodError } from 'zod';
+import { collectDiscoveryResearch, DISCOVERY_RESEARCH_GAP } from './discovery-research.js';
 import { researchCompany, type WebResearchConfig, type WebResearchEvidence } from './web-research.js';
 import {
   AGENT_REASONING_PROMPTS,
@@ -311,7 +312,8 @@ Absolute rules:
 11. Do not value securities, calculate volatility, recommend trades, or alter holdings. Human approval is required before financial analysis.
 12. Return a security identity (exchange plus ticker) at most once across the combined candidate output.
 13. For sector and industry, copy the structured-universe classification exactly when it is supplied. When it is absent, classify only when the supplied web-research evidence explicitly supports the classification; otherwise return null. Never use memory or a plausible-sounding label.
-14. Treat revenue-geography attributes as dated, issuer-level disclosures. Cite the matching revenue_geo_source_url when using them, and do not conflate revenue geography with issuer domicile or listing country.
+14. Missing evidence is unknown, not a match or a violation. Put unsupported thesis criteria in informationGaps. A retrieved URL or identity field alone does not substantiate business quality. Disclose researchLimitation when present; never infer a company failed the thesis because retrieval failed.
+15. Treat revenue-geography attributes as dated, issuer-level disclosures. Cite the matching revenue_geo_source_url when using them, and do not conflate revenue geography with issuer domicile or listing country.
 
 Prefer decision-useful gaps over generic caveats. A concise, evidence-bound shortlist is better than a long speculative list.`;
 
@@ -719,13 +721,10 @@ export class OpenAIAgenticPipeline {
 
   async discoverSecurities(input: z.infer<typeof DiscoveryRunRequest>): Promise<z.infer<typeof MarketDiscoveryOutput>> {
     const request = DiscoveryRunRequest.parse(input);
-    const webEvidence = new Map<string, Awaited<ReturnType<typeof researchCompany>>>();
-    // The dashboard supplies no more than 50 structurally-filtered records.
-    // Sequential calls make the qualitative research budget explicit and avoid
-    // bursting a free-tier search API.
-    for (const record of request.universe) {
-      webEvidence.set(`${record.exchange}:${record.ticker}`, await researchCompany(record.companyName, record.ticker, this.webResearch));
-    }
+    const { evidence: webEvidence, failures: researchFailures } = await collectDiscoveryResearch(
+      request.universe,
+      (companyName, ticker) => researchCompany(companyName, ticker, this.webResearch),
+    );
     try {
       const portfolioOutputs: z.infer<typeof MarketDiscoveryOutput>[] = [];
       const portfolioOutcomes: NonNullable<z.infer<typeof MarketDiscoveryOutput>['portfolioOutcomes']> = [];
@@ -745,6 +744,10 @@ export class OpenAIAgenticPipeline {
             false
           );
         }
+        const failedResearch = portfolioUniverse.filter(record => researchFailures.has(`${record.exchange}:${record.ticker}`));
+        if (failedResearch.length === portfolioUniverse.length) {
+          throw new AgenticPipelineError('discovery', 'Web research failed for every security in this market. Check provider access before retrying; eligibility was not assessed.', true);
+        }
         const portfolioRequest = DiscoveryRunRequest.parse({
           ...request,
           portfolios: [portfolio],
@@ -754,6 +757,7 @@ export class OpenAIAgenticPipeline {
           ...record,
           groundingKeys: universeGroundingKeys(record),
           webResearch: webEvidence.get(`${record.exchange}:${record.ticker}`),
+          researchLimitation: researchFailures.has(`${record.exchange}:${record.ticker}`) ? DISCOVERY_RESEARCH_GAP : null,
         }));
         const prompt = `CONFIRMED THESIS\n${JSON.stringify(request.thesis.criteria)}\n\nPORTFOLIO TO RESEARCH\n${JSON.stringify(portfolio)}\n\nMAX CANDIDATES FOR THIS PORTFOLIO\n${request.maxCandidatesPerPortfolio}\n\nSTRUCTURED UNIVERSE FOR THIS PORTFOLIO\n${JSON.stringify(universe)}`;
         const response = await this.client.responses.parse({
@@ -778,14 +782,17 @@ export class OpenAIAgenticPipeline {
           marketMandates: pinMarketMandateIdentity(response.output_parsed.marketMandates, portfolioRequest),
           candidates: deduplicateCandidateIdentities(
             pinCandidateIdentity(response.output_parsed.candidates, portfolioRequest, webEvidence)
-          ),
+          ).map(candidate => researchFailures.has(`${candidate.exchange}:${candidate.ticker}`)
+            ? { ...candidate, informationGaps: [...new Set([...candidate.informationGaps, DISCOVERY_RESEARCH_GAP])] }
+            : candidate),
           limitations: [
             ...new Set([
               ...response.output_parsed.limitations,
-              ...(response.output_parsed.candidates.length === 0
+              ...(response.output_parsed.candidates.length === 0 && !failedResearch.length
                 ? [`${portfolio.name}: no candidates met the confirmed mandate within the supplied universe.`]
                 : []),
               ...sourceCurrencyLimitations(portfolioRequest),
+              ...(failedResearch.length ? [`Web research unavailable for ${failedResearch.map(record => `${record.exchange}:${record.ticker}`).join(', ')}. This is a partial assessment; unavailable evidence does not establish a thesis mismatch.`] : []),
             ]),
           ],
           thesisVersion: request.thesis.criteria.version,
@@ -795,7 +802,7 @@ export class OpenAIAgenticPipeline {
         portfolioOutputs.push(portfolioOutput);
         portfolioOutcomes.push({
           portfolioId: portfolio.id,
-          status: portfolioOutput.candidates.length ? 'candidates_found' : 'no_candidates',
+          status: portfolioOutput.candidates.length ? 'candidates_found' : failedResearch.length ? 'failed' : 'no_candidates',
           reason: portfolioOutput.candidates.length
             ? `${portfolioOutput.candidates.length} candidates matched the supplied universe and thesis.`
             : portfolioOutput.limitations.join(' ') || 'No candidates met the confirmed mandate in the supplied universe.',

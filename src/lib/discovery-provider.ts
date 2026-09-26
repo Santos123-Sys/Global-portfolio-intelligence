@@ -88,10 +88,19 @@ export class FinnhubDiscoveryProvider implements MarketDiscoveryProvider {
       classify: () => ({ outcome: 'ok', httpStatus: 200 }),
     });
     if (!Array.isArray(raw)) throw new Error(`Finnhub returned an invalid symbol list for ${exchange}`);
-    return raw
+    const eligible = raw
       .flatMap((value) => value && typeof value === 'object' ? [toRecord(value as Record<string, unknown>, exchange)] : [])
-      .filter((value): value is SecurityUniverseRecordType => value !== null)
-      .slice(0, Math.max(1, Math.min(limit, 500)));
+      .filter((value): value is SecurityUniverseRecordType => value !== null);
+    const unique = [...new Map(eligible.map(record => [`${record.exchange}:${record.ticker}`, record])).values()];
+    const selected = unique.slice(0, Math.max(1, Math.min(limit, 500)));
+    return selected.map(record => ({ ...record, attributes: {
+      ...record.attributes,
+      universe_truncated: unique.length > selected.length,
+      universe_ranking: 'unranked',
+      universe_eligible_count: unique.length,
+      universe_selected_count: selected.length,
+      listing_country: info.country,
+    } }));
   }
 }
 
