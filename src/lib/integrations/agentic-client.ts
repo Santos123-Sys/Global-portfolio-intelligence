@@ -39,6 +39,7 @@ export async function startExternalDiscoveryRun(
 ): Promise<DiscoveryRunStatus> {
   const response = await agenticFetch('/v1/discovery-runs', {
     method: 'POST',
+    signal: AbortSignal.timeout(30_000),
     body: JSON.stringify(input),
   });
   return DiscoveryRunStatus.parse(await response.json());
@@ -155,3 +156,4 @@ async function agenticFetch(path: string, init: RequestInit = {}): Promise<Respo
   }
   return response;
 }
+

@@ -34,6 +34,7 @@ test('mandate review blocks conflicts and records corrections before confirmatio
   await page.getByRole('button', { name: 'Review', exact: true }).click();
   const confirm = page.getByRole('button', { name: /Confirm thesis version 1/ });
   await expect(confirm).toBeDisabled();
+  await page.getByText('Source prose and legacy criteria', {exact:true}).click();
   await page.getByLabel('Exclusion criteria — one per line').fill('High leverage');
   await page.getByRole('textbox', { name: 'Investment objective', exact: true }).fill('Long-term capital growth');
   await expect(confirm).toBeDisabled();
@@ -43,3 +44,4 @@ test('mandate review blocks conflicts and records corrections before confirmatio
   await expect(page.getByText(/The thesis was confirmed, but market research did not start/)).toBeVisible();
   expect(confirmed).toBe(true);
 });
+

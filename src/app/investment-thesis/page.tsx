@@ -1,9 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, useRef, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import type { ThesisCriteria, ThesisExtractionResult } from '@portfolio-intelligence/agentic-contract';
+import { type ThesisCriteria, emptyThesisPolicy, diffThesis, type ThesisExtractionResult } from '@portfolio-intelligence/agentic-contract';
+import { ThesisDraft } from '@/lib/thesis-draft';
 import { assessThesisReview } from '@/lib/thesis-review';
+import { ThesisDiscoveryPreview } from '@/components/thesis-discovery-preview';
 import { ThesisCriteriaEditor } from '@/components/thesis-criteria-editor';
 import { canDismissThesisExtraction } from '@/lib/thesis-extraction-lifecycle';
 import { normalizeThesisMandateCurrency } from '@/lib/thesis-currency';
@@ -67,6 +69,14 @@ export default function InvestmentThesisPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
   const [criteriaDraft, setCriteriaDraft] = useState<ThesisCriteria | null>(null);
+  const [manual, setManual] = useState(false);
+  const [baseVersionId, setBaseVersionId] = useState<string | null>(null);
+  const [nextVersion, setNextVersion] = useState(1);
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState('Edits are not yet saved');
+  const [loading, setLoading] = useState(true);
+  const restored = useRef(false);
+  const confirming = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [transitionNotice, setTransitionNotice] = useState<string | null>(null);
@@ -83,10 +93,13 @@ export default function InvestmentThesisPage() {
       fetch('/api/integrations/agentic/thesis-extractions', { signal }),
     ]);
     if (!versionsResponse.ok || !extractionsResponse.ok) throw new Error('Unable to load thesis workflow');
-    const versionsBody = await versionsResponse.json() as { versions: ThesisVersionRow[] };
+    const versionsBody = await versionsResponse.json() as { versions: ThesisVersionRow[]; nextVersion?: number; ownerId?: string };
     const extractionsBody = await extractionsResponse.json() as { extractions: ExtractionRow[] };
     if (!signal?.aborted) {
       setVersions(versionsBody.versions);
+      setNextVersion(versionsBody.nextVersion ?? Math.max(0, ...versionsBody.versions.map(v=>v.versionNumber))+1);
+      setOwnerId(versionsBody.ownerId ?? null);
+      setLoading(false); setError(null);
       setExtractions(extractionsBody.extractions);
     }
   }, []);
@@ -94,7 +107,7 @@ export default function InvestmentThesisPage() {
   useEffect(() => {
     const controller = new AbortController();
     void load(controller.signal).catch((cause) => {
-      if (!controller.signal.aborted) setError((cause as Error).message);
+      if (!controller.signal.aborted) { setError((cause as Error).message); setLoading(false); }
     });
     return () => controller.abort();
   }, [load]);
@@ -103,6 +116,7 @@ export default function InvestmentThesisPage() {
     if (!pendingExtractionIds) return;
     const pendingIds = pendingExtractionIds.split('|');
     const interval = window.setInterval(async () => {
+      try {
       const refreshed = await Promise.all(pendingIds.map(async (externalExtractionId) => {
         const response = await fetch(`/api/integrations/agentic/thesis-extractions?externalExtractionId=${encodeURIComponent(externalExtractionId)}`);
         if (!response.ok) return null;
@@ -112,23 +126,65 @@ export default function InvestmentThesisPage() {
       setExtractions((current) => current.map((item) =>
         refreshed.find((candidate) => candidate?.externalExtractionId === item.externalExtractionId) ?? item
       ));
+      } catch { setError('Could not refresh extraction status. Your draft remains available; retry loading when the connection returns.'); }
     }, 3_000);
     return () => window.clearInterval(interval);
   }, [pendingExtractionIds]);
 
-  useEffect(() => { setReviewNotes(''); }, [selectedId]);
+  useEffect(() => {
+    if (!ownerId || restored.current) return;
+    restored.current = true;
+    try {
+      const raw = sessionStorage.getItem(`thesis-draft:${ownerId}`);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      const parsed = ThesisDraft.safeParse(saved);
+      if (!parsed.success) { setSaveStatus('Saved draft is invalid; start a fresh draft.'); return; }
+      setCriteriaDraft(parsed.data.criteria); setSelectedId(parsed.data.selectedId);
+      setManual(Boolean(saved.manual)); setBaseVersionId(saved.baseVersionId ?? null);
+      setReviewNotes(typeof saved.reviewNotes === 'string' ? saved.reviewNotes : '');
+      setSaveStatus('Recovered draft from this browser tab');
+    } catch { setSaveStatus('Draft recovery is unavailable in this browser. Keep this page open.'); }
+  }, [ownerId]);
+
+  useEffect(() => {
+    if (!ownerId || !criteriaDraft || !restored.current) return;
+    try {
+      sessionStorage.setItem(`thesis-draft:${ownerId}`, JSON.stringify({ schemaVersion: 1, criteria: criteriaDraft, selectedId, manual, baseVersionId, reviewNotes }));
+      setSaveStatus('Draft saved in this browser tab — not yet approved');
+    } catch { setSaveStatus('Draft could not be saved in this browser. Keep this page open and approve when ready.'); }
+  }, [ownerId, criteriaDraft, selectedId, manual, baseVersionId, reviewNotes]);
+
+  useEffect(() => {
+    if (!criteriaDraft) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [criteriaDraft]);
+
+  function startDraft(thesis?: ThesisVersionRow) {
+    if (criteriaDraft && !window.confirm('Replace the current draft? Its unapproved edits will be discarded.')) return;
+    const current = versions.find(v=>!v.supersededAt);
+    setBaseVersionId(current?.id ?? null); setSelectedId(null); setManual(true); setReviewNotes('');
+    setCriteriaDraft(thesis ? { ...structuredClone(thesis.criteriaJson as ThesisCriteria), version: nextVersion } : {
+      version: nextVersion, portfolios: [{role:'swiss_quality',currency:'CHF',objective:'',inclusionCriteria:[],exclusionCriteria:[],policy:emptyThesisPolicy()}],globalConstraints:[]
+    });
+    setError(null);
+  }
 
   const draftReview = criteriaDraft ? assessThesisReview(criteriaDraft) : null;
+  const staleDraft = !!criteriaDraft && (criteriaDraft.version !== nextVersion || baseVersionId !== (versions.find(v=>!v.supersededAt)?.id ?? null));
   const selected = extractions.find((item) => item.id === selectedId) ?? null;
 
   useEffect(() => {
-    if (selected?.status === 'completed' && selected.resultJson && !criteriaDraft) {
+    if (selected?.status === 'completed' && selected.resultJson && !criteriaDraft && !manual) {
       setCriteriaDraft(structuredClone(selected.resultJson.criteria));
     }
-  }, [selected, criteriaDraft]);
+  }, [selected, criteriaDraft, manual]);
 
   async function upload(file: File | null) {
     if (!file) return;
+    if (criteriaDraft && !window.confirm('Replace the current unapproved draft with this document?')) return;
     setBusy(true);
     setError(null);
     try {
@@ -148,6 +204,7 @@ export default function InvestmentThesisPage() {
       });
       const body = await response.json().catch(() => ({})) as { extraction?: ExtractionRow; error?: string };
       if (!response.ok || !body.extraction) throw new Error(body.error ?? `Upload failed (${response.status})`);
+      setManual(false); setBaseVersionId(versions.find(v=>!v.supersededAt)?.id ?? null);
       setExtractions((current) => [body.extraction!, ...current]);
       setSelectedId(body.extraction.id);
       setCriteriaDraft(null);
@@ -163,7 +220,9 @@ export default function InvestmentThesisPage() {
   }
 
   async function generateThesis(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setBusy(true); setError(null); setTransitionNotice(null);
+    event.preventDefault();
+    if (criteriaDraft && !window.confirm('Replace the current unapproved draft?')) return;
+    setBusy(true); setError(null); setTransitionNotice(null);
     try {
       const response = await fetch('/api/thesis/generate', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
@@ -174,19 +233,23 @@ export default function InvestmentThesisPage() {
       const body = await response.json().catch(() => ({})) as { extraction?: ExtractionRow; generatedDocument?: { fileName: string; contentBase64: string }; error?: string };
       if (!response.ok || !body.extraction) throw new Error(body.error ?? `Thesis generation failed (${response.status})`);
       if (body.generatedDocument) downloadGeneratedPdf(body.generatedDocument.fileName, body.generatedDocument.contentBase64);
+      setManual(false); setBaseVersionId(versions.find(v=>!v.supersededAt)?.id ?? null);
       setExtractions((current) => [body.extraction!, ...current]); setSelectedId(body.extraction.id); setCriteriaDraft(null);
     } catch (cause) { setError((cause as Error).message); } finally { setBusy(false); }
   }
 
   function review(extraction: ExtractionRow) {
+    if (criteriaDraft && !window.confirm('Replace the current unapproved draft?')) return;
+    setManual(false); setBaseVersionId(versions.find(v=>!v.supersededAt)?.id ?? null);
     setReviewNotes('');
     setSelectedId(extraction.id);
     setCriteriaDraft(extraction.resultJson ? structuredClone(extraction.resultJson.criteria) : null);
     setError(null);
   }
 
-  async function confirm() {
-    if (!selected) return;
+  async function confirm(startDiscovery = true) {
+    if ((!selected && !manual) || confirming.current) return;
+    confirming.current = true;
     setBusy(true);
     setError(null);
     setTransitionNotice(null);
@@ -195,22 +258,29 @@ export default function InvestmentThesisPage() {
       const response = await fetch('/api/thesis', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ externalExtractionId: selected.externalExtractionId, criteriaJson: draftReview?.criteria, reviewNotes }),
+        body: JSON.stringify({ externalExtractionId: selected?.externalExtractionId, criteriaJson: draftReview?.criteria, reviewNotes, baseVersionId, startDiscovery }),
       });
       const body = await response.json().catch(() => ({})) as {
         error?: string;
         discoveryTransition?: {
-          status: 'started' | 'existing' | 'blocked';
+          status: 'started' | 'existing' | 'blocked' | 'not_requested';
           runId?: string;
           runStatus?: string;
           errorMessage?: string;
         };
       };
-      if (!response.ok) throw new Error(body.error ?? `Confirmation failed (${response.status})`);
+      if (!response.ok) {
+        if (response.status === 409) await load();
+        throw new Error(body.error ?? `Confirmation failed (${response.status})`);
+      }
       setSelectedId(null);
-      setCriteriaDraft(null);
+      setCriteriaDraft(null); setManual(false);
+      if (ownerId) { try { sessionStorage.removeItem(`thesis-draft:${ownerId}`); } catch {} }
       if (body.discoveryTransition?.status === 'started' || body.discoveryTransition?.status === 'existing') {
         router.push('/ai-stock-discovery');
+      } else if (body.discoveryTransition?.status === 'not_requested') {
+        setTransitionNotice('Thesis approved. Open Discovery when you are ready to search using this version.');
+        await load();
       } else {
         setTransitionNotice(
           `The thesis was confirmed, but market research did not start: ${body.discoveryTransition?.errorMessage ?? 'the transition was not accepted'}. ` +
@@ -221,7 +291,7 @@ export default function InvestmentThesisPage() {
     } catch (cause) {
       setError((cause as Error).message);
     } finally {
-      setBusy(false);
+      setBusy(false); confirming.current = false;
     }
   }
 
@@ -263,8 +333,8 @@ export default function InvestmentThesisPage() {
         throw new Error(body.error ?? `Dismissal failed (${response.status})`);
       }
       if (selectedId === extraction.id) {
-        setSelectedId(null);
-        setCriteriaDraft(null);
+        setSelectedId(null); setCriteriaDraft(null); setManual(false);
+        if (ownerId) { try { sessionStorage.removeItem(`thesis-draft:${ownerId}`); } catch {} }
       }
       await load();
     } catch (cause) {
@@ -289,8 +359,9 @@ export default function InvestmentThesisPage() {
         const body = await response.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error ?? `Thesis exclusion failed (${response.status})`);
       }
-      setSelectedId(null);
-      setCriteriaDraft(null);
+      if (!manual) { setSelectedId(null); setCriteriaDraft(null);
+        if (ownerId) { try { sessionStorage.removeItem(`thesis-draft:${ownerId}`); } catch {} }
+      }
       await load();
     } catch (cause) {
       setError((cause as Error).message);
@@ -302,13 +373,19 @@ export default function InvestmentThesisPage() {
   return (
     <main>
       <h1>Investment Thesis</h1>
-      <p className="sub">Extract a document, review every ambiguity, then explicitly confirm the canonical criteria.</p>
+      <p className="sub">Define your strategy, review what Discovery will search for, then approve a version.</p>
 
       {error && <p className="caveat" role="alert">{error}</p>}
       {transitionNotice && <p className="caveat" role="status">{transitionNotice}</p>}
 
       <section className="card">
-        <h2>1. Build an investment thesis</h2>
+        <h2>Define your investment mandate</h2>
+        <p className="note">Draft → Review issues → Approve → Discovery. Automated research currently covers B3 and SIX.</p>
+        {loading ? <p role="status">Loading your thesis workspace…</p> : <button type="button" className="action-button" disabled={busy || !!error} onClick={()=>startDraft()}>Create structured thesis</button>}
+        {error && <button type="button" className="secondary-button" onClick={()=>void load().catch(e=>setError(e.message))}>Retry loading</button>}
+      </section>
+      <details className="card"><summary>Create a PDF from a questionnaire (optional)</summary>
+        <h2>Build a thesis document</h2>
         <p className="note">Answer the questions below. Portfolio Intelligence will prepare a professional, static PDF, download a copy for you, and send that exact document to the thesis extractor. You review and confirm the resulting mandate before it is used.</p>
         <form className="thesis-generator" onSubmit={(event) => void generateThesis(event)}>
           <div className="grid">
@@ -341,10 +418,10 @@ export default function InvestmentThesisPage() {
           </div>
           <button className="action-button" type="submit" disabled={busy}>{busy ? 'Creating and extracting…' : 'Create thesis PDF and extract it'}</button>
         </form>
-      </section>
+      </details>
 
       <section className="card">
-        <h2>2. Or submit an existing thesis</h2>
+        <h2>Or submit an existing thesis</h2>
         <p className="note">PDF up to 10 MB, or UTF-8 plain text/Markdown up to 2 MB. Static office exports are supported; executable actions, embedded files, forms, and encrypted PDFs are rejected. Extraction never becomes canonical automatically.</p>
         <label className="action-button" style={{ display: 'inline-block', cursor: busy ? 'wait' : 'pointer' }}>
           {busy ? 'Working…' : 'Choose thesis document'}
@@ -359,7 +436,7 @@ export default function InvestmentThesisPage() {
       </section>
 
       <section className="card">
-        <h2>3. Extraction review queue</h2>
+        <h2>Document review queue</h2>
         {extractions.length === 0 ? <p className="note">No extraction submitted yet.</p> : (
           <div className="table-scroll">
             <table>
@@ -373,7 +450,7 @@ export default function InvestmentThesisPage() {
                   <td>
                     <div className="thesis-extraction-actions">
                       {extraction.status === 'completed' && !extraction.confirmedAt && (
-                        <button className="action-button" type="button" onClick={() => review(extraction)}>Review</button>
+                        <button className="action-button" type="button" disabled={busy} onClick={() => review(extraction)}>Review</button>
                       )}
                       {extraction.status === 'failed' && (
                         <button className="action-button" type="button" onClick={() => void retry(extraction)} disabled={busy}>Retry</button>
@@ -398,11 +475,19 @@ export default function InvestmentThesisPage() {
         )}
       </section>
 
-      {selected?.resultJson && (
+      {(selected?.resultJson || manual) && (
         <section className="card">
-          <h2>4. Human confirmation</h2>
-          <p className="note">Model-reported extraction confidence (not a correctness guarantee): {(selected.resultJson.extractionConfidence * 100).toFixed(0)}%. Review the source-derived mandate below, then confirm. Only markets supported by configured discovery providers can start automated market research.</p>
-          {selected.resultJson.ambiguousPoints.length > 0 && (
+          <h2>Review and approve thesis</h2>
+          <p role="status">{ownerId ? saveStatus : 'Draft is in memory; keep this page open until approval.'}</p>
+          <fieldset disabled={busy} className="thesis-review-fields">
+          {staleDraft && <div role="alert" className="caveat"><p>The approved thesis changed. Compare your draft with the current version below before proceeding.</p>{manual ? <button type="button" className="secondary-button" onClick={()=>{
+            setBaseVersionId(versions.find(v=>!v.supersededAt)?.id ?? null);
+            setCriteriaDraft(current=>current ? {...current,version:nextVersion} : current);
+            setReviewNotes(''); setError(null);
+          }}>Keep my edits and review against the latest version</button> : <p>This extraction targets an older version. Submit the document again to obtain an extraction for the current next version.</p>}</div>}
+
+          {selected?.resultJson && <p className="note">Model-reported extraction confidence (not a correctness guarantee): {(selected.resultJson.extractionConfidence * 100).toFixed(0)}%. Review the source-derived mandate below, then confirm. Only markets supported by configured discovery providers can start automated market research.</p>}
+          {!!selected?.resultJson?.ambiguousPoints.length && (
             <div className="caveat">
               <strong>Ambiguities requiring judgment</strong>
               <ul>{selected.resultJson.ambiguousPoints.map((point, index) => (
@@ -410,23 +495,37 @@ export default function InvestmentThesisPage() {
               ))}</ul>
             </div>
           )}
-          {selected.resultJson.unmappedContent.length > 0 && (
+          {!!selected?.resultJson?.unmappedContent.length && (
             <p className="note">Unmapped content: {selected.resultJson.unmappedContent.join(' · ')}</p>
           )}
-          <details><summary>Compare with the original extraction</summary><ThesisSummary criteria={selected.resultJson.criteria} /></details>
+          {selected?.resultJson && <details><summary>Compare with the original extraction</summary><ThesisSummary criteria={selected.resultJson.criteria} /></details>}
           {criteriaDraft && <ThesisCriteriaEditor criteria={criteriaDraft} onChange={setCriteriaDraft} />}
           {draftReview && <div aria-live="polite">
             {draftReview.errors.length > 0 && <div className="workflow-error"><strong>Correct before confirmation</strong><ul>{draftReview.errors.map(error => <li key={error}>{error}</li>)}</ul></div>}
             {draftReview.warnings.length > 0 && <details><summary>Review considerations ({draftReview.warnings.length})</summary><ul>{draftReview.warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></details>}
           </div>}
+          {draftReview && <>
+            <h3>{draftReview.errors.length ? 'Not ready for approval' : 'Readiness check'}</h3>
+            <ul><li>Mandate and reporting currency: {draftReview.errors.length ? 'review issues below' : 'validated'}</li><li>Structured universe and rules: {criteriaDraft?.portfolios.every(p=>p.policy) ? 'defined; review search preview' : 'legacy prose needs acknowledgment'}</li><li>Blocking contradictions: {draftReview.errors.length}</li><li>Ambiguities / review notes: {draftReview.needsAcknowledgment && reviewNotes.trim().length<20 ? 'acknowledgment required' : 'reviewed or none detected'}</li></ul>
+            {!!draftReview.issues.length && <details><summary>Ambiguities requiring judgment and observations ({draftReview.issues.length})</summary>{draftReview.issues.map((issue,i)=><article key={i}><p><strong>{issue.severity} · {issue.location}</strong> — “{issue.statement}”</p><p>{issue.reason}</p><p><strong>Interpretation:</strong> {issue.interpretation}</p>{issue.proxy&&<p><strong>Possible proxy:</strong> {issue.proxy}</p>}</article>)}</details>}
+            <ThesisDiscoveryPreview criteria={draftReview.criteria}/>
+            {versions.find(v=>!v.supersededAt) && <details><summary>Changes from the active version — Discovery should be rerun after material changes</summary><ul>{diffThesis(versions.find(v=>!v.supersededAt)!.criteriaJson as ThesisCriteria,draftReview.criteria).map(change=><li key={change.path}>{change.kind}: {change.path.replace(/([A-Z])/g,' $1')} — {change.previous??'not set'} → {change.current??'removed'}</li>)}</ul><p>Historical runs retain their original thesis; their candidates have not been certified against this draft.</p></details>}
+          </>}
           <label className="setup-form">Review decision
             <textarea value={reviewNotes} maxLength={4000} onChange={event => setReviewNotes(event.target.value)} placeholder="Explain what you corrected, retained or deferred and why." />
           </label>
-          <p className="note">A review note of at least 20 characters is required when extraction contains ambiguities or unmapped content. The original extraction, your edits and this note are retained in the confirmation audit.</p>
+          <p className="note">A review note of at least 20 characters is required for review warnings, extraction ambiguities or unmapped content. The original extraction, your edits and this note are retained in the confirmation audit.</p>
           <p className="note">Every portfolio destination needs a native three-letter currency. Swiss Quality and Brazilian Growth use CHF and BRL respectively; for every other mandate, set the source currency here before confirmation.</p>
-          <button className="action-button" type="button" onClick={() => void confirm()} disabled={busy || !criteriaDraft || !!draftReview?.errors.length || (!!(selected.resultJson.ambiguousPoints.length || selected.resultJson.unmappedContent.length) && reviewNotes.trim().length < 20) || !!selected.confirmedAt}>
-            Confirm thesis version {selected.requestedVersion} &amp; start market research
+          <button className="action-button" type="button" onClick={() => void confirm()} disabled={busy || staleDraft || !criteriaDraft || !!draftReview?.errors.length || (!!(draftReview?.needsAcknowledgment || selected?.resultJson?.ambiguousPoints.length || selected?.resultJson?.unmappedContent.length) && reviewNotes.trim().length < 20) || !!selected?.confirmedAt}>
+            Confirm thesis version {criteriaDraft?.version} &amp; start market research
           </button>
+          <button type="button" className="secondary-button" onClick={()=>void confirm(false)} disabled={busy || staleDraft || !criteriaDraft || !!draftReview?.errors.length || (!!(draftReview?.needsAcknowledgment || selected?.resultJson?.ambiguousPoints.length || selected?.resultJson?.unmappedContent.length) && reviewNotes.trim().length<20) || !!selected?.confirmedAt}>Approve without starting Discovery</button>
+          <button type="button" className="secondary-button" disabled={busy} onClick={()=>{
+            if (!window.confirm('Discard this unapproved draft? Approved versions are preserved.')) return;
+            setCriteriaDraft(null); setSelectedId(null); setManual(false); setReviewNotes('');
+            if (ownerId) { try { sessionStorage.removeItem(`thesis-draft:${ownerId}`); } catch { setError('Draft recovery could not be cleared from this browser tab.'); } }
+          }}>Discard unapproved draft</button>
+          </fieldset>
         </section>
       )}
 
@@ -447,11 +546,13 @@ export default function InvestmentThesisPage() {
               >
                 Exclude version
               </button>
-              <button type="button" className="secondary-button" onClick={() => {
+              <button type="button" className="secondary-button" disabled={busy} onClick={()=>startDraft(thesis)}>Edit as a new version</button>
+              <details><summary>Advanced export</summary><button type="button" className="secondary-button" onClick={() => {
                 const url = URL.createObjectURL(new Blob([JSON.stringify({ thesisVersionId: thesis.id, effectiveDate: thesis.effectiveDate, criteria: thesis.criteriaJson }, null, 2)], { type: 'application/json' }));
                 const link = document.createElement('a'); link.href = url; link.download = `thesis-version-${thesis.versionNumber}.json`; link.click(); URL.revokeObjectURL(url);
-              }}>Download confirmed criteria (JSON)</button>
+              }}>Download confirmed criteria (JSON)</button></details>
               <ThesisSummary criteria={thesis.criteriaJson as ThesisCriteria} />
+              <ThesisDiscoveryPreview criteria={thesis.criteriaJson as ThesisCriteria} />
             </article>
           ))}</div>
         )}
@@ -504,3 +605,4 @@ function ThesisSummary({
     </div>
   );
 }
+

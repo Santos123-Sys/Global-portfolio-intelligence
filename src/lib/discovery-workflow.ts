@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
+import { sql, and, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import {
   AgenticRunRequest,
   DiscoveryCandidate,
@@ -90,6 +90,7 @@ export async function buildDiscoveryRunRequest(
   const thesisFilters = [
     eq(thesisVersions.ownerId, ownerId),
     isNull(thesisVersions.excludedAt),
+    isNull(thesisVersions.supersededAt),
   ];
   if (thesisVersionId) thesisFilters.push(eq(thesisVersions.id, thesisVersionId));
   const [thesis, ownerPortfolios, agentConfig] = await Promise.all([
@@ -201,35 +202,41 @@ export async function startDiscoveryRunForOwner(input: {
   thesisVersionId?: string;
   reuseExistingForThesis?: boolean;
 }) {
-  if (input.reuseExistingForThesis && input.thesisVersionId) {
-    const [existing] = await db.select().from(externalDiscoveryRuns).where(and(
-      eq(externalDiscoveryRuns.ownerId, input.ownerId),
-      eq(externalDiscoveryRuns.thesisVersionId, input.thesisVersionId)
-    )).orderBy(desc(externalDiscoveryRuns.requestedAt)).limit(1);
-    if (existing) return { run: existing, remote: null, reused: true as const };
-  }
 
   const built = await buildDiscoveryRunRequest(
     input.ownerId,
     input.maxCandidatesPerPortfolio ?? 6,
     input.thesisVersionId
   );
-  const remote = await startExternalDiscoveryRun(built.request);
-  const [created] = await db.insert(externalDiscoveryRuns).values({
-    ownerId: input.ownerId,
-    thesisVersionId: built.thesisVersionId,
-    externalDiscoveryId: remote.externalDiscoveryId,
-    status: remote.status,
-    provider: built.provider,
-    requestJson: built.request,
-    resultJson: remote.result,
-    errorMessage: remote.errorMessage,
-    completedAt: remote.status === 'completed' || remote.status === 'failed' ? new Date() : null,
-  }).returning();
-  const run = remote.status === 'completed'
-    ? await synchronizeDiscoveryRun(created.id, input.ownerId, remote)
-    : created;
-  return { run, remote, reused: false as const };
+  // Serialize against confirmation/exclusion. Recheck after provider loading, just
+  // before dispatch; a previously loaded mandate must not start after supersession.
+  const dispatched = await db.transaction(async tx => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.ownerId}))`);
+    const [active] = await tx.select().from(thesisVersions).where(and(
+      eq(thesisVersions.id, built.thesisVersionId), eq(thesisVersions.ownerId, input.ownerId),
+      isNull(thesisVersions.excludedAt), isNull(thesisVersions.supersededAt)
+    )).limit(1);
+    if (!active) throw new Error('The thesis changed before Discovery started. Review the active version and retry.');
+    if (input.reuseExistingForThesis) {
+      const [existing] = await tx.select().from(externalDiscoveryRuns).where(and(
+        eq(externalDiscoveryRuns.ownerId, input.ownerId), eq(externalDiscoveryRuns.thesisVersionId, built.thesisVersionId)
+      )).orderBy(desc(externalDiscoveryRuns.requestedAt)).limit(1);
+      if (existing && existing.status !== 'failed') return { run: existing, remote: null, reused: true as const };
+    }
+    const remote = await startExternalDiscoveryRun(built.request);
+    const [created] = await tx.insert(externalDiscoveryRuns).values({
+      ownerId: input.ownerId, thesisVersionId: built.thesisVersionId,
+      externalDiscoveryId: remote.externalDiscoveryId, status: remote.status,
+      provider: built.provider, requestJson: built.request, resultJson: remote.result,
+      errorMessage: remote.errorMessage,
+      completedAt: remote.status === 'completed' || remote.status === 'failed' ? new Date() : null,
+    }).returning();
+    return { run: created, remote, reused: false as const };
+  });
+  if (dispatched.remote?.status === 'completed') {
+    return { ...dispatched, run: await synchronizeDiscoveryRun(dispatched.run.id, input.ownerId, dispatched.remote) };
+  }
+  return dispatched;
 }
 
 export async function synchronizeDiscoveryRun(
@@ -593,3 +600,4 @@ export async function candidateAnalysisIds(runIds: string[]) {
     .where(inArray(externalAgenticRuns.externalRunId, runIds));
   return new Map(rows.map((row) => [row.externalRunId, row.analysisId]));
 }
+

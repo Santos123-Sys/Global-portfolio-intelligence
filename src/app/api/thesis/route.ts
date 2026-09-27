@@ -23,6 +23,8 @@ const thesisMutationSchema = z.object({
   rawDocument: z.string().min(1).max(100_000).optional(),
   criteriaJson: ThesisCriteria,
   reviewNotes: z.string().trim().max(4000).optional(),
+  baseVersionId: z.string().uuid().nullable().optional(),
+  startDiscovery: z.boolean().optional(),
 }).strict();
 
 export async function GET(req: Request) {
@@ -34,7 +36,9 @@ export async function GET(req: Request) {
       isNull(thesisVersions.excludedAt)
     ))
     .orderBy(desc(thesisVersions.versionNumber));
-  return NextResponse.json({ versions });
+  const [latest] = await db.select({ versionNumber: thesisVersions.versionNumber }).from(thesisVersions)
+    .where(eq(thesisVersions.ownerId, session.auth.userId)).orderBy(desc(thesisVersions.versionNumber)).limit(1);
+  return NextResponse.json({ versions, ownerId: session.auth.userId, nextVersion: (latest?.versionNumber ?? 0) + 1 }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function POST(req: Request) {
@@ -49,9 +53,12 @@ export async function POST(req: Request) {
   const body = await readBoundedJson(req, 128 * 1024);
   if (!body.ok) return NextResponse.json({ error: body.error }, { status: body.status });
   const parsed = thesisMutationSchema.safeParse(body.value);
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(' ') }, { status: 400 });
   const review = assessThesisReview(parsed.data.criteriaJson);
   if (review.errors.length) return NextResponse.json({ error: review.errors.join(' '), review }, { status: 422 });
+  if (review.needsAcknowledgment && (parsed.data.reviewNotes?.length ?? 0) < 20) {
+    return NextResponse.json({ error: 'Record how you interpreted or deferred the review warnings (at least 20 characters).', review }, { status: 422 });
+  }
   const criteriaJson = review.criteria;
 
   try {
@@ -65,6 +72,9 @@ export async function POST(req: Request) {
         isNull(thesisVersions.excludedAt),
         isNull(thesisVersions.supersededAt)
       )).orderBy(desc(thesisVersions.versionNumber)).limit(1);
+      if (parsed.data.baseVersionId !== undefined && parsed.data.baseVersionId !== (active?.id ?? null)) {
+        throw new ConfirmationError('The active thesis changed while you were editing. Reload and compare before approving.');
+      }
       const nextVersion = (latest?.versionNumber ?? 0) + 1;
       if (criteriaJson.version !== nextVersion) {
         throw new ConfirmationError(`Confirmed criteria must be thesis version ${nextVersion}`);
@@ -136,7 +146,7 @@ export async function POST(req: Request) {
       }
       return created;
     });
-    const discoveryTransition = await startDiscoveryAfterThesisConfirmation({
+    const discoveryTransition = parsed.data.startDiscovery === false ? { status: 'not_requested' as const } : await startDiscoveryAfterThesisConfirmation({
       ownerId: session.auth.userId,
       thesisVersionId: version.id,
     });
@@ -180,3 +190,4 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'Unable to exclude thesis version' }, { status: 500 });
   }
 }
+

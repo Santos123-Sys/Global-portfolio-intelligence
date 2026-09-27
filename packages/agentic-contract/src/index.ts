@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import { ThesisPolicy } from './thesis-policy.js';
+import { evaluateThesisEligibility } from './thesis-domain.js';
+export { ThesisPolicy, ThesisRule, emptyThesisPolicy } from './thesis-policy.js';
+export { reviewStructuredThesis, thesisDiscoveryPlan, evaluateThesisEligibility, diffThesis } from './thesis-domain.js';
 
 export {
   AGENT_REASONING_PROMPT_VERSION,
@@ -84,6 +88,7 @@ export const ThesisPortfolioCriteria = z.object({
   inclusionCriteria: z.array(z.string()),
   exclusionCriteria: z.array(z.string()),
   targetMetrics: z.record(z.string(), z.string()).optional(),
+  policy: ThesisPolicy.optional(),
 }).strict();
 
 export const ThesisCriteria = z.object({
@@ -638,6 +643,10 @@ export function validateDiscoveryOutput(
 
     const record = universe.get(`${candidate.exchange}:${candidate.ticker}`);
     if (!record) throw new ContractValidationError(`Candidate ${candidate.ticker} is absent from the supplied universe`);
+    const thesisMandate = request.thesis.criteria.portfolios.find(item => item.role === portfolio.role);
+    if (thesisMandate && evaluateThesisEligibility(thesisMandate, record).status !== 'eligible') {
+      throw new ContractValidationError(`Candidate ${candidate.ticker} has violated or unverified structured hard constraints`);
+    }
     if (
       candidate.companyName !== record.companyName ||
       candidate.currency !== record.currency ||
@@ -764,3 +773,4 @@ export function stableStringify(value: unknown): string {
     `${JSON.stringify(key)}:${stableStringify(record[key])}`
   ).join(',')}}`;
 }
+
