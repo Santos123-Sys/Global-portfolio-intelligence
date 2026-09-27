@@ -3,6 +3,8 @@
 import type { DiscoveryEvidenceScorecard } from '@/lib/discovery-evidence';
 
 import Link from 'next/link';
+import type { DiscoveryCandidate as ContractCandidate, MarketDiscoveryOutput } from '@portfolio-intelligence/agentic-contract';
+import { DiscoveryScreeningReview, DiscoveryCandidateContext } from '@/components/discovery-screening-review';
 import { useCallback, useEffect, useState } from 'react';
 import { ValuationWorkbench } from '@/components/valuation-workbench';
 import { ResearchWorkspace } from '@/components/research-workspace';
@@ -14,6 +16,7 @@ interface DiscoveryRun {
   id: string;
   externalDiscoveryId: string;
   status: string;
+  progress?: { completed: number; total: number; currentStage: string };
   provider: string;
   requestedAt: string;
   completedAt: string | null;
@@ -42,6 +45,8 @@ interface DiscoveryRun {
    * because there is nothing to act on.
    */
   resultJson: {
+    thesisVersion?: number;
+    screeningAudit?: MarketDiscoveryOutput['screeningAudit'];
     limitations?: string[];
     marketMandates?: Array<{ portfolioId: string; rationale: string }>;
   } | null;
@@ -97,6 +102,7 @@ interface Candidate {
   decisionJournal: DecisionJournalDraft | null;
   evidenceScorecard: DiscoveryEvidenceScorecard;
   discoveryJson: {
+    discoveryContext?: ContractCandidate['discoveryContext'];
     thesisAlignmentScore: number;
     rationale: string;
     matchedCriteria: string[];
@@ -138,7 +144,7 @@ interface DiscoveryPreflight {
   ready: boolean;
   checkedAt: string;
   provider: string | null;
-  checks: Array<{ label: string; detail: string; status: 'ready' | 'blocked' }>;
+  checks: Array<{ label: string; detail: string; status: 'ready' | 'blocked' | 'warning' }>;
 }
 
 const emptyDecisionJournal = (): DecisionJournalDraft => ({
@@ -508,6 +514,8 @@ export default function AIStockDiscoveryPage() {
               <span className={`badge ${latestRun!.status === 'failed' ? 'breach' : latestRun!.status === 'completed' ? 'ok' : 'watch'}`}>{t(latestRun!.status === 'failed' ? 'failed' : latestRun!.status === 'completed' ? 'completed' : latestRun!.status === 'running' ? 'running' : 'queued')}</span>{' '}
               · {latestRun!.candidateCount} {t('candidates')}
             </p>
+            {latestRun!.resultJson?.thesisVersion && <p>Approved thesis version {latestRun!.resultJson.thesisVersion}</p>}
+            {latestRun!.progress && latestRun!.status !== 'completed' && <p role="status">{latestRun!.progress.currentStage} · {latestRun!.progress.completed}/{latestRun!.progress.total} stages</p>}
             <div className="preflight-checks" aria-label="Research outcome by portfolio">
               {latestRun!.portfolioCandidateCounts.map((portfolio) => <div key={portfolio.portfolioId}>
                 <strong>{portfolio.portfolioName}</strong>
@@ -529,6 +537,7 @@ export default function AIStockDiscoveryPage() {
                   </p>}
               </div>)}
             </div>
+            <DiscoveryScreeningReview audit={latestRun!.resultJson?.screeningAudit} portfolios={latestRun!.portfolioCandidateCounts} />
             {!!latestRun!.resultJson?.limitations?.length && <details className="run-outcome-details">
               <summary>{t('researchLimits')}</summary>
               <ul>{latestRun!.resultJson.limitations.map((limitation, index) => <li key={index}>{limitation}</li>)}</ul>
@@ -570,9 +579,10 @@ export default function AIStockDiscoveryPage() {
                   <p className="note">{candidate.portfolioName} · {candidate.country ?? t('countryUnknown')} · {candidate.sector ?? t('sectorUnknown')} · {candidate.industry ?? t('industryUnknown')} · {candidate.currency}</p>
                   <p className="note">{t('classification')}: {candidate.classificationSource === 'provider' ? t('providerClass') : candidate.classificationSource === 'web_research' ? t('webClass') : t('unclassified')}</p>
                 </div>
-                <div className="candidate-score"><strong>{discovery.thesisAlignmentScore}</strong><span>{t('thesisFit')}</span></div>
+                <div className="candidate-score"><span>Thesis fit</span><span>Review reasons below</span></div>
               </div>
               <p>{discovery.rationale}</p>
+              <DiscoveryCandidateContext context={discovery.discoveryContext} />
               {candidate.latestPrice && <p className="note"><strong>{t('close')}:</strong> {formatLatestPrice(candidate.latestPrice)} · {t('asOf')} {candidate.latestPrice.asOf} · {candidate.latestPrice.provider}</p>}
               <section className="evidence-scorecard" aria-label={t('evidence')}>
                 <div className="evidence-scorecard-heading">
@@ -743,3 +753,4 @@ export default function AIStockDiscoveryPage() {
     </main>
   );
 }
+

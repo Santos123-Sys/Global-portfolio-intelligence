@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { ThesisPolicy } from './thesis-policy.js';
 import { evaluateThesisEligibility } from './thesis-domain.js';
+import { DiscoveryContext, ScreeningAudit, screenDiscoveryUniverse, issuerKey } from './discovery-domain.js';
+export { DiscoveryContext, ScreeningAudit, screenDiscoveryUniverse, issuerKey, listingKey, discoveryMarkets } from './discovery-domain.js';
 export { ThesisPolicy, ThesisRule, emptyThesisPolicy } from './thesis-policy.js';
 export { reviewStructuredThesis, thesisDiscoveryPlan, evaluateThesisEligibility, diffThesis } from './thesis-domain.js';
 
@@ -298,6 +300,12 @@ export const DiscoveryRunRequest = z.object({
     investmentObjective: z.string(),
   }).strict()).min(1),
   universe: z.array(SecurityUniverseRecord).min(1).max(500),
+  universeFailures: z.array(z.object({ exchange: z.string(), reason: z.string() }).strict()).optional(),
+  knownSecurities: z.array(z.object({
+    portfolioId: z.string().uuid(), ticker: z.string(), exchange: z.string(),
+    issuerKey: z.string().optional(), reason: z.enum(['held', 'under_review', 'under_analysis', 'rejected']),
+    thesisVersionId: z.string().uuid().optional(),
+  }).strict()).optional(),
   maxCandidatesPerPortfolio: z.number().int().min(1).max(20).default(8),
   agentConfig: AgentCustomization.optional(),
 }).strict().superRefine((request, context) => {
@@ -312,6 +320,7 @@ export const DiscoveryRunRequest = z.object({
 export type DiscoveryRunRequest = z.infer<typeof DiscoveryRunRequest>;
 
 export const DiscoveryCandidate = z.object({
+  discoveryContext: DiscoveryContext.optional(),
   portfolioId: z.string().uuid(),
   ticker: z.string().trim().min(1),
   exchange: z.string().trim().min(1),
@@ -333,6 +342,7 @@ export const DiscoveryCandidate = z.object({
 export type DiscoveryCandidate = z.infer<typeof DiscoveryCandidate>;
 
 export const MarketDiscoveryOutput = z.object({
+  screeningAudit: ScreeningAudit.optional(),
   thesisVersion: z.number().int().positive(),
   marketMandates: z.array(z.object({
     portfolioId: z.string().uuid(),
@@ -610,7 +620,7 @@ export function validateDiscoveryOutput(
       }
     }
   }
-  const universeExchanges = new Set(request.universe.map((record) => record.exchange));
+  const universeExchanges = new Set([...request.universe.map((record) => record.exchange), ...(request.universeFailures ?? []).map(f => f.exchange)]);
   const mandatesByPortfolio = new Map(output.marketMandates.map((mandate) => [mandate.portfolioId, mandate]));
   for (const mandate of output.marketMandates) {
     const portfolio = portfoliosById.get(mandate.portfolioId)!;
@@ -627,12 +637,16 @@ export function validateDiscoveryOutput(
     record,
   ]));
   const externallyRetrievedSources = new Set(output.verifiedWebSources);
+  const screening = screenDiscoveryUniverse(request);
+  if (output.screeningAudit && (output.screeningAudit.thesisVersionId !== request.thesis.versionId || JSON.stringify(output.screeningAudit.records) !== JSON.stringify(screening.records))) {
+    throw new ContractValidationError('Screening audit disagrees with the saved request');
+  }
   const seen = new Set<string>();
   const perPortfolio = new Map<string, number>();
   for (const candidate of output.candidates) {
     const portfolio = portfoliosById.get(candidate.portfolioId);
     if (!portfolio) throw new ContractValidationError(`Candidate references unknown portfolio ${candidate.portfolioId}`);
-    const uniqueKey = `${candidate.exchange}:${candidate.ticker}`;
+    const uniqueKey = `${candidate.portfolioId}:${candidate.exchange}:${candidate.ticker}`;
     if (seen.has(uniqueKey)) throw new ContractValidationError(`Duplicate discovery candidate ${uniqueKey}`);
     seen.add(uniqueKey);
     const count = (perPortfolio.get(candidate.portfolioId) ?? 0) + 1;
@@ -643,6 +657,13 @@ export function validateDiscoveryOutput(
 
     const record = universe.get(`${candidate.exchange}:${candidate.ticker}`);
     if (!record) throw new ContractValidationError(`Candidate ${candidate.ticker} is absent from the supplied universe`);
+    const eligible = screening.eligibleByPortfolio.get(portfolio.id) ?? [];
+    if (!eligible.some(r => r.exchange === record.exchange && r.ticker === record.ticker)) {
+      throw new ContractValidationError(`Candidate ${candidate.ticker} is not eligible for this portfolio snapshot`);
+    }
+    if (candidate.discoveryContext && (JSON.stringify(candidate.discoveryContext.eligibility) !== JSON.stringify(screening.records.find(r => r.portfolioId === portfolio.id && r.ticker === record.ticker && r.exchange === record.exchange)) || candidate.discoveryContext.thesisVersionId !== request.thesis.versionId || candidate.discoveryContext.issuerKey !== issuerKey(record))) {
+      throw new ContractValidationError('Candidate discovery context changed thesis or issuer identity');
+    }
     const thesisMandate = request.thesis.criteria.portfolios.find(item => item.role === portfolio.role);
     if (thesisMandate && evaluateThesisEligibility(thesisMandate, record).status !== 'eligible') {
       throw new ContractValidationError(`Candidate ${candidate.ticker} has violated or unverified structured hard constraints`);
@@ -678,7 +699,7 @@ export function validateDiscoveryOutput(
       );
     }
     const mandate = mandatesByPortfolio.get(candidate.portfolioId)!;
-    if (!mandate.exchanges.includes(candidate.exchange) || candidate.currency !== portfolio.baseCurrency) {
+    if (!mandate.exchanges.includes(candidate.exchange)) {
       throw new ContractValidationError(`Candidate ${candidate.ticker} does not match its portfolio market mandate`);
     }
     const availableGrounding = new Set(universeGroundingKeys(record));
@@ -692,6 +713,12 @@ export function validateDiscoveryOutput(
       throw new ContractValidationError(`Candidate ${candidate.ticker} omitted its structured-universe source`);
     }
     const allowedRecordSources = universeSourceUrls(record);
+    if (candidate.discoveryContext) {
+      const candidateSources = new Set(candidate.discoveryContext.evidence.map(e => e.url));
+      if (candidate.sourceUrls.some(url => !allowedRecordSources.has(url) && !candidateSources.has(url))) {
+        throw new ContractValidationError(`Candidate ${candidate.ticker} cited another security's research evidence`);
+      }
+    }
     if (candidate.sourceUrls.some((url) => !allowedRecordSources.has(url) && !externallyRetrievedSources.has(url))) {
       throw new ContractValidationError(`Candidate ${candidate.ticker} cited a source absent from its universe record`);
     }

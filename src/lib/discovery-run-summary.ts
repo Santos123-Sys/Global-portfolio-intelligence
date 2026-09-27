@@ -1,4 +1,4 @@
-import { DiscoveryRunRequest, MarketDiscoveryOutput } from '@portfolio-intelligence/agentic-contract';
+import { DiscoveryRunRequest, MarketDiscoveryOutput, discoveryMarkets } from '@portfolio-intelligence/agentic-contract';
 
 export interface PortfolioCandidateCount {
   portfolioId: string;
@@ -58,7 +58,7 @@ export function summarizeDiscoveryCandidateCounts(
       providers: [...new Set(universe.map((record) => record.provider))],
       recordsByPortfolio: parsed.data.portfolios.map((portfolio) => ({
         portfolioId: portfolio.id,
-        count: universe.filter((record) => record.currency.toUpperCase() === portfolio.baseCurrency.toUpperCase()).length,
+        count: universe.filter((record) => discoveryMarkets(portfolio.role).includes(record.exchange)).length,
       })),
     },
     portfolioCandidateCounts: parsed.data.portfolios.map((portfolio) => {
@@ -79,3 +79,4 @@ export function summarizeDiscoveryCandidateCounts(
     }),
   };
 }
+

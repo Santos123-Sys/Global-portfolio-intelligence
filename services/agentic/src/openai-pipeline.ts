@@ -1,4 +1,4 @@
-import { evaluateThesisEligibility, thesisDiscoveryPlan } from '@portfolio-intelligence/agentic-contract';
+import { screenDiscoveryUniverse, issuerKey, listingKey, discoveryMarkets, thesisDiscoveryPlan } from '@portfolio-intelligence/agentic-contract';
 import OpenAI, {
   APIConnectionError,
   APIConnectionTimeoutError,
@@ -143,7 +143,7 @@ const DiscoveryCandidateModelOutput = z.object({
 }).strict();
 
 export const MarketDiscoveryModelOutput = MarketDiscoveryOutput
-  .omit({ verifiedWebSources: true, thesisVersion: true, portfolioOutcomes: true, candidates: true })
+  .omit({ screeningAudit: true, verifiedWebSources: true, thesisVersion: true, portfolioOutcomes: true, candidates: true })
   .extend({ candidates: z.array(DiscoveryCandidateModelOutput) });
 
 const UNSPECIFIED_CURRENCY_VALUES = new Set(['NOT SPECIFIED', 'UNSPECIFIED', 'ANY', 'N/A']);
@@ -227,7 +227,7 @@ function deduplicateCandidateIdentities(
 ) {
   const seen = new Set<string>();
   return candidates.filter((candidate) => {
-    const key = `${candidate.exchange.trim().toUpperCase()}:${candidate.ticker.trim().toUpperCase()}`;
+    const key = `${candidate.portfolioId}:${candidate.exchange.trim().toUpperCase()}:${candidate.ticker.trim().toUpperCase()}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -299,7 +299,7 @@ Rules:
 - The disclaimer must plainly say the output is analytical, is not professional financial advice, and depends on supplied data.
 - Do not add facts from general knowledge and do not calculate anything.`;
 
-const discoveryInstructions = `Structured policy rules classified as preference or context must never exclude a company. Only hard rules and explicit exclusions screen eligibility. Reporting currency does not establish domicile, listing, operations or revenue geography. The supplied discovery interpretation is authoritative; never invent thresholds.
+const discoveryInstructions = `Structured policy rules classified as preference or context must never exclude a company. Only hard rules and explicit exclusions screen eligibility. Reporting currency does not establish domicile, listing, operations or revenue geography. Candidate trading currency may differ from portfolio reporting currency; that difference alone must never exclude a candidate. The supplied discovery interpretation is authoritative; never invent thresholds.
 You are the final market-research agent for a thesis-driven investment workflow. You receive a confirmed thesis, portfolio mandates, a structurally filtered provider universe, and independently retrieved web-research evidence.
 
 Absolute rules:
@@ -723,10 +723,16 @@ export class OpenAIAgenticPipeline {
     }
   }
 
-  async discoverSecurities(input: z.infer<typeof DiscoveryRunRequest>): Promise<z.infer<typeof MarketDiscoveryOutput>> {
+  async discoverSecurities(input: z.infer<typeof DiscoveryRunRequest>, onProgress?: (completed: number, total: number, stage: string) => Promise<void>): Promise<z.infer<typeof MarketDiscoveryOutput>> {
+    const startedAt = Date.now();
+    let modelCalls = 0;
     const request = DiscoveryRunRequest.parse(input);
+    await onProgress?.(0, 3, 'Applying thesis constraints');
+    const screening = screenDiscoveryUniverse(request);
+    const researchUniverse = [...new Map([...screening.eligibleByPortfolio.values()].flat().map(r => [listingKey(r), r])).values()];
+    await onProgress?.(1, 3, `Researching ${researchUniverse.length} eligible listings`);
     const { evidence: webEvidence, failures: researchFailures } = await collectDiscoveryResearch(
-      request.universe,
+      researchUniverse,
       (companyName, ticker) => researchCompany(companyName, ticker, this.webResearch),
     );
     try {
@@ -738,23 +744,24 @@ export class OpenAIAgenticPipeline {
         // model every mandate in one call allowed a valid-looking combined
         // response to spend the whole shortlist on the first market. Isolate
         // each mandate so every eligible portfolio receives a complete pass.
-        const mandate = request.thesis.criteria.portfolios.find(item => item.role === portfolio.role);
-        const marketUniverse = request.universe.filter(record =>
-          record.exchange === (portfolio.role === 'swiss_quality' ? 'XSWX' : portfolio.role === 'brazilian_growth' ? 'BVMF' : '') && record.currency.toUpperCase() === portfolio.baseCurrency.toUpperCase()
-        );
-        const screened = marketUniverse.map(record => ({ record, review: mandate ? evaluateThesisEligibility(mandate, record) : null }));
-        const portfolioUniverse = screened.filter(item => item.review?.status === 'eligible').map(item => item.record);
-        const screenLimitations = screened.filter(item => item.review?.status !== 'eligible').map(item => `${item.record.exchange}:${item.record.ticker}: ${item.review?.status ?? 'missing mandate'} — ${[...(item.review?.violated ?? []), ...(item.review?.unverified ?? [])].join('; ')}`);
+        const universeFailure = request.universeFailures?.find(f => discoveryMarkets(portfolio.role).includes(f.exchange));
+        if (universeFailure) throw new AgenticPipelineError('discovery', universeFailure.reason, true);
+        const portfolioUniverse = screening.eligibleByPortfolio.get(portfolio.id) ?? [];
+        const screened = screening.records.filter(r => r.portfolioId === portfolio.id);
+        const screenLimitations = screened.filter(r => r.status !== 'eligible').map(r => `${r.exchange}:${r.ticker}: ${r.status} — ${r.reasons.join('; ')}`);
         if (!portfolioUniverse.length) {
-          throw new AgenticPipelineError(
-            'discovery',
-            `No supplied securities have verified eligibility for ${portfolio.name}. ${screenLimitations.slice(0, 8).join(' | ')}`,
-            false
-          );
+          if (screened.some(r => r.status === 'unverified')) {
+            throw new AgenticPipelineError('discovery', `Eligibility is unverified for ${portfolio.name}. ${screenLimitations.join(' | ')}`, false);
+          }
+          portfolioOutputs.push({ thesisVersion: request.thesis.criteria.version,
+            marketMandates: [{ portfolioId: portfolio.id, role: portfolio.role, exchanges: discoveryMarkets(portfolio.role), currency: portfolio.baseCurrency, rationale: 'Deterministic screening completed before research' }],
+            candidates: [], verifiedWebSources: [], limitations: screenLimitations });
+          portfolioOutcomes.push({ portfolioId: portfolio.id, status: 'no_candidates', reason: 'No new eligible issuers in the supplied universe; inspect screening results.' });
+          continue;
         }
         const failedResearch = portfolioUniverse.filter(record => researchFailures.has(`${record.exchange}:${record.ticker}`));
         if (failedResearch.length === portfolioUniverse.length) {
-          throw new AgenticPipelineError('discovery', 'Web research failed for every security in this market. Check provider access before retrying; eligibility was not assessed.', true);
+          throw new AgenticPipelineError('discovery', 'Web research failed for every security in this market. Check provider access before retrying; eligibility passed, but qualitative evidence is unavailable.', true);
         }
         const portfolioRequest = DiscoveryRunRequest.parse({
           ...request,
@@ -768,6 +775,8 @@ export class OpenAIAgenticPipeline {
           researchLimitation: researchFailures.has(`${record.exchange}:${record.ticker}`) ? DISCOVERY_RESEARCH_GAP : null,
         }));
         const prompt = `DISCOVERY INTERPRETATION\n${JSON.stringify(thesisDiscoveryPlan(request.thesis.criteria))}\n\nCONFIRMED THESIS\n${JSON.stringify(request.thesis.criteria)}\n\nPORTFOLIO TO RESEARCH\n${JSON.stringify(portfolio)}\n\nMAX CANDIDATES FOR THIS PORTFOLIO\n${request.maxCandidatesPerPortfolio}\n\nSTRUCTURED UNIVERSE FOR THIS PORTFOLIO\n${JSON.stringify(universe)}`;
+        await onProgress?.(2, 3, `Assessing thesis fit for ${portfolio.name}`);
+        modelCalls += 1;
         const response = await this.client.responses.parse({
           model: this.model,
           reasoning: { effort: this.effort.discovery },
@@ -790,9 +799,23 @@ export class OpenAIAgenticPipeline {
           marketMandates: pinMarketMandateIdentity(response.output_parsed.marketMandates, portfolioRequest),
           candidates: deduplicateCandidateIdentities(
             pinCandidateIdentity(response.output_parsed.candidates, portfolioRequest, webEvidence)
-          ).map(candidate => researchFailures.has(`${candidate.exchange}:${candidate.ticker}`)
-            ? { ...candidate, informationGaps: [...new Set([...candidate.informationGaps, DISCOVERY_RESEARCH_GAP])] }
-            : candidate),
+          ).map(candidate => {
+            const record = portfolioUniverse.find(r => r.exchange === candidate.exchange && r.ticker === candidate.ticker);
+            if (!record) return candidate; // contract rejects invented securities
+            const web = webEvidence.get(`${record.exchange}:${record.ticker}`);
+            return { ...candidate,
+              discoveryContext: {
+                thesisVersionId: request.thesis.versionId, issuerKey: issuerKey(record), channel: 'structured_universe',
+                eligibility: screened.find(r => r.exchange === record.exchange && r.ticker === record.ticker)!,
+                evidence: [{ url: record.sourceUrl, provider: record.provider, kind: 'structured_record', tier: ['eodhd', 'finnhub'].includes(record.provider) ? 'data_provider' : 'unclassified', retrievedAt: null, observedAt: record.observedAt, publishedAt: null },
+                  ...(web?.sources ?? []).map(source => ({ ...source, provider: this.webResearch.provider, kind: 'search_result', tier: 'unclassified' }))],
+              },
+              informationGaps: [...new Set([...candidate.informationGaps,
+                ...(researchFailures.has(`${record.exchange}:${record.ticker}`) ? [DISCOVERY_RESEARCH_GAP] : []),
+                ...(!web?.urls.length ? ['No external qualitative sources were retrieved; assessment uses structured identity only.'] : []),
+              ])],
+            };
+          }),
           limitations: [
             ...new Set([
               ...response.output_parsed.limitations,
@@ -825,9 +848,7 @@ export class OpenAIAgenticPipeline {
                 ? new AgenticPipelineError('discovery', `Market discovery: ${error.message}`, true)
                 : classifyProviderError('discovery', error);
           portfolioOutcomes.push({ portfolioId: portfolio.id, status: 'failed', reason: failure.message });
-          const exchanges = [...new Set(request.universe.filter((record) =>
-            record.currency.toUpperCase() === portfolio.baseCurrency.toUpperCase()
-          ).map((record) => record.exchange))];
+          const exchanges = discoveryMarkets(portfolio.role);
           portfolioOutputs.push({
             thesisVersion: request.thesis.criteria.version,
             marketMandates: [{
@@ -853,8 +874,12 @@ export class OpenAIAgenticPipeline {
         verifiedWebSources: [...new Set(portfolioOutputs.flatMap((result) => result.verifiedWebSources))],
         limitations: [...new Set(portfolioOutputs.flatMap((result) => result.limitations))],
         portfolioOutcomes,
+        screeningAudit: { thesisVersionId: request.thesis.versionId, records: screening.records,
+          researchAttempted: researchUniverse.length, researchFailed: researchFailures.size,
+          modelCalls, elapsedMs: Date.now() - startedAt },
       });
       validateDiscoveryOutput(output, request);
+      await onProgress?.(3, 3, 'Shortlist ready for review');
       return output;
     } catch (error) {
       if (error instanceof AgenticPipelineError) throw error;

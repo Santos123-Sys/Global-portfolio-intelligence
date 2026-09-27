@@ -979,3 +979,9 @@ button.nav-link:hover, button.nav-link[aria-expanded="true"] { background: var(-
 .thesis-summary dt { font-weight: 600; text-transform: capitalize; }
 .thesis-summary dd { margin: 0 0 8px; }
 @media (max-width: 640px) { .thesis-review-fields .setup-form-row { grid-template-columns: minmax(0, 1fr); } }
+
+/* Long source excerpts and rule explanations must fit narrow review cards. */
+.discovery-screening { margin-block: 1rem; overflow-wrap: anywhere; }
+.discovery-screening summary { cursor: pointer; font-weight: 600; padding-block: .5rem; }
+.discovery-screening li { margin-block: .75rem; }
+.discovery-screening p { max-width: 85ch; }

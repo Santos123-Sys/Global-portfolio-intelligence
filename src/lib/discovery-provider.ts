@@ -30,6 +30,7 @@ function errorMessage(error: unknown): string {
 const NON_EQUITY = ['etf', 'fund', 'bond', 'index', 'currency', 'warrant', 'right'];
 
 function finite(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
   const number = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(number) ? number : undefined;
 }
@@ -180,3 +181,4 @@ export async function loadDiscoveryUniverse(exchange: string, limit: number): Pr
     throw new Error(`${marketLabel(exchange)} could not be loaded from ${primary.name}: ${errorMessage(primaryError)}`);
   }
 }
+
