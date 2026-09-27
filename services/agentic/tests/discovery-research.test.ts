@@ -1,6 +1,6 @@
 import type OpenAI from 'openai';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { DiscoveryRunRequest } from '@portfolio-intelligence/agentic-contract';
+import { emptyThesisPolicy, type DiscoveryRunRequest } from '@portfolio-intelligence/agentic-contract';
 import { OpenAIAgenticPipeline } from '../src/openai-pipeline.js';
 import { DISCOVERY_RESEARCH_GAP } from '../src/discovery-research.js';
 import { portfolioId, thesis, thesisVersionId } from './fixtures.js';
@@ -8,7 +8,7 @@ import { portfolioId, thesis, thesisVersionId } from './fixtures.js';
 const brazilId = '22222222-2222-4222-8222-222222222222';
 function request(): DiscoveryRunRequest {
   return {
-    thesis: { versionId: thesisVersionId, criteria: thesis },
+    thesis: { versionId: thesisVersionId, criteria: structuredClone(thesis) },
     portfolios: [{ id: portfolioId, name: 'Swiss', role: 'swiss_quality', baseCurrency: 'CHF', investmentObjective: 'Quality' }],
     universe: ['AAA', 'BBB'].map(ticker => ({ ticker, exchange: 'XSWX', companyName: ticker, currency: 'CHF', country: 'CH', sector: null, industry: null, assetType: 'Common Stock', observedAt: '2026-09-26T00:00:00.000Z', provider: 'test', sourceUrl: `https://example.test/${ticker}`, attributes: {} })),
     maxCandidatesPerPortfolio: 3,
@@ -29,6 +29,14 @@ function pipeline(parsed: unknown) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('discovery research failure isolation', () => {
+  it('never asks the model to waive an unverified structured hard rule', async () => {
+    const input = request();
+    input.thesis.criteria.portfolios[0].policy = { ...emptyThesisPolicy(), rules: [{ statement: 'ROIC minimum 15 percent FY2025', kind: 'hard', category: 'selection', metric: { field: 'roic', operator: 'gte', value: 15, unit: 'percent', period: 'FY2025' } }] };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ results: [] })));
+    const { instance, parse } = pipeline(modelCandidate(input));
+    await expect(instance.discoverSecurities(input)).rejects.toThrow(/unverified/);
+    expect(parse).not.toHaveBeenCalled();
+  });
   it('retains a partial shortlist while adding a service-owned gap and limitation', async () => {
     const input = request();
     vi.stubGlobal('fetch', vi.fn(async (_url: unknown, init: RequestInit) => JSON.parse(init.body as string).query.startsWith('AAA ')
@@ -48,6 +56,7 @@ describe('discovery research failure isolation', () => {
   });
   it('preserves a successful market when another market has no retrievable research', async () => {
     const input = request();
+    input.thesis.criteria.portfolios.push({ role: 'brazilian_growth', currency: 'BRL', objective: 'Growth', inclusionCriteria: [], exclusionCriteria: [] });
     input.portfolios.push({ id: brazilId, name: 'Brazil', role: 'brazilian_growth', baseCurrency: 'BRL', investmentObjective: 'Growth' });
     input.universe[1] = { ...input.universe[1], currency: 'BRL', exchange: 'BVMF' };
     vi.stubGlobal('fetch', vi.fn(async (_url: unknown, init: RequestInit) => JSON.parse(init.body as string).query.startsWith('AAA ')
@@ -65,3 +74,4 @@ describe('discovery research failure isolation', () => {
     expect(parse).not.toHaveBeenCalled();
   });
 });
+

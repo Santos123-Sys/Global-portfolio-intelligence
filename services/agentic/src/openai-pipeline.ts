@@ -1,3 +1,4 @@
+import { evaluateThesisEligibility, thesisDiscoveryPlan } from '@portfolio-intelligence/agentic-contract';
 import OpenAI, {
   APIConnectionError,
   APIConnectionTimeoutError,
@@ -259,6 +260,8 @@ Rules:
 - Set criteria.version to the version explicitly supplied by the caller.
 - Keep sourceExcerpt short and verbatim from the submitted document.
 - targetMetrics is required by the output schema; use an empty array when none are explicit and one name/value item per explicit threshold.
+- Explicitly distinguish domicile, listing, operating geography and revenue exposure. If the legacy schema cannot encode the distinction, preserve it in the criterion and flag for structured review.
+- Never turn macro assumptions into hard screening rules. Preserve context and uncertain severity in ambiguousPoints.
 - Do not evaluate securities, calculate metrics, or give investment advice.`;
 
 const analysisInstructions = `You are the sole investment-analysis language model in this system. You interpret one dashboard-supplied grounding bundle against a confirmed investment thesis. You do not fetch data or calculate metrics.
@@ -296,7 +299,8 @@ Rules:
 - The disclaimer must plainly say the output is analytical, is not professional financial advice, and depends on supplied data.
 - Do not add facts from general knowledge and do not calculate anything.`;
 
-const discoveryInstructions = `You are the final market-research agent for a thesis-driven investment workflow. You receive a confirmed thesis, portfolio mandates, a structurally filtered provider universe, and independently retrieved web-research evidence.
+const discoveryInstructions = `Structured policy rules classified as preference or context must never exclude a company. Only hard rules and explicit exclusions screen eligibility. Reporting currency does not establish domicile, listing, operations or revenue geography. The supplied discovery interpretation is authoritative; never invent thresholds.
+You are the final market-research agent for a thesis-driven investment workflow. You receive a confirmed thesis, portfolio mandates, a structurally filtered provider universe, and independently retrieved web-research evidence.
 
 Absolute rules:
 1. Select only exact ticker/exchange/company identities present in the supplied universe. Never invent or transform a security identity.
@@ -734,13 +738,17 @@ export class OpenAIAgenticPipeline {
         // model every mandate in one call allowed a valid-looking combined
         // response to spend the whole shortlist on the first market. Isolate
         // each mandate so every eligible portfolio receives a complete pass.
-        const portfolioUniverse = request.universe.filter(
-          (record) => record.currency.toUpperCase() === portfolio.baseCurrency.toUpperCase()
+        const mandate = request.thesis.criteria.portfolios.find(item => item.role === portfolio.role);
+        const marketUniverse = request.universe.filter(record =>
+          record.exchange === (portfolio.role === 'swiss_quality' ? 'XSWX' : portfolio.role === 'brazilian_growth' ? 'BVMF' : '') && record.currency.toUpperCase() === portfolio.baseCurrency.toUpperCase()
         );
+        const screened = marketUniverse.map(record => ({ record, review: mandate ? evaluateThesisEligibility(mandate, record) : null }));
+        const portfolioUniverse = screened.filter(item => item.review?.status === 'eligible').map(item => item.record);
+        const screenLimitations = screened.filter(item => item.review?.status !== 'eligible').map(item => `${item.record.exchange}:${item.record.ticker}: ${item.review?.status ?? 'missing mandate'} — ${[...(item.review?.violated ?? []), ...(item.review?.unverified ?? [])].join('; ')}`);
         if (!portfolioUniverse.length) {
           throw new AgenticPipelineError(
             'discovery',
-            `No supplied security universe matches ${portfolio.name} (${portfolio.baseCurrency})`,
+            `No supplied securities have verified eligibility for ${portfolio.name}. ${screenLimitations.slice(0, 8).join(' | ')}`,
             false
           );
         }
@@ -759,7 +767,7 @@ export class OpenAIAgenticPipeline {
           webResearch: webEvidence.get(`${record.exchange}:${record.ticker}`),
           researchLimitation: researchFailures.has(`${record.exchange}:${record.ticker}`) ? DISCOVERY_RESEARCH_GAP : null,
         }));
-        const prompt = `CONFIRMED THESIS\n${JSON.stringify(request.thesis.criteria)}\n\nPORTFOLIO TO RESEARCH\n${JSON.stringify(portfolio)}\n\nMAX CANDIDATES FOR THIS PORTFOLIO\n${request.maxCandidatesPerPortfolio}\n\nSTRUCTURED UNIVERSE FOR THIS PORTFOLIO\n${JSON.stringify(universe)}`;
+        const prompt = `DISCOVERY INTERPRETATION\n${JSON.stringify(thesisDiscoveryPlan(request.thesis.criteria))}\n\nCONFIRMED THESIS\n${JSON.stringify(request.thesis.criteria)}\n\nPORTFOLIO TO RESEARCH\n${JSON.stringify(portfolio)}\n\nMAX CANDIDATES FOR THIS PORTFOLIO\n${request.maxCandidatesPerPortfolio}\n\nSTRUCTURED UNIVERSE FOR THIS PORTFOLIO\n${JSON.stringify(universe)}`;
         const response = await this.client.responses.parse({
           model: this.model,
           reasoning: { effort: this.effort.discovery },
@@ -788,6 +796,7 @@ export class OpenAIAgenticPipeline {
           limitations: [
             ...new Set([
               ...response.output_parsed.limitations,
+              ...screenLimitations,
               ...(response.output_parsed.candidates.length === 0 && !failedResearch.length
                 ? [`${portfolio.name}: no candidates met the confirmed mandate within the supplied universe.`]
                 : []),
@@ -857,3 +866,4 @@ export class OpenAIAgenticPipeline {
     }
   }
 }
+

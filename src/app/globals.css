@@ -966,3 +966,16 @@ button.nav-link:hover, button.nav-link[aria-expanded="true"] { background: var(-
 @media (max-width: 640px) {
   .candidate-actions .approve-action { flex: 1 1 100%; min-height: 44px; }
 }
+
+
+/* Thesis review keeps nested controls within the viewport and exposes focus. */
+.thesis-review-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.thesis-mandate, .thesis-summary, .thesis-review-fields details { min-width: 0; overflow-wrap: anywhere; }
+.thesis-review-fields summary { cursor: pointer; padding: 12px 0; font-weight: 600; }
+.thesis-review-fields button { margin: 8px 8px 8px 0; }
+.thesis-review-fields input, .thesis-review-fields select, .thesis-review-fields textarea { max-width: 100%; min-width: 0; }
+.thesis-review-fields :focus-visible { outline: 2px solid var(--accent, #4a7466); outline-offset: 3px; }
+.thesis-summary dl { margin: 12px 0; }
+.thesis-summary dt { font-weight: 600; text-transform: capitalize; }
+.thesis-summary dd { margin: 0 0 8px; }
+@media (max-width: 640px) { .thesis-review-fields .setup-form-row { grid-template-columns: minmax(0, 1fr); } }
