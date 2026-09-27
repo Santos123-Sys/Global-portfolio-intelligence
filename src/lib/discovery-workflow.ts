@@ -1,7 +1,9 @@
-import { sql, and, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
+import { sql, and, or, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import {
   AgenticRunRequest,
   DiscoveryCandidate,
+  issuerKey,
+  listingKey,
   DiscoveryRunRequest,
   MarketDiscoveryOutput,
   PortfolioRole,
@@ -16,7 +18,7 @@ import { decisionJournalAuditText, type DecisionJournal } from './decision-journ
 import { getPriceProvider } from './connectors';
 import { loadDiscoveryUniverse } from './discovery-provider';
 import { db } from './db';
-import { accounts, aiAnalyses, decisionLog, portfolios, priceHistory, securities, thesisVersions } from './db/schema';
+import { accounts, aiAnalyses, decisionLog, portfolios, positions, priceHistory, securities, thesisVersions } from './db/schema';
 import {
   discoveryCandidates,
   externalAgenticRuns,
@@ -58,16 +60,11 @@ export function candidateIdentityKey(candidate: CandidateIdentity): string {
   return [candidate.portfolioId, candidate.exchange.trim().toUpperCase(), candidate.ticker.trim().toUpperCase()].join('::');
 }
 
-function securityIdentityKey(candidate: Pick<CandidateIdentity, 'exchange' | 'ticker'>): string {
-  return [candidate.exchange.trim().toUpperCase(), candidate.ticker.trim().toUpperCase()].join('::');
-}
-
-/** One security is reviewed once per market-research output, even if a model
- * accidentally emits it more than once or assigns it to multiple mandates. */
+/** Listing deduplication is scoped to the investor's portfolio. */
 export function deduplicateDiscoveryCandidates<T extends CandidateIdentity>(candidates: T[]): T[] {
   const seen = new Set<string>();
   return candidates.filter((candidate) => {
-    const key = securityIdentityKey(candidate);
+    const key = candidateIdentityKey(candidate);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -142,18 +139,46 @@ export async function buildDiscoveryRunRequest(
   }
 
   const exchanges = [...new Set(equityPortfolios.map((portfolio) => ROLE_EXCHANGE[portfolio.role]!))];
-  // At most 25 names per market: a 20–50-company structural universe is the
-  // input to qualitative research, not the final recommendation list.
-  const loaded = await Promise.all(exchanges.map((exchange) => loadDiscoveryUniverse(exchange, 25)));
+  // Provider lists are capped before screening; dated seed supplements may
+  // expand them. Report this bounded coverage instead of claiming a full market.
+  const attempts = await Promise.allSettled(exchanges.map((exchange) => loadDiscoveryUniverse(exchange, 25)));
+  const universeFailures = attempts.flatMap((result, i) => result.status === 'rejected'
+    ? [{ exchange: exchanges[i], reason: 'Market universe could not be retrieved; check provider access and retry.' }] : []);
+  const loaded = attempts.flatMap(result => result.status === 'fulfilled' ? [result.value] : []);
   const batches = loaded.map((result) => result.records);
   const universe = uniqueBy(batches.flat(), (record) => `${record.exchange}:${record.ticker}`);
   if (!universe.length) throw new Error('The configured market-data provider returned an empty security universe');
 
+  const [held, prior] = await Promise.all([
+    db.select({ portfolioId: positions.portfolioId, ticker: securities.ticker, exchange: securities.exchange })
+      .from(positions).innerJoin(portfolios, eq(positions.portfolioId, portfolios.id))
+      .innerJoin(securities, eq(positions.securityId, securities.id))
+      .where(and(eq(portfolios.ownerId, ownerId), sql`${positions.quantity} <> 0`)),
+    db.select({ portfolioId: discoveryCandidates.portfolioId, ticker: discoveryCandidates.ticker, exchange: discoveryCandidates.exchange,
+      decision: discoveryCandidates.decision, thesisVersionId: externalDiscoveryRuns.thesisVersionId, discoveryJson: discoveryCandidates.discoveryJson })
+      .from(discoveryCandidates).innerJoin(externalDiscoveryRuns, eq(discoveryCandidates.runId, externalDiscoveryRuns.id))
+      .innerJoin(thesisVersions, eq(externalDiscoveryRuns.thesisVersionId, thesisVersions.id))
+      .where(and(eq(discoveryCandidates.ownerId, ownerId), isNull(thesisVersions.excludedAt),
+        or(eq(discoveryCandidates.decision, 'approved'), eq(externalDiscoveryRuns.thesisVersionId, thesis.id)))),
+  ]);
+  const knownSecurities: NonNullable<DiscoveryRunRequest['knownSecurities']> = [
+    ...held.map(row => ({ ...row, issuerKey: undefined as string | undefined, reason: 'held' as const })),
+    ...prior.filter(row => row.decision === 'approved' || row.thesisVersionId === thesis.id).map(row => ({
+      portfolioId: row.portfolioId, ticker: row.ticker, exchange: row.exchange, thesisVersionId: row.thesisVersionId,
+      issuerKey: DiscoveryCandidate.safeParse(row.discoveryJson).data?.discoveryContext?.issuerKey,
+      reason: row.decision === 'rejected' ? 'rejected' as const : row.decision === 'approved' ? 'under_analysis' as const : 'under_review' as const,
+    })),
+  ].map(row => ({ ...row, issuerKey: row.issuerKey ?? (() => {
+    const record = universe.find(record => listingKey(record) === listingKey(row));
+    return record ? issuerKey(record) : undefined;
+  })() }));
   const request = DiscoveryRunRequest.parse({
     thesis: { versionId: thesis.id, criteria },
     portfolios: equityPortfolios,
     universe,
     maxCandidatesPerPortfolio,
+    knownSecurities,
+    universeFailures,
     agentConfig,
   });
   return { request, provider: [...new Set(loaded.map((result) => `${result.provider}${result.cached ? ':cached' : ''}`))].join(', '), thesisVersionId: thesis.id };
@@ -172,6 +197,7 @@ export async function preflightDiscoveryForOwner(ownerId: string, maxCandidatesP
       provider: built.provider,
       thesisVersionId: built.thesisVersionId,
       checks: [
+        ...(built.request.universeFailures ?? []).map(f => ({ label: `${f.exchange} unavailable`, status: 'warning' as const, detail: `${f.reason} Other available portfolios can still run.` })),
         { label: 'Confirmed thesis', detail: `Version ${built.request.thesis.criteria.version} is active`, status: 'ready' as const },
         { label: 'Portfolio mandates', detail: `${built.request.portfolios.length} eligible portfolio${built.request.portfolios.length === 1 ? '' : 's'} aligned to the thesis`, status: 'ready' as const },
         ...[...universeByExchange.entries()].map(([exchange, count]) => ({
@@ -294,7 +320,9 @@ export async function synchronizeDiscoveryRun(
         portfolioId: discoveryCandidates.portfolioId,
         exchange: discoveryCandidates.exchange,
         ticker: discoveryCandidates.ticker,
-      }).from(discoveryCandidates).where(and(
+      }).from(discoveryCandidates)
+        .innerJoin(externalDiscoveryRuns, eq(discoveryCandidates.runId, externalDiscoveryRuns.id)).where(and(
+        eq(externalDiscoveryRuns.thesisVersionId, local.thesisVersionId),
         eq(discoveryCandidates.ownerId, ownerId),
         eq(discoveryCandidates.decision, 'rejected'),
         inArray(discoveryCandidates.portfolioId, portfolioIds),
@@ -366,7 +394,7 @@ export async function rejectOrWatchCandidate(
       decision,
       reasoning: rationale ?? null,
       alternativesConsidered: journal ? decisionJournalAuditText(journal) : null,
-      outcome: decision === 'rejected' ? 'Excluded from future discovery outputs for this portfolio.' : 'Kept for later review.',
+      outcome: decision === 'rejected' ? 'Excluded from new discovery outputs for this portfolio under this thesis version; a new thesis may reconsider it.' : 'Kept for later review.',
       relatedPortfolioId: row.portfolio.id,
       metadata: {
         thesisVersionId: row.run.thesisVersionId,
@@ -395,6 +423,12 @@ export async function approveCandidateForAnalysis(ownerId: string, candidateId: 
   }
 
   return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${ownerId}))`);
+    const [active] = await tx.select({ id: thesisVersions.id }).from(thesisVersions).where(and(
+      eq(thesisVersions.id, row.run.thesisVersionId), eq(thesisVersions.ownerId, ownerId),
+      isNull(thesisVersions.excludedAt), isNull(thesisVersions.supersededAt)
+    )).limit(1);
+    if (!active) throw new Error('The thesis has changed. Run Discovery under the current approved thesis before approving this candidate.');
     const [candidate] = await tx.update(discoveryCandidates).set({
       decision: 'approved',
       rationale: journal.decisionReason,
@@ -496,6 +530,13 @@ export async function startApprovedCandidateAnalysis(
   const discoveryEvidence = DiscoveryCandidate.parse(row.candidate.discoveryJson);
   const researchEvidence: NonNullable<GroundingBundle['researchEvidence']> = {
     [`research:rationale:${candidateId}`]: discoveryEvidence.rationale,
+    [`research:discovery_handoff:${candidateId}`]: JSON.stringify({
+      discoveryRunId: row.run.id, thesisVersionId: row.run.thesisVersionId,
+      portfolioId: row.portfolio.id, reportingCurrency: row.portfolio.baseCurrency,
+      identity: { ticker: row.candidate.ticker, exchange: row.candidate.exchange, tradingCurrency: row.candidate.currency },
+      context: discoveryEvidence.discoveryContext ?? null,
+      unresolvedQuestions: discoveryEvidence.informationGaps,
+    }),
     [`research:matched_criteria:${candidateId}`]: discoveryEvidence.matchedCriteria.join(' | ') || 'None evidenced',
     [`research:violated_criteria:${candidateId}`]: discoveryEvidence.violatedCriteria.join(' | ') || 'None evidenced',
     [`research:information_gaps:${candidateId}`]: discoveryEvidence.informationGaps.join(' | ') || 'None recorded',

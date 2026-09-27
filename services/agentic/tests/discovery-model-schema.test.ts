@@ -37,18 +37,19 @@ describe('agent schemas are expressible as strict Structured Outputs', () => {
 
 describe('the derived candidate schema does not drift from the contract', () => {
   it('carries exactly the contract candidate keys', () => {
-    const contractKeys = Object.keys(DiscoveryCandidate.shape).sort();
+    const contractKeys = Object.keys(DiscoveryCandidate.shape).filter(key => key !== 'discoveryContext').sort();
     const modelKeys = Object.keys(
       (MarketDiscoveryModelOutput.shape.candidates.element as typeof DiscoveryCandidate).shape
     ).sort();
     expect(modelKeys).toEqual(contractKeys);
   });
 
-  it('omits only the two fields the service supplies itself', () => {
+  it('omits service-owned fields from model output', () => {
     const contractKeys = Object.keys(MarketDiscoveryOutput.shape).sort();
     const modelKeys = Object.keys(MarketDiscoveryModelOutput.shape).sort();
     expect(contractKeys.filter((k) => !modelKeys.includes(k))).toEqual([
       'portfolioOutcomes',
+      'screeningAudit',
       'thesisVersion',
       'verifiedWebSources',
     ]);
@@ -79,3 +80,4 @@ describe('the derived candidate schema does not drift from the contract', () => 
     expect(DiscoveryCandidate.parse(candidate).ticker).toBe('NESN');
   });
 });
+

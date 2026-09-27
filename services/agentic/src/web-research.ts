@@ -7,6 +7,7 @@ export interface WebResearchEvidence {
   query: string;
   urls: string[];
   snippets: string[];
+  sources?: Array<{ url: string; snippet: string; retrievedAt: string; publishedAt: string | null }>;
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -33,6 +34,16 @@ async function searchResponse(url: string | URL, init: RequestInit): Promise<Res
   throw new Error('Research provider unavailable');
 }
 
+function searchEvidence(query: string, rows: unknown[], snippetField: string): WebResearchEvidence {
+  const retrievedAt = new Date().toISOString();
+  const sources = rows.map(record).flatMap(row => {
+    const url = text(row.url);
+    try { if (!['https:', 'http:'].includes(new URL(url).protocol)) return []; } catch { return []; }
+    return [{ url, snippet: text(row[snippetField]), retrievedAt, publishedAt: text(row.published_date) || null }];
+  });
+  return { query, urls: sources.map(s => s.url), snippets: sources.map(s => s.snippet).filter(Boolean), sources };
+}
+
 /** Server-side qualitative evidence only: never a substitute for market data. */
 export async function researchCompany(companyName: string, ticker: string, config: WebResearchConfig): Promise<WebResearchEvidence> {
   const query = `${companyName} ${ticker} business activities products services customers market sector business model strategy catalysts competitive advantage risks`;
@@ -44,7 +55,7 @@ export async function researchCompany(companyName: string, ticker: string, confi
     });
     const raw = record(await response.json());
     const rows: unknown[] = Array.isArray(raw.results) ? raw.results : [];
-    return { query, urls: rows.map(record).map((row) => text(row.url)).filter(Boolean), snippets: rows.map(record).map((row) => text(row.content)).filter(Boolean) };
+    return searchEvidence(query, rows, 'content');
   }
   const url = new URL('https://api.search.brave.com/res/v1/web/search');
   url.searchParams.set('q', query); url.searchParams.set('count', '3');
@@ -52,5 +63,6 @@ export async function researchCompany(companyName: string, ticker: string, confi
   const raw = record(await response.json());
   const searchResults = record(raw.web).results;
   const rows: unknown[] = Array.isArray(searchResults) ? searchResults : [];
-  return { query, urls: rows.map(record).map((row) => text(row.url)).filter(Boolean), snippets: rows.map(record).map((row) => text(row.description)).filter(Boolean) };
+  return searchEvidence(query, rows, 'description');
 }
+

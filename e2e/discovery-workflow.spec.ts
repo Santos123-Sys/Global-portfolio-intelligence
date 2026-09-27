@@ -7,6 +7,9 @@ import { signSessionPayload } from '../src/lib/session-token';
 
 const runId = '11111111-1111-4111-8111-111111111111';
 const candidateId = '22222222-2222-4222-8222-222222222222';
+const eligibility = { portfolioId: 'swiss', ticker: 'NESN', exchange: 'XSWX', issuerKey: 'listing:XSWX:NESN', status: 'eligible', reasons: [], rules: [{ criterion: 'Listing market', status: 'PASS', reason: 'XSWX; allowed: XSWX', sourceUrl: 'https://example.org/issuer', observedAt: '2026-09-26T00:00:00Z', thesisPath: 'policy.universe.listingMarkets' }] };
+const screeningAudit = { thesisVersionId: runId, records: [eligibility, { ...eligibility, ticker: 'BANK', status: 'ineligible', reasons: ['Excluded Financials sector'], rules: [] }, { ...eligibility, ticker: 'UNKNOWN', status: 'unverified', reasons: ['Sector evidence unavailable'], rules: [] }], researchAttempted: 1, researchFailed: 0, modelCalls: 1, elapsedMs: 2500 };
+
 
 test('thesis-matched discovery remains reviewable through approval and report access', async ({ page, context }) => {
   const expiry = Date.now() + 60 * 60_000;
@@ -28,7 +31,7 @@ test('thesis-matched discovery remains reviewable through approval and report ac
     analysisMode: 'limited_research_risk', dcfLocked: true, dcfLockReason: 'Statements unavailable',
     latestPrice: null, decisionJournal: null, risk: null, analysis: approved ? { investmentScore: 60, thesisAlignmentScore: 70, confidenceScore: 40, qualityScore: null, growthScore: null, riskScore: null, dividendScore: null, investmentThesis: 'Research lead with incomplete financial evidence.', fundamentalSummary: 'Partial annual filings.', keyCatalysts: [], keyRisks: ['Evidence gaps'], thesisBreakers: [], informationGaps: ['FCFF unavailable'], groundedIn: ['identity:ticker'], researchFramework: null } : null, valuation: null,
     evidenceScorecard: { assessment: 'developing', sourceUrlCount: 1, groundingFieldCount: 2, informationGapCount: 2, conflictCount: 0, marketPriceStatus: 'unavailable', summary: 'Initial evidence; gaps remain.' },
-    discoveryJson: { thesisAlignmentScore: 81, rationale: 'Matches the quality mandate.', matchedCriteria: ['Swiss listing'], violatedCriteria: [], informationGaps: ['Check cash generation'], groundedIn: ['identity:ticker', 'identity:exchange'], sourceUrls: ['https://example.org/issuer'] },
+    discoveryJson: { discoveryContext: { thesisVersionId: runId, issuerKey: eligibility.issuerKey, channel: 'structured_universe', eligibility, evidence: [{ url: 'https://example.org/issuer', provider: 'fixture', kind: 'structured_record', tier: 'unclassified', retrievedAt: '2026-09-26T00:00:00Z', publishedAt: null }] }, thesisAlignmentScore: 81, rationale: 'Matches the quality mandate.', matchedCriteria: ['Swiss listing'], violatedCriteria: [], informationGaps: ['Check cash generation'], groundedIn: ['identity:ticker', 'identity:exchange'], sourceUrls: ['https://example.org/issuer'] },
   });
   await page.route('**/api/**', async (route) => {
     const { pathname } = new URL(route.request().url());
@@ -54,7 +57,7 @@ test('thesis-matched discovery remains reviewable through approval and report ac
       { label: 'Brazilian B3 universe', detail: '25 securities available', status: 'ready' },
     ] } });
     if (pathname === '/api/discovery/runs' && method === 'POST') { started = true; return json({ run: { id: runId } }, 202); }
-    if (pathname === '/api/discovery/runs') return json({ runs: started ? [{ id: runId, status: 'completed', requestedAt: '2026-09-23T11:00:00.000Z', candidateCount: 1, portfolioCandidateCounts: [{ portfolioId: 'swiss', portfolioName: 'Swiss Quality', count: 1, status: 'candidates_found', reason: 'One research lead' }], universeCoverage: { records: 25, truncated: true, unranked: true, providers: ['finnhub'], recordsByPortfolio: [{ portfolioId: 'swiss', count: 25 }] }, resultJson: { limitations: ['Web research unavailable for XSWX:OTHER. Partial assessment.'] } }] : [] });
+    if (pathname === '/api/discovery/runs') return json({ runs: started ? [{ id: runId, status: 'completed', requestedAt: '2026-09-23T11:00:00.000Z', candidateCount: 1, portfolioCandidateCounts: [{ portfolioId: 'swiss', portfolioName: 'Swiss Quality', count: 1, status: 'candidates_found', reason: 'One research lead' }], universeCoverage: { records: 25, truncated: true, unranked: true, providers: ['finnhub'], recordsByPortfolio: [{ portfolioId: 'swiss', count: 25 }] }, resultJson: { thesisVersion: 1, screeningAudit, limitations: ['Web research unavailable for XSWX:OTHER. Partial assessment.'] } }] : [] });
     if (pathname === '/api/discovery/candidates' && method === 'POST') {
       const body = route.request().postDataJSON();
       expect(body.decision).toBe('approved');
@@ -77,10 +80,25 @@ test('thesis-matched discovery remains reviewable through approval and report ac
   await expect(page.getByText(/this shortlist does not represent a ranked search/)).toBeVisible();
   await page.getByText('Research limitations and retrieval failures', { exact: true }).click();
   await expect(page.getByText(/Web research unavailable for XSWX:OTHER/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'From supplied universe to shortlist' })).toBeVisible();
+  await page.getByText('Inspect eligibility and exclusions', { exact: true }).click();
+  await expect(page.getByText('Excluded Financials sector')).toBeVisible();
+  await expect(page.getByText('Sector evidence unavailable')).toBeVisible();
+  await expect(page.getByText('Approved thesis version 1')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: '/tmp/discovery-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: '/tmp/discovery-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Review latest candidates' }).click();
   await expect(page.getByRole('heading', { name: /Nestle SA/ })).toBeVisible();
   await expect(page.getByText('2 grounding fields', { exact: true })).toBeVisible();
   await expect(page.getByText(/not independently verified investment facts/)).toBeVisible();
+  await page.getByText('Eligibility and evidence dates', { exact: true }).click();
+  await expect(page.getByText(/retrieved 2026-09-26 · published unknown/)).toBeVisible();
   const approve = page.getByRole('button', { name: 'Approve & analyze' });
   await expect(approve).toBeEnabled();
   await approve.click();
@@ -128,3 +146,4 @@ test('thesis-matched discovery remains reviewable through approval and report ac
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), JSON.stringify(overflow)).toBe(true);
 
 });
+

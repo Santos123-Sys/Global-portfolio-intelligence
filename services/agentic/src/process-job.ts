@@ -34,7 +34,7 @@ export async function processJob(job: AgenticJob, deps: ProcessingDependencies):
       const request = DiscoveryRunRequest.safeParse(job.payload);
       if (!request.success) throw new AgenticPipelineError('analysis', 'Stored discovery payload failed contract validation');
       await deps.repository.updateProgress(job.id, 0, 1, 'market_discovery', job.attemptCount);
-      const result = await deps.pipeline.discoverSecurities(request.data);
+      const result = await deps.pipeline.discoverSecurities(request.data, (completed, total, stage) => deps.repository.updateProgress(job.id, completed, total, stage, job.attemptCount));
       await deps.repository.completeDiscovery(job.id, result, job.attemptCount);
       return;
     }
@@ -120,3 +120,4 @@ class ProcessingStageError extends Error {
     this.name = 'ProcessingStageError';
   }
 }
+

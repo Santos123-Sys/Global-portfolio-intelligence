@@ -1,6 +1,10 @@
 import type { ThesisCriteria, SecurityUniverseRecord } from './index.js';
+import type { z } from 'zod';
+import type { EligibilityRuleResult } from './discovery-domain.js';
 type Mandate = ThesisCriteria['portfolios'][number];
 const key = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+const sectorKey = (s: string) => ({ tech: 'information technology', technology: 'information technology', financial: 'financials', 'financial services': 'financials' }[key(s)] ?? key(s));
+const universePaths: Record<string, string> = { 'Listing market': 'listingMarkets', Domicile: 'domicileCountries', 'Operating geography': 'operatingCountries', 'Revenue exposure': 'revenueCountries', 'Security type': 'securityTypes', 'Sector inclusion': 'sectorsIncluded', 'Sector exclusion': 'sectorsExcluded', 'Industry inclusion': 'industriesIncluded', 'Industry exclusion': 'industriesExcluded' };
 export interface ThesisIssue {
   severity: 'blocking' | 'warning' | 'info';
   location: string;
@@ -140,7 +144,7 @@ export function reviewStructuredThesis(
       [u.industriesIncluded, u.industriesExcluded, 'Industry'],
     ] as const) {
       for (const v of included)
-        if (excluded.some((e) => key(e) === key(v)))
+        if (excluded.some((e) => (label === 'Sector' ? sectorKey(e) === sectorKey(v) : key(e) === key(v))))
           add(
             'blocking',
             p.role,
@@ -261,8 +265,23 @@ export function evaluateThesisEligibility(
 ) {
   const violated: string[] = [];
   const unverified: string[] = [];
+  const rules: z.infer<typeof EligibilityRuleResult>[] = [];
+  const result = (criterion: string, thesisPath: string, status: z.infer<typeof EligibilityRuleResult>['status'], reason: string) => {
+    const attr = record.attributes;
+    const source = criterion === 'Domicile' ? attr.issuer_identity_source_url : undefined;
+    const date = criterion === 'Domicile' ? attr.issuer_identity_observed_at : undefined;
+    let sourceUrl = record.sourceUrl;
+    if (typeof source === 'string') {
+      try { if (['http:', 'https:'].includes(new URL(source).protocol)) sourceUrl = source; } catch { /* retain record provenance */ }
+    }
+    const observedAt = typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date)) ? `${date}T00:00:00.000Z` : record.observedAt;
+    rules.push({ criterion, thesisPath, status, reason, sourceUrl, observedAt });
+  };
   const policy = p.policy;
-  if (!policy) return { status: 'eligible' as const, violated, unverified };
+  if (!policy) {
+    result('Structured eligibility', p.role, 'NOT_APPLICABLE', 'Legacy mandate: only configured listing market verified; prose requires human review');
+    return { status: 'eligible' as const, violated, unverified, rules };
+  }
   const u = policy.universe,
     a = record.attributes;
   function check(
@@ -274,10 +293,14 @@ export function evaluateThesisEligibility(
     if (!allowed.length) return;
     if (typeof actual !== 'string' || !actual.trim()) {
       unverified.push(`${label}: evidence unavailable`);
+      result(label, `${p.role}.policy.universe.${universePaths[label]}`, 'UNKNOWN', 'Evidence unavailable');
       return;
     }
-    const matches = allowed.some((v) => key(v) === key(actual));
-    if (exclusion ? matches : !matches) violated.push(`${label}: ${actual}`);
+    const normalize = label.startsWith('Sector') ? sectorKey : key;
+    const matches = allowed.some((v) => normalize(v) === normalize(actual));
+    const failed = exclusion ? matches : !matches;
+    if (failed) violated.push(`${label}: ${actual}`);
+    result(label, `${p.role}.policy.universe.${universePaths[label]}`, failed ? 'FAIL' : 'PASS', `${actual}; ${exclusion ? 'excluded' : 'allowed'}: ${allowed.join(', ')}`);
   }
   check('Listing market', u.listingMarkets, record.exchange);
   check('Domicile', u.domicileCountries, a.issuer_domicile_country_iso2);
@@ -296,6 +319,7 @@ export function evaluateThesisEligibility(
     const m = r.metric;
     if (!m) {
       unverified.push(r.statement);
+      result(r.statement, `${p.role}.policy.rules[${policy.rules.indexOf(r)}]`, 'UNKNOWN', 'No measurable predicate');
       continue;
     }
     const value = a[m.field];
@@ -306,10 +330,12 @@ export function evaluateThesisEligibility(
       a[`${m.field}_period`] !== m.period
     ) {
       unverified.push(`${r.statement}: metric, unit or period unavailable`);
+      result(r.statement, `${p.role}.policy.rules[${policy.rules.indexOf(r)}]`, 'UNKNOWN', 'Metric, unit or period unavailable');
       continue;
     }
-    if (m.operator === 'gte' ? value < m.value : value > m.value)
-      violated.push(r.statement);
+    const failed = m.operator === 'gte' ? value < m.value : value > m.value;
+    if (failed) violated.push(r.statement);
+    result(r.statement, `${p.role}.policy.rules[${policy.rules.indexOf(r)}]`, failed ? 'FAIL' : 'PASS', `${m.field}: ${value} ${m.unit} (${m.period}); ${m.operator} ${m.value}`);
   }
   return {
     status: violated.length
@@ -319,6 +345,7 @@ export function evaluateThesisEligibility(
         : ('eligible' as const),
     violated,
     unverified,
+    rules,
   };
 }
 

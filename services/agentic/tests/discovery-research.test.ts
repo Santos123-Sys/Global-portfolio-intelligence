@@ -36,6 +36,7 @@ describe('discovery research failure isolation', () => {
     const { instance, parse } = pipeline(modelCandidate(input));
     await expect(instance.discoverSecurities(input)).rejects.toThrow(/unverified/);
     expect(parse).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
   });
   it('retains a partial shortlist while adding a service-owned gap and limitation', async () => {
     const input = request();
@@ -70,8 +71,65 @@ describe('discovery research failure isolation', () => {
   it('skips the model when every retrieval fails and returns an actionable failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 401 })));
     const { instance, parse } = pipeline({});
-    await expect(instance.discoverSecurities(request())).rejects.toThrow(/eligibility was not assessed/);
+    await expect(instance.discoverSecurities(request())).rejects.toThrow(/qualitative evidence is unavailable/);
     expect(parse).not.toHaveBeenCalled();
   });
 });
 
+
+it('filters before research, retains dated sources and reports deterministic funnel metrics', async () => {
+  const input = request();
+  input.thesis.criteria.portfolios[0].policy = { ...emptyThesisPolicy(), universe: { ...emptyThesisPolicy().universe, listingMarkets: ['XSWX'], sectorsExcluded: ['Financials'] } };
+  input.universe[0].sector = 'Industrials';
+  input.universe[0].attributes = { issuer_lei: 'SAME', listing_primary_status: 'Yes' };
+  input.universe[1].sector = 'Financials';
+  input.universe.push({ ...input.universe[0], ticker: 'CCC', attributes: { issuer_lei: 'SAME' } }, { ...input.universe[0], ticker: 'DDD', sector: null });
+  const fetcher = vi.fn().mockResolvedValue(Response.json({ results: [{ url: 'https://example.test/report', content: 'Annual report overview', published_date: '2026-08-01' }] }));
+  vi.stubGlobal('fetch', fetcher);
+  const { instance, parse } = pipeline(modelCandidate(input));
+  const result = await instance.discoverSecurities(input);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(parse).toHaveBeenCalledTimes(1);
+  expect(result.screeningAudit).toMatchObject({ researchAttempted: 1, researchFailed: 0, modelCalls: 1 });
+  expect(result.screeningAudit?.records.map(r => r.status).sort()).toEqual(['duplicate', 'eligible', 'ineligible', 'unverified']);
+  expect(result.candidates[0].discoveryContext?.evidence[1]).toMatchObject({ tier: 'unclassified', publishedAt: '2026-08-01', snippet: 'Annual report overview' });
+  expect(result.candidates[0].discoveryContext?.thesisVersionId).toBe(thesisVersionId);
+});
+
+it('returns an explicit empty result for hard failures without web or model calls', async () => {
+  const input = request(); input.thesis.criteria.portfolios[0].policy = { ...emptyThesisPolicy(), universe: { ...emptyThesisPolicy().universe, listingMarkets: ['BVMF'] } };
+  const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
+  const { instance, parse } = pipeline({});
+  const result = await instance.discoverSecurities(input);
+  expect(result.portfolioOutcomes?.[0].status).toBe('no_candidates');
+  expect(fetcher).not.toHaveBeenCalled(); expect(parse).not.toHaveBeenCalled();
+});
+
+it('keeps a successful portfolio when the other universe provider fails', async () => {
+  const input = request(); input.portfolios.push({ id: brazilId, name: 'Brazil', role: 'brazilian_growth', baseCurrency: 'BRL', investmentObjective: 'Growth' });
+  input.thesis.criteria.portfolios.push({ role: 'brazilian_growth', currency: 'BRL', objective: 'Growth', inclusionCriteria: [], exclusionCriteria: [] });
+  input.universeFailures = [{ exchange: 'BVMF', reason: 'Provider unavailable' }];
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ results: [] })));
+  const result = await pipeline(modelCandidate(input)).instance.discoverSecurities(input);
+  expect(result.portfolioOutcomes?.map(o => o.status)).toEqual(['candidates_found', 'failed']);
+  expect(result.candidates).toHaveLength(1);
+});
+
+it('preserves trading currency independently of portfolio reporting currency through validation', async () => {
+  const input = request(); const model = modelCandidate(input);
+  input.universe[0].currency = 'USD';
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ results: [] })));
+  const result = await pipeline(model).instance.discoverSecurities(input);
+  expect(result.candidates[0].currency).toBe('USD');
+  expect(result.marketMandates[0].currency).toBe('CHF');
+});
+
+it('rejects a candidate that cites research retrieved only for another security', async () => {
+  const input = request(); const model = modelCandidate(input);
+  model.candidates[0].sourceUrls.push('https://example.test/BBB-research');
+  vi.stubGlobal('fetch', vi.fn(async (_url: unknown, init: RequestInit) => {
+    const ticker = JSON.parse(init.body as string).query.startsWith('AAA ') ? 'AAA' : 'BBB';
+    return Response.json({ results: [{ url: `https://example.test/${ticker}-research`, content: 'Evidence' }] });
+  }));
+  await expect(pipeline(model).instance.discoverSecurities(input)).rejects.toThrow(/another security's research/);
+});

@@ -54,12 +54,14 @@ export async function GET(req: Request) {
   if (!session.ok) return session.response;
   const id = new URL(req.url).searchParams.get('id');
   let runs = await list(session.auth.userId);
+  const progress = new Map<string, { completed: number; total: number; currentStage: string }>();
   const active = runs.filter((run) =>
     (!id || run.id === id) && (run.status === 'queued' || run.status === 'running')
   );
   await Promise.all(active.map(async (run) => {
     try {
       const remote = await fetchExternalDiscoveryRun(run.externalDiscoveryId);
+      if (remote.progress) progress.set(run.id, remote.progress);
       await synchronizeDiscoveryRun(run.id, session.auth.userId, remote);
     } catch {
       // Keep the durable local record while the private service is temporarily unavailable.
@@ -69,7 +71,7 @@ export async function GET(req: Request) {
   if (id && !runs.some((run) => run.id === id)) {
     return NextResponse.json({ error: 'Discovery run not found' }, { status: 404 });
   }
-  return NextResponse.json({ runs: id ? runs.filter((run) => run.id === id) : runs });
+  return NextResponse.json({ runs: (id ? runs.filter((run) => run.id === id) : runs).map(run => ({ ...run, progress: progress.get(run.id) })) });
 }
 
 export async function POST(req: Request) {
@@ -125,3 +127,4 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: (error as Error).message }, { status: 502 });
   }
 }
+
