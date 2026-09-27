@@ -8,6 +8,7 @@ import { ValuationWorkbench } from '@/components/valuation-workbench';
 import { ResearchWorkspace } from '@/components/research-workspace';
 import { useLanguage } from '@/lib/i18n';
 import { discoveryDate, discoveryText } from '@/lib/discovery-translations';
+import { decisionJournalSchema } from '@/lib/decision-journal';
 
 interface DiscoveryRun {
   id: string;
@@ -149,7 +150,20 @@ const emptyDecisionJournal = (): DecisionJournalDraft => ({
 });
 
 function journalIsComplete(journal: DecisionJournalDraft): boolean {
-  return Object.values(journal).every((value) => value.trim().length >= 8);
+  return decisionJournalSchema.safeParse(journal).success;
+}
+
+function invalidJournalFields(journal: DecisionJournalDraft): Array<keyof DecisionJournalDraft> {
+  const result = decisionJournalSchema.safeParse(journal);
+  if (result.success) return [];
+  return [...new Set(result.error.issues.map((issue) => issue.path[0] as keyof DecisionJournalDraft))];
+}
+
+function journalFieldLabels(t: (key: Parameters<typeof discoveryText>[1]) => string): Record<keyof DecisionJournalDraft, string> {
+  return {
+    decisionReason: t('why'), expectedHoldingPeriod: t('period'), valuationView: t('valuation'),
+    principalRisk: t('principalRisk'), invalidationTrigger: t('invalidation'),
+  };
 }
 
 function friendlyAnalysisStatus(candidate: Candidate, t: (key: Parameters<typeof discoveryText>[1]) => string): {
@@ -352,18 +366,25 @@ export default function AIStockDiscoveryPage() {
     return journalDrafts[candidate.id] ?? candidate.decisionJournal ?? emptyDecisionJournal();
   }
 
-  function updateJournal(candidateId: string, field: keyof DecisionJournalDraft, value: string) {
+  function updateJournal(candidate: Candidate, field: keyof DecisionJournalDraft, value: string) {
     setJournalDrafts((current) => ({
       ...current,
-      [candidateId]: { ...(current[candidateId] ?? emptyDecisionJournal()), [field]: value },
+      [candidate.id]: { ...(current[candidate.id] ?? candidate.decisionJournal ?? emptyDecisionJournal()), [field]: value },
     }));
+    setCandidateErrors((current) => {
+      if (!current[candidate.id]) return current;
+      const next = { ...current };
+      delete next[candidate.id];
+      return next;
+    });
   }
 
   async function decide(candidate: Candidate, decision: 'approved' | 'rejected' | 'watchlist') {
     const candidateId = candidate.id;
     const journal = journalFor(candidate);
     if (decision === 'approved' && !journalIsComplete(journal)) {
-      const message = 'Complete the five decision-journal fields before approving a candidate for analysis.';
+      const labels = journalFieldLabels(t);
+      const message = `${t('journalIncomplete')} ${invalidJournalFields(journal).map((field) => labels[field]).join(', ')}.`;
       setCandidateErrors((current) => ({ ...current, [candidateId]: message }));
       return;
     }
@@ -539,6 +560,9 @@ export default function AIStockDiscoveryPage() {
             const canDecide = candidate.decision === 'pending' || candidate.decision === 'watchlist';
             const isWorking = busy === candidate.id;
             const analysisStatus = friendlyAnalysisStatus(candidate, t);
+            const journal = journalFor(candidate);
+            const invalidFields = invalidJournalFields(journal);
+            const fieldLabels = journalFieldLabels(t);
             return <article className="card candidate-card" key={candidate.id}>
               <div className="candidate-heading">
                 <div>
@@ -577,26 +601,29 @@ export default function AIStockDiscoveryPage() {
                 <p>{t('journalDetail')}</p>
                 <div className="decision-journal-grid">
                   <label>{t('why')}
-                    <textarea value={journalFor(candidate).decisionReason} onChange={(event) => updateJournal(candidate.id, 'decisionReason', event.target.value)} placeholder="Specific reason this opportunity merits deeper work" />
+                    <textarea value={journal.decisionReason} onChange={(event) => updateJournal(candidate, 'decisionReason', event.target.value)} placeholder="Specific reason this opportunity merits deeper work" />
                   </label>
                   <label>{t('period')}
-                    <input value={journalFor(candidate).expectedHoldingPeriod} onChange={(event) => updateJournal(candidate.id, 'expectedHoldingPeriod', event.target.value)} placeholder="e.g. 3–5 years" />
+                    <input value={journal.expectedHoldingPeriod} onChange={(event) => updateJournal(candidate, 'expectedHoldingPeriod', event.target.value)} placeholder="e.g. 3–5 years" />
                   </label>
                   <label>{t('valuation')}
-                    <textarea value={journalFor(candidate).valuationView} onChange={(event) => updateJournal(candidate.id, 'valuationView', event.target.value)} placeholder="What must be tested in valuation and why" />
+                    <textarea value={journal.valuationView} onChange={(event) => updateJournal(candidate, 'valuationView', event.target.value)} placeholder="What must be tested in valuation and why" />
                   </label>
                   <label>{t('principalRisk')}
-                    <textarea value={journalFor(candidate).principalRisk} onChange={(event) => updateJournal(candidate.id, 'principalRisk', event.target.value)} placeholder="Most material downside risk" />
+                    <textarea value={journal.principalRisk} onChange={(event) => updateJournal(candidate, 'principalRisk', event.target.value)} placeholder="Most material downside risk" />
                   </label>
                   <label>{t('invalidation')}
-                    <textarea value={journalFor(candidate).invalidationTrigger} onChange={(event) => updateJournal(candidate.id, 'invalidationTrigger', event.target.value)} placeholder="Observable trigger that would change the decision" />
+                    <textarea value={journal.invalidationTrigger} onChange={(event) => updateJournal(candidate, 'invalidationTrigger', event.target.value)} placeholder="Observable trigger that would change the decision" />
                   </label>
                 </div>
+                <p className="journal-feedback" role="status">{invalidFields.length === 0
+                  ? t('journalReady')
+                  : `${t('journalIncomplete')} ${invalidFields.map((field) => fieldLabels[field]).join(', ')}.`}</p>
               </details>}
               <div className="candidate-actions">
                 <span className={`badge ${candidate.decision === 'rejected' ? 'breach' : candidate.decision === 'approved' ? 'ok' : 'watch'}`}>{candidate.decision === 'watchlist' ? t('watchlist') : candidate.decision === 'rejected' ? t('reject') : candidate.decision === 'approved' ? t('approved') : t('pending')}</span>
                 {canDecide && <>
-                  <button type="button" onClick={() => void decide(candidate, 'approved')} disabled={isWorking || !journalIsComplete(journalFor(candidate))}>{isWorking ? t('approving') : t('approve')}</button>
+                  <button className="approve-action" type="button" onClick={() => void decide(candidate, 'approved')} disabled={isWorking}>{isWorking ? t('approving') : t('approve')}</button>
                   <button type="button" onClick={() => void decide(candidate, 'watchlist')} disabled={isWorking}>{t('watchlist')}</button>
                   <button type="button" className="danger-outline" onClick={() => void decide(candidate, 'rejected')} disabled={isWorking}>{t('reject')}</button>
                 </>}

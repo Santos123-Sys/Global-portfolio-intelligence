@@ -961,3 +961,8 @@ button.nav-link:hover, button.nav-link[aria-expanded="true"] { background: var(-
 .dcf-review fieldset { border: 1px solid var(--border); border-radius: 8px; }
 .dcf-review legend { text-transform: capitalize; padding-inline: .3rem; }
 .dcf-review summary { padding-block: .5rem; }
+
+.decision-journal .journal-feedback { margin-top: .8rem; color: var(--text); }
+@media (max-width: 640px) {
+  .candidate-actions .approve-action { flex: 1 1 100%; min-height: 44px; }
+}

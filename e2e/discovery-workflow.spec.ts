@@ -59,6 +59,7 @@ test('thesis-matched discovery remains reviewable through approval and report ac
       const body = route.request().postDataJSON();
       expect(body.decision).toBe('approved');
       expect(body.journal.decisionReason).toContain('durable');
+      expect(body.journal.expectedHoldingPeriod).toBe('3 years');
       approved = true;
       return json({ candidate: candidate() });
     }
@@ -80,12 +81,18 @@ test('thesis-matched discovery remains reviewable through approval and report ac
   await expect(page.getByRole('heading', { name: /Nestle SA/ })).toBeVisible();
   await expect(page.getByText('2 grounding fields', { exact: true })).toBeVisible();
   await expect(page.getByText(/not independently verified investment facts/)).toBeVisible();
+  const approve = page.getByRole('button', { name: 'Approve & analyze' });
+  await expect(approve).toBeEnabled();
+  await approve.click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Complete these fields before approval:' })).toBeVisible();
   await page.getByLabel('Why does this fit the thesis?').fill('A durable competitive advantage warrants deeper analysis.');
-  await page.getByLabel('Expected holding period').fill('Five years');
+  await page.getByLabel('Expected holding period').fill('3 years');
   await page.getByLabel('Current valuation view').fill('Test normalized cash flows before investing.');
   await page.getByLabel('Principal risk').fill('Margin compression from input costs.');
   await page.getByLabel('What would invalidate the view?').fill('Sustained loss of pricing power.');
-  await page.getByRole('button', { name: 'Approve & analyze' }).click();
+  await expect(page.getByText('Ready to approve and start analysis.')).toBeVisible();
+  await expect(approve).toBeEnabled();
+  await approve.click();
   await expect(page.getByRole('link', { name: 'Open PDF report' })).toHaveAttribute('href', /reports\?externalRunId=analysis-1/);
   await page.getByRole('button', { name: 'Open embedded financial report' }).click();
   await expect(page.getByRole('heading', { name: 'Company financial report' })).toBeVisible();
