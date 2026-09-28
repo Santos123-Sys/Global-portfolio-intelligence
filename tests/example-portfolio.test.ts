@@ -17,10 +17,14 @@ describe('isolated example portfolio', () => {
       expect(asset.researchStatus).toBe('illustrative_scenario');
       expect(asset.fcff).toBeCloseTo(asset.ebit * (1 - asset.taxRate) + asset.depreciation - asset.capex - asset.workingCapital);
       expect(asset.revenueGrowth).toBeCloseTo(asset.revenue / asset.revenuePrior - 1);
+      expect(asset.dcf.scenarios.map(scenario => scenario.name)).toEqual(['worst_case', 'base_case', 'optimistic_case']);
+      expect(asset.dcf.scenarios.every(scenario => scenario.result.projections.length === 5)).toBe(true);
+      expect(asset.dcf.scenarios[0]!.result.fairValuePerShare).toBeLessThan(asset.dcf.scenarios[1]!.result.fairValuePerShare);
+      expect(asset.dcf.scenarios[1]!.result.fairValuePerShare).toBeLessThan(asset.dcf.scenarios[2]!.result.fairValuePerShare);
     }
   });
 
-  it('requires authentication before contacting the private service', async () => {
+  it('requires authentication before serving the sample allocation', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     auth.mockResolvedValueOnce({ ok: false, response: new Response('Authentication required', { status: 401 }) });
     expect((await GET(request)).status).toBe(401);
@@ -28,16 +32,17 @@ describe('isolated example portfolio', () => {
     fetchSpy.mockRestore();
   });
 
-  it('refuses unavailable compute service without fabricating recommendations', async () => {
+  it('serves the already-computed seeded sample allocation without the private service', async () => {
     auth.mockResolvedValueOnce({ ok: true, auth: { userId: 'example' } });
-    const previous = process.env.FILINGS_API_URL;
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
     delete process.env.FILINGS_API_URL;
-    try {
-      const response = await GET(request);
-      expect(response.status).toBe(503);
-      expect(await response.json()).toEqual({ error: 'The allocation engine is not configured.' });
-    } finally {
-      if (previous !== undefined) process.env.FILINGS_API_URL = previous;
-    }
+    const response = await GET(request);
+    expect(response.status).toBe(200);
+    const { result } = await response.json();
+    expect(result.data_kind).toBe('synthetic_educational_example');
+    expect(result.recommendation.user_must_choose).toBe(true);
+    expect(Object.keys(result.weights_table)).toHaveLength(8);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 });

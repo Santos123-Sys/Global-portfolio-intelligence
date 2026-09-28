@@ -1,0 +1,321 @@
+{
+  "inputs": {
+    "engine_version": "portfolio-weights/1.0.0",
+    "asset_order": [
+      "DEMO-ALP",
+      "DEMO-LIM",
+      "DEMO-CED",
+      "DEMO-RIG",
+      "DEMO-AAR",
+      "DEMO-TIC"
+    ],
+    "objective": "balanced",
+    "rf": 0.02,
+    "max_drawdown": 0.25,
+    "est_window": 504,
+    "step": 63,
+    "cost": 0.001,
+    "n_boot": 20,
+    "seed": 17,
+    "per_asset_max": 0.5
+  },
+  "weights_table": {
+    "1/N": {
+      "DEMO-ALP": 0.16666666666666666,
+      "DEMO-LIM": 0.16666666666666666,
+      "DEMO-CED": 0.16666666666666666,
+      "DEMO-RIG": 0.16666666666666666,
+      "DEMO-AAR": 0.16666666666666666,
+      "DEMO-TIC": 0.16666666666666666
+    },
+    "MinVar": {
+      "DEMO-ALP": 0.0,
+      "DEMO-LIM": 4.577105990422837e-19,
+      "DEMO-CED": 0.5000000000000001,
+      "DEMO-RIG": 0.16059401726516845,
+      "DEMO-AAR": 0.30796823035499993,
+      "DEMO-TIC": 0.031437752379831596
+    },
+    "MaxSharpe": {
+      "DEMO-ALP": 1.0807160120272752e-16,
+      "DEMO-LIM": 0.2451061080699784,
+      "DEMO-CED": 2.0864900601687392e-17,
+      "DEMO-RIG": 0.41394116461942454,
+      "DEMO-AAR": 0.0,
+      "DEMO-TIC": 0.34095272731059695
+    },
+    "RiskParity": {
+      "DEMO-ALP": 0.06958286659596331,
+      "DEMO-LIM": 0.06450898329268635,
+      "DEMO-CED": 0.39797723742237406,
+      "DEMO-RIG": 0.13948996672175032,
+      "DEMO-AAR": 0.2493947776627033,
+      "DEMO-TIC": 0.07904616830452267
+    },
+    "MaxDiv": {
+      "DEMO-ALP": 0.027141970117929893,
+      "DEMO-LIM": 0.045201875185161444,
+      "DEMO-CED": 0.4852033901843117,
+      "DEMO-RIG": 0.0691510809259936,
+      "DEMO-AAR": 0.29852465845627224,
+      "DEMO-TIC": 0.07477702513033103
+    },
+    "Kelly_frac": {
+      "DEMO-ALP": 4.163336342344336e-16,
+      "DEMO-LIM": 0.4999999999999996,
+      "DEMO-CED": 9.826803166797714e-17,
+      "DEMO-RIG": 0.0,
+      "DEMO-AAR": 0.0,
+      "DEMO-TIC": 0.4999999999999999
+    },
+    "BlackLitterman": {
+      "DEMO-ALP": 0.16666666666666669,
+      "DEMO-LIM": 0.16666666666666669,
+      "DEMO-CED": 0.16666666666666669,
+      "DEMO-RIG": 0.16666666666666669,
+      "DEMO-AAR": 0.16666666666666669,
+      "DEMO-TIC": 0.16666666666666669
+    },
+    "HRP": {
+      "DEMO-ALP": 0.01847508936376109,
+      "DEMO-LIM": 0.015522128509648373,
+      "DEMO-CED": 0.5,
+      "DEMO-RIG": 0.17812111542924736,
+      "DEMO-AAR": 0.2495491321153841,
+      "DEMO-TIC": 0.038332534581959114
+    }
+  },
+  "oos_summary": {
+    "1/N": {
+      "cagr": 0.10855532900983622,
+      "vol": 0.09100680515533124,
+      "sharpe": 0.9583021759573559,
+      "max_drawdown": -0.10032454698341775,
+      "ann_turnover": 0.6273683091879706
+    },
+    "MinVar": {
+      "cagr": 0.013439054030380815,
+      "vol": 0.04272832207508237,
+      "sharpe": -0.13431301395227108,
+      "max_drawdown": -0.06618885532891328,
+      "ann_turnover": 0.608593200955758
+    },
+    "MaxSharpe": {
+      "cagr": 0.1079396968156503,
+      "vol": 0.10082901024151998,
+      "sharpe": 0.8687184019103082,
+      "max_drawdown": -0.11285113533026703,
+      "ann_turnover": 2.6688176781153166
+    },
+    "RiskParity": {
+      "cagr": 0.04717834913791785,
+      "vol": 0.05367648743277436,
+      "sharpe": 0.513099874450541,
+      "max_drawdown": -0.0703585285062992,
+      "ann_turnover": 0.6233440381392485
+    },
+    "MaxDiv": {
+      "cagr": 0.02649555951543081,
+      "vol": 0.0466047944026998,
+      "sharpe": 0.15526344301543035,
+      "max_drawdown": -0.06738168939764422,
+      "ann_turnover": 0.7097296349013805
+    },
+    "Kelly_frac": {
+      "cagr": 0.17247219114979306,
+      "vol": 0.1637693124808301,
+      "sharpe": 0.9314975809855551,
+      "max_drawdown": -0.15682969335845487,
+      "ann_turnover": 2.0278817332492114
+    },
+    "BlackLitterman": {
+      "cagr": 0.108555329009836,
+      "vol": 0.09100680515533127,
+      "sharpe": 0.958302175957355,
+      "max_drawdown": -0.10032454698341786,
+      "ann_turnover": 0.6273683091879705
+    },
+    "HRP": {
+      "cagr": 0.02144937420758075,
+      "vol": 0.04372717401972885,
+      "sharpe": 0.049802178877402056,
+      "max_drawdown": -0.06480642430490557,
+      "ann_turnover": 0.5896440321502099
+    }
+  },
+  "stability": {
+    "1/N": {
+      "mad_from_base": 0.0,
+      "cross_run_std": 5.551115123125783e-17
+    },
+    "MinVar": {
+      "mad_from_base": 0.005346745165321408,
+      "cross_run_std": 0.006827410997684181
+    },
+    "MaxSharpe": {
+      "mad_from_base": 0.12381174575180928,
+      "cross_run_std": 0.14644976484435998
+    },
+    "RiskParity": {
+      "mad_from_base": 0.0036100628985857707,
+      "cross_run_std": 0.004349077905171591
+    },
+    "MaxDiv": {
+      "mad_from_base": 0.010161302239464138,
+      "cross_run_std": 0.011947628944683049
+    },
+    "Kelly_frac": {
+      "mad_from_base": 0.09861993112737069,
+      "cross_run_std": 0.1381172770474451
+    },
+    "BlackLitterman": {
+      "mad_from_base": 0.0,
+      "cross_run_std": 5.551115123125783e-17
+    },
+    "HRP": {
+      "mad_from_base": 0.0031350745866386706,
+      "cross_run_std": 0.003844668874940542
+    }
+  },
+  "recommendation": {
+    "recommended_method": "1/N",
+    "recommended_weights": {
+      "DEMO-ALP": 0.16666666666666666,
+      "DEMO-LIM": 0.16666666666666666,
+      "DEMO-CED": 0.16666666666666666,
+      "DEMO-RIG": 0.16666666666666666,
+      "DEMO-AAR": 0.16666666666666666,
+      "DEMO-TIC": 0.16666666666666666
+    },
+    "stability_flag": null,
+    "constraint_flag": null,
+    "ranking": {
+      "1/N": {
+        "cagr": 0.10855532900983622,
+        "vol": 0.09100680515533124,
+        "sharpe": 0.9583021759573559,
+        "max_drawdown": -0.10032454698341775,
+        "ann_turnover": 0.6273683091879706,
+        "mad_from_base": 0.0,
+        "cross_run_std": 5.551115123125783e-17,
+        "vol_inv": 10.988189271046169,
+        "eligible": true,
+        "score": 0.9576748076481679
+      },
+      "BlackLitterman": {
+        "cagr": 0.108555329009836,
+        "vol": 0.09100680515533127,
+        "sharpe": 0.958302175957355,
+        "max_drawdown": -0.10032454698341786,
+        "ann_turnover": 0.6273683091879705,
+        "mad_from_base": 0.0,
+        "cross_run_std": 5.551115123125783e-17,
+        "vol_inv": 10.988189271046165,
+        "eligible": true,
+        "score": 0.957674807648167
+      },
+      "Kelly_frac": {
+        "cagr": 0.17247219114979306,
+        "vol": 0.1637693124808301,
+        "sharpe": 0.9314975809855551,
+        "max_drawdown": -0.15682969335845487,
+        "ann_turnover": 2.0278817332492114,
+        "mad_from_base": 0.09861993112737069,
+        "cross_run_std": 0.1381172770474451,
+        "vol_inv": 6.1061500769080554,
+        "eligible": true,
+        "score": 0.7322298369975645
+      },
+      "MaxSharpe": {
+        "cagr": 0.1079396968156503,
+        "vol": 0.10082901024151998,
+        "sharpe": 0.8687184019103082,
+        "max_drawdown": -0.11285113533026703,
+        "ann_turnover": 2.6688176781153166,
+        "mad_from_base": 0.12381174575180928,
+        "cross_run_std": 0.14644976484435998,
+        "vol_inv": 9.917780583233514,
+        "eligible": true,
+        "score": 0.6184260927285743
+      },
+      "RiskParity": {
+        "cagr": 0.04717834913791785,
+        "vol": 0.05367648743277436,
+        "sharpe": 0.513099874450541,
+        "max_drawdown": -0.0703585285062992,
+        "ann_turnover": 0.6233440381392485,
+        "mad_from_base": 0.0036100628985857707,
+        "cross_run_std": 0.004349077905171591,
+        "vol_inv": 18.630131139866826,
+        "eligible": true,
+        "score": 0.5052564046152301
+      },
+      "MaxDiv": {
+        "cagr": 0.02649555951543081,
+        "vol": 0.0466047944026998,
+        "sharpe": 0.15526344301543035,
+        "max_drawdown": -0.06738168939764422,
+        "ann_turnover": 0.7097296349013805,
+        "mad_from_base": 0.010161302239464138,
+        "cross_run_std": 0.011947628944683049,
+        "vol_inv": 21.457019879956178,
+        "eligible": true,
+        "score": 0.1342311089016007
+      },
+      "HRP": {
+        "cagr": 0.02144937420758075,
+        "vol": 0.04372717401972885,
+        "sharpe": 0.049802178877402056,
+        "max_drawdown": -0.06480642430490557,
+        "ann_turnover": 0.5896440321502099,
+        "mad_from_base": 0.0031350745866386706,
+        "cross_run_std": 0.003844668874940542,
+        "vol_inv": 22.869074492415617,
+        "eligible": true,
+        "score": 0.0429423856719745
+      },
+      "MinVar": {
+        "cagr": 0.013439054030380815,
+        "vol": 0.04272832207508237,
+        "sharpe": -0.13431301395227108,
+        "max_drawdown": -0.06618885532891328,
+        "ann_turnover": 0.608593200955758,
+        "mad_from_base": 0.005346745165321408,
+        "cross_run_std": 0.006827410997684181,
+        "vol_inv": 23.403680543382823,
+        "eligible": true,
+        "score": -0.14561509748386967
+      }
+    },
+    "user_must_choose": true
+  },
+  "engine_version": "portfolio-weights/1.0.0",
+  "data_range": {
+    "start": "2022-01-03",
+    "end": "2025-11-12",
+    "rows": 1008
+  },
+  "dependencies": {
+    "numpy": "2.3.5",
+    "pandas": "2.2.3",
+    "scipy": "1.17.0",
+    "scikit-learn": "1.8.0"
+  },
+  "asset_annualized_volatility": {
+    "DEMO-ALP": 0.1684295768017829,
+    "DEMO-LIM": 0.18517868982566774,
+    "DEMO-CED": 0.0522323440160279,
+    "DEMO-RIG": 0.0891250241150145,
+    "DEMO-AAR": 0.08102123720753776,
+    "DEMO-TIC": 0.15486872988219091
+  },
+  "sample_starting_weights": {
+    "DEMO-ALP": 0.25,
+    "DEMO-LIM": 0.2,
+    "DEMO-CED": 0.18,
+    "DEMO-RIG": 0.15,
+    "DEMO-AAR": 0.12,
+    "DEMO-TIC": 0.1
+  },
+  "data_kind": "synthetic_educational_example"
+}

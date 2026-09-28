@@ -30,6 +30,8 @@ for (const width of [390, 1440]) {
     await page.goto('/example-portfolio');
     await expect(page.getByRole('heading', { name: 'Illustrative Swiss Quality portfolio' })).toBeVisible();
     await expect(page.getByText('Educational example: fictional companies and synthetic prices.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Three-case DCF · illustrative CHF per share' })).toBeVisible();
+    await expect(page.getByText('Alpen Health AG').first()).toBeVisible();
     await expect(page.getByRole('heading', { name: '04 · Compute portfolio weights' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Method comparison · synthetic out-of-sample history' })).toBeVisible();
     const method = page.getByRole('combobox', { name: 'Explore allocation method' });
