@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { db } from './db';
+import { portfolioExposure } from './portfolio-exposure';
 import {
   aiAnalyses,
   alerts,
@@ -165,11 +166,8 @@ export async function buildGovernanceDashboard(ownerId: string) {
 
   const construction = ownedPortfolios.map((portfolio) => {
     const rows = holdings.filter((holding) => holding.portfolioId === portfolio.id);
-    const weightTotal = rows.reduce((sum, row) => sum + (row.weight ?? 0), 0);
-    const canUseStoredWeights = rows.length > 0 && rows.every((row) => row.weight != null) && Math.abs(weightTotal - 1) < 0.02;
-    const valuesAreComparable = rows.every((row) => row.currency === portfolio.baseCurrency && row.marketValueNative != null);
-    const totalValue = valuesAreComparable ? rows.reduce((sum, row) => sum + Number(row.marketValueNative), 0) : null;
-    const normalized = rows.map((row) => ({ ...row, effectiveWeight: row.weight ?? (totalValue && totalValue > 0 ? Number(row.marketValueNative) / totalValue : null) }));
+    const exposure = portfolioExposure(rows.map((row) => ({ ...row, id: row.positionId })), portfolio.baseCurrency);
+    const normalized = exposure.rows;
     const sectors = new Map<string, number>();
     const countries = new Map<string, number>();
     for (const holding of normalized) {
@@ -178,6 +176,7 @@ export async function buildGovernanceDashboard(ownerId: string) {
       countries.set(holding.country ?? 'Unknown', (countries.get(holding.country ?? 'Unknown') ?? 0) + holding.effectiveWeight);
     }
     const issues: Array<{ severity: Severity; label: string; detail: string }> = [];
+    if (rows.length && !exposure.source) issues.push({ severity: 'watch', label: 'Exposure data', detail: exposure.reason! });
     if (rows.length > 0 && rows.length < policy.minimumHoldings) issues.push({ severity: 'watch', label: 'Diversification', detail: `${rows.length} holdings vs baseline minimum of ${policy.minimumHoldings}.` });
     for (const holding of normalized) if ((holding.effectiveWeight ?? 0) > policy.maxPositionWeight) issues.push({ severity: 'breach', label: `${holding.ticker} concentration`, detail: `${((holding.effectiveWeight ?? 0) * 100).toFixed(1)}% exceeds ${(policy.maxPositionWeight * 100).toFixed(1)}% baseline.` });
     for (const [sector, weight] of sectors) if (weight > policy.maxSectorWeight) issues.push({ severity: 'watch', label: `${sector} sector`, detail: `${(weight * 100).toFixed(1)}% exceeds ${(policy.maxSectorWeight * 100).toFixed(1)}% baseline.` });
@@ -188,7 +187,7 @@ export async function buildGovernanceDashboard(ownerId: string) {
       .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution));
     return {
       portfolioName: portfolio.name, currency: portfolio.baseCurrency, holdingCount: rows.length,
-      weightsAvailable: canUseStoredWeights || totalValue != null,
+      weightsAvailable: exposure.source != null, weightSource: exposure.source, weightReason: exposure.reason,
       issues, sectors: [...sectors.entries()].map(([name, weight]) => ({ name, weight })).sort((a, b) => b.weight - a.weight),
       countries: [...countries.entries()].map(([name, weight]) => ({ name, weight })).sort((a, b) => b.weight - a.weight),
       holdings: normalized.map((holding) => ({ ticker: holding.ticker, companyName: holding.companyName, weight: holding.effectiveWeight })).sort((a, b) => (b.weight ?? 0) - (a.weight ?? 0)),
