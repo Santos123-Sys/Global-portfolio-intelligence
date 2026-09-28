@@ -49,7 +49,8 @@ export async function fetchExternalDiscoveryRun(
   externalDiscoveryId: string
 ): Promise<DiscoveryRunStatus> {
   const response = await agenticFetch(
-    `/v1/discovery-runs/${encodeURIComponent(externalDiscoveryId)}`
+    `/v1/discovery-runs/${encodeURIComponent(externalDiscoveryId)}`,
+    { signal: AbortSignal.timeout(30_000) }
   );
   return DiscoveryRunStatus.parse(await response.json());
 }

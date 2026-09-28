@@ -7,7 +7,7 @@ import { db } from '@/lib/db';
 import { thesisVersions } from '@/lib/db/schema';
 import { discoveryCandidates, externalDiscoveryRuns } from '@/lib/db/workflow-schema';
 import { summarizeDiscoveryCandidateCounts } from '@/lib/discovery-run-summary';
-import { startDiscoveryRunForOwner, synchronizeDiscoveryRun } from '@/lib/discovery-workflow';
+import { startDiscoveryRunForOwner, synchronizeDiscoveryRun, recoverDiscoveryDispatch } from '@/lib/discovery-workflow';
 import {
   fetchExternalDiscoveryRun,
   retryExternalDiscoveryRun,
@@ -56,10 +56,11 @@ export async function GET(req: Request) {
   let runs = await list(session.auth.userId);
   const progress = new Map<string, { completed: number; total: number; currentStage: string }>();
   const active = runs.filter((run) =>
-    (!id || run.id === id) && (run.status === 'queued' || run.status === 'running')
+    (!id || run.id === id) && (run.status === 'dispatching' || run.status === 'queued' || run.status === 'running')
   );
   await Promise.all(active.map(async (run) => {
     try {
+      if (run.status === 'dispatching') { await recoverDiscoveryDispatch(run.id, session.auth.userId); return; }
       const remote = await fetchExternalDiscoveryRun(run.externalDiscoveryId);
       if (remote.progress) progress.set(run.id, remote.progress);
       await synchronizeDiscoveryRun(run.id, session.auth.userId, remote);

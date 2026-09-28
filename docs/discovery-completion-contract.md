@@ -1,0 +1,9 @@
+# Discovery reliability, coverage and source contract
+
+Proposed before cross-service changes. Extend existing JSON contracts; no cross-database writes.
+
+1. A dashboard discovery row is a durable dispatch intent committed before HTTP. Its UUID becomes an optional `dispatchId`; the service derives a stable external ID and atomically reuses an identical payload on conflict. Different payloads cannot reuse the ID. Polling and the existing authenticated cron reconcile pending dispatches. Approved-version checks remain serialized against thesis updates. No new table is required.
+2. Retrieve a substantially broader, bounded symbol universe with provider pagination where supported. Persist coverage/truncation metadata. Apply hard constraints and issuer/known-security checks before an explicit per-portfolio research budget. Deferred eligible names appear in the audit, not as failed or screened-out names. Existing role markets remain explicit; unsupported exchanges are not invented.
+3. Primary-source verification means actual retrieval of a trusted issuer/filing URL, matching a supplied issuer identity and retaining a content hash, excerpt, retrieval date and verification status. Search snippets alone are not verified primary evidence. Fetches must reject private network addresses, enforce TLS/size/deadline limits and revalidate redirects. Failure is explicit and can fall back to labelled secondary research. This verifies provenance and document identity, not investment claims or audited accounting truth.
+
+Optional additions keep old saved requests/results readable. Deploy shared contract and agentic service before dashboard. Recovery and failure tests must cover accepted-then-timeout, repeat requests, changed payloads, stale thesis, pagination, research budget, source mismatch and unsafe URLs.

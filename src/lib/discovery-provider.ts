@@ -93,7 +93,7 @@ export class FinnhubDiscoveryProvider implements MarketDiscoveryProvider {
       .flatMap((value) => value && typeof value === 'object' ? [toRecord(value as Record<string, unknown>, exchange)] : [])
       .filter((value): value is SecurityUniverseRecordType => value !== null);
     const unique = [...new Map(eligible.map(record => [`${record.exchange}:${record.ticker}`, record])).values()];
-    const selected = unique.slice(0, Math.max(1, Math.min(limit, 500)));
+    const selected = unique.slice(0, Math.max(1, Math.min(limit, 4000)));
     return selected.map(record => ({ ...record, attributes: {
       ...record.attributes,
       universe_truncated: unique.length > selected.length,
@@ -121,6 +121,44 @@ export function getDiscoveryProvider(): MarketDiscoveryProvider {
   }
   if (!env.MARKET_DATA_API_KEY) throw new Error('MARKET_DATA_API_KEY is required when DISCOVERY_PROVIDER=eodhd');
   return new EodhdDiscoveryProvider(new EodhdProvider(env.MARKET_DATA_API_KEY, getProviderGateway()));
+}
+
+/** Only the bounded, eligible research queue gets issuer-profile calls. */
+export async function enrichDiscoveryIssuerSources(records: SecurityUniverseRecordType[]): Promise<SecurityUniverseRecordType[]> {
+  const env = getEnv();
+  const eodhd = env.MARKET_DATA_API_KEY ? new EodhdProvider(env.MARKET_DATA_API_KEY, getProviderGateway()) : null;
+  const enriched = [...records];
+  let cursor = 0;
+  await Promise.all(Array.from({ length: Math.min(8, records.length) }, async () => {
+    while (cursor < records.length) {
+      const index = cursor++;
+      const record = records[index];
+      if (typeof record.attributes.issuer_website === 'string') continue;
+      try {
+        let profile: { name?: string | null; isin?: string | null; website?: string | null } | null = null;
+        if (record.provider === 'eodhd' && eodhd) profile = await eodhd.getDiscoveryIssuerProfile(record.ticker, record.exchange);
+        else if (record.provider === 'finnhub' && env.FINNHUB_API_KEY) {
+          const url = new URL('https://finnhub.io/api/v1/stock/profile2');
+          url.searchParams.set('symbol', String(record.attributes.provider_symbol ?? record.ticker));
+          const response = await fetch(url, { signal: AbortSignal.timeout(8_000), headers: { 'X-Finnhub-Token': env.FINNHUB_API_KEY } });
+          if (response.ok) {
+            const raw = await response.json() as Record<string, unknown>;
+            profile = { name: typeof raw.name === 'string' ? raw.name : '', website: typeof raw.weburl === 'string' ? raw.weburl : '' };
+          }
+        }
+        if (!profile?.website) continue;
+        const source = new URL(profile.website);
+        if (source.protocol !== 'https:' || source.username || source.password || source.port && source.port !== '443') continue;
+        const normalize = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const sameIssuer = profile.isin && profile.isin === record.attributes.isin
+          || profile.name && normalize(profile.name) === normalize(record.companyName);
+        if (!sameIssuer) continue;
+        enriched[index] = { ...record, attributes: { ...record.attributes, issuer_website: source.href,
+          issuer_website_provider: record.provider, issuer_profile_name: profile.name ?? null } };
+      } catch { /* Identity or source unavailable. The service reports a research gap. */ }
+    }
+  }));
+  return enriched;
 }
 
 async function cachedUniverse(provider: string, exchange: string): Promise<SecurityUniverseRecordType[] | null> {
@@ -181,4 +219,3 @@ export async function loadDiscoveryUniverse(exchange: string, limit: number): Pr
     throw new Error(`${marketLabel(exchange)} could not be loaded from ${primary.name}: ${errorMessage(primaryError)}`);
   }
 }
-

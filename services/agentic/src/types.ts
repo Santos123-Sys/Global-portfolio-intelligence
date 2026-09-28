@@ -64,3 +64,6 @@ export interface JobRepository {
   markCallbackDelivered(id: string): Promise<void>;
   scheduleCallbackRetry(id: string, error: string, nextAt: Date, permanent: boolean): Promise<void>;
 }
+
+
+export class DispatchConflictError extends Error { constructor() { super('Dispatch identity cannot be reused with a different payload'); this.name = 'DispatchConflictError'; } }

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createAgenticHttpServer } from '../src/http-server.js';
 import { hashManifest } from '../src/manifest.js';
 import { MemoryRepository } from './memory-repository.js';
-import { manifest, runRequest } from './fixtures.js';
+import { manifest, runRequest, portfolioId, thesisVersionId, thesis } from './fixtures.js';
 
 const apiKey = 'agentic-test-key-12345678901234567890';
 
@@ -43,6 +43,21 @@ describe('agentic HTTP API', () => {
     const bodies = await Promise.all(responses.map((response) => response.json())) as Array<{ externalRunId: string; status: string }>;
     expect(bodies[0].status).toBe('queued');
     expect(bodies[0].externalRunId).not.toBe(bodies[1].externalRunId);
+  });
+
+  it('atomically reuses Discovery dispatch IDs and rejects changed payloads', async () => {
+    const input = { dispatchId: '11111111-1111-4111-8111-111111111111', thesis: { versionId: thesisVersionId, criteria: thesis },
+      portfolios: [{ id: portfolioId, name: 'Swiss', role: 'swiss_quality', baseCurrency: 'CHF', investmentObjective: 'Quality' }],
+      universe: [{ ticker: 'AAA', exchange: 'XSWX', companyName: 'Example', currency: 'CHF', country: null, sector: null, industry: null, assetType: 'Common Stock', observedAt: '2026-09-27T00:00:00Z', provider: 'test', sourceUrl: 'https://example.test', attributes: {} }], maxCandidatesPerPortfolio: 6 };
+    const send = (value: unknown) => fetch(`${baseUrl}/v1/discovery-runs`, authenticated({ method: 'POST', body: JSON.stringify(value) }));
+    const responses = await Promise.all([send(input), send(input)]);
+    expect(responses.map(r => r.status)).toEqual([202, 202]);
+    const bodies = await Promise.all(responses.map(r => r.json())) as Array<{externalDiscoveryId: string}>;
+    expect(bodies[0].externalDiscoveryId).toBe(`discovery_${input.dispatchId}`);
+    expect(bodies[1].externalDiscoveryId).toBe(bodies[0].externalDiscoveryId);
+    expect(repository.jobs.size).toBe(1);
+    expect((await send({ ...input, maxCandidatesPerPortfolio: 3 })).status).toBe(409);
+    expect(repository.jobs.size).toBe(1);
   });
 
   it('rejects incoherent run coverage before persistence', async () => {
@@ -137,3 +152,4 @@ describe('agentic HTTP API', () => {
     expect(JSON.stringify(await response.json())).not.toContain(source);
   });
 });
+

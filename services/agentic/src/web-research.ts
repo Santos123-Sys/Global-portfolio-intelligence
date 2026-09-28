@@ -1,3 +1,5 @@
+import type { SecurityUniverseRecord } from '@portfolio-intelligence/agentic-contract';
+import { verifyPrimarySources } from './primary-source.js';
 export interface WebResearchConfig {
   provider: 'none' | 'brave' | 'tavily';
   apiKey?: string;
@@ -7,7 +9,10 @@ export interface WebResearchEvidence {
   query: string;
   urls: string[];
   snippets: string[];
-  sources?: Array<{ url: string; snippet: string; retrievedAt: string; publishedAt: string | null }>;
+  gaps?: string[];
+  sources?: Array<{ url: string; snippet: string; retrievedAt: string; publishedAt: string | null;
+    tier?: 'primary' | 'unclassified'; kind?: 'primary_document' | 'search_result'; contentHash?: string; verification?: 'issuer_identity_matched'; }>;
+
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -66,3 +71,11 @@ export async function researchCompany(companyName: string, ticker: string, confi
   return searchEvidence(query, rows, 'description');
 }
 
+
+/** Trusted issuer/filing retrieval precedes general search. */
+export async function researchSecurity(security: SecurityUniverseRecord, config: WebResearchConfig): Promise<WebResearchEvidence> {
+  const primary = await verifyPrimarySources(security);
+  if (primary.sources.length) return { query: 'Direct issuer/filing source retrieval', urls: primary.sources.map(s => s.url), snippets: primary.sources.map(s => s.snippet), sources: primary.sources, gaps: primary.gaps };
+  const secondary = await researchCompany(security.companyName, security.ticker, config);
+  return { ...secondary, gaps: [...primary.gaps, 'Secondary search evidence is not verified primary evidence.'] };
+}

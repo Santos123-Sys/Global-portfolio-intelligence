@@ -15,7 +15,7 @@ import OpenAI, {
 import { zodTextFormat } from 'openai/helpers/zod';
 import { z, ZodError } from 'zod';
 import { collectDiscoveryResearch, DISCOVERY_RESEARCH_GAP } from './discovery-research.js';
-import { researchCompany, type WebResearchConfig, type WebResearchEvidence } from './web-research.js';
+import { researchSecurity, type WebResearchConfig, type WebResearchEvidence } from './web-research.js';
 import {
   AGENT_REASONING_PROMPTS,
   AnalysisOutput,
@@ -733,7 +733,7 @@ export class OpenAIAgenticPipeline {
     await onProgress?.(1, 3, `Researching ${researchUniverse.length} eligible listings`);
     const { evidence: webEvidence, failures: researchFailures } = await collectDiscoveryResearch(
       researchUniverse,
-      (companyName, ticker) => researchCompany(companyName, ticker, this.webResearch),
+      (_companyName, _ticker, record) => researchSecurity(record, this.webResearch),
     );
     try {
       const portfolioOutputs: z.infer<typeof MarketDiscoveryOutput>[] = [];
@@ -808,9 +808,9 @@ export class OpenAIAgenticPipeline {
                 thesisVersionId: request.thesis.versionId, issuerKey: issuerKey(record), channel: 'structured_universe',
                 eligibility: screened.find(r => r.exchange === record.exchange && r.ticker === record.ticker)!,
                 evidence: [{ url: record.sourceUrl, provider: record.provider, kind: 'structured_record', tier: ['eodhd', 'finnhub'].includes(record.provider) ? 'data_provider' : 'unclassified', retrievedAt: null, observedAt: record.observedAt, publishedAt: null },
-                  ...(web?.sources ?? []).map(source => ({ ...source, provider: this.webResearch.provider, kind: 'search_result', tier: 'unclassified' }))],
+                  ...(web?.sources ?? []).map(source => ({ ...source, provider: source.kind === 'primary_document' ? 'issuer_or_filing' : this.webResearch.provider, kind: source.kind ?? 'search_result', tier: source.tier ?? 'unclassified' }))],
               },
-              informationGaps: [...new Set([...candidate.informationGaps,
+              informationGaps: [...new Set([...candidate.informationGaps, ...(web?.gaps ?? []),
                 ...(researchFailures.has(`${record.exchange}:${record.ticker}`) ? [DISCOVERY_RESEARCH_GAP] : []),
                 ...(!web?.urls.length ? ['No external qualitative sources were retrieved; assessment uses structured identity only.'] : []),
               ])],

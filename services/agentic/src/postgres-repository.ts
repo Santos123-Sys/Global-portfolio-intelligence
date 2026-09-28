@@ -1,3 +1,4 @@
+import { DispatchConflictError } from './types.js';
 import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
 import type { AgenticJob, CallbackStatus, JobKind, JobRepository, JobStatus } from './types.js';
@@ -60,8 +61,11 @@ export class PostgresJobRepository implements JobRepository {
     const rows = await this.sql<Row[]>`
       insert into agentic_jobs (id, external_id, kind, status, payload_json, progress_total)
       values (${id}, ${externalId}, ${kind}, 'queued', ${this.sql.json(payload as never)}, ${progressTotal})
+      on conflict (external_id) do update set external_id = excluded.external_id
+      where agentic_jobs.kind = excluded.kind and agentic_jobs.payload_json = excluded.payload_json
       returning *
     `;
+    if (!rows[0]) throw new DispatchConflictError();
     return mapJob(rows[0]);
   }
 
@@ -228,3 +232,4 @@ export class PostgresJobRepository implements JobRepository {
     `;
   }
 }
+

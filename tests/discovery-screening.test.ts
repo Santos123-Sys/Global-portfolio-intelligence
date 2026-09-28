@@ -66,3 +66,14 @@ describe('deterministic Discovery screening', () => {
     expect(screenDiscoveryUniverse(req).records[0].status).toBe('eligible');
   });
 });
+
+it('screens a broad universe before applying the research budget and preserves deferred eligibility', () => {
+  const req = request(); req.researchBudgetPerPortfolio = 2;
+  req.universe = Array.from({ length: 600 }, (_, i) => record(`T${String(i).padStart(4, '0')}`, { sector: i < 590 ? 'Financials' : 'Industrials' }));
+  const output = screenDiscoveryUniverse(req);
+  expect(output.records).toHaveLength(600);
+  expect(output.eligibleByPortfolio.get(swiss)?.map(r => r.ticker)).toEqual(['T0590', 'T0591']);
+  expect(output.records.filter(r => r.status === 'ineligible')).toHaveLength(590);
+  expect(output.records.filter(r => r.status === 'budget_deferred')).toHaveLength(8);
+  expect(screenDiscoveryUniverse(req).records).toEqual(output.records);
+});
