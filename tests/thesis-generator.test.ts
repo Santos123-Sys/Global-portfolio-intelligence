@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { validateThesisDocument } from '../src/lib/document-security';
+import { toAgenticThesisDocument, validateThesisDocument } from '../src/lib/document-security';
 import { generatedThesisFileName, renderGeneratedThesisPdf } from '../src/lib/thesis-generator';
+import { ThesisExtractionRequest } from '@portfolio-intelligence/agentic-contract';
 
 describe('thesis generator', () => {
   it('creates a substantive static PDF accepted by the thesis upload validator', async () => {
@@ -11,6 +12,10 @@ describe('thesis generator', () => {
     });
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
     expect(pdf.length).toBeGreaterThan(1_000);
-    expect(validateThesisDocument({ fileName: generatedThesisFileName('Long-term mandate'), mimeType: 'application/pdf', contentBase64: pdf.toString('base64') }).byteLength).toBe(pdf.length);
+    const validated = validateThesisDocument({ fileName: generatedThesisFileName('Long-term mandate'), mimeType: 'application/pdf', contentBase64: pdf.toString('base64') });
+    expect(validated.byteLength).toBe(pdf.length);
+    const extractionDocument = toAgenticThesisDocument(validated, 1);
+    expect(ThesisExtractionRequest.safeParse({ document: extractionDocument }).success).toBe(true);
+    expect(extractionDocument).not.toHaveProperty('byteLength');
   });
 });
