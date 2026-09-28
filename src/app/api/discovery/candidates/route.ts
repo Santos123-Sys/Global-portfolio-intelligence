@@ -1,3 +1,4 @@
+import { PortfolioAnalysisManifest } from '@portfolio-intelligence/agentic-contract';
 import { after, NextResponse } from 'next/server';
 import { and, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import { z } from 'zod';
@@ -125,6 +126,8 @@ export async function GET(req: Request) {
       ? runByExternalId.get(row.candidate.externalAnalysisRunId)
       : null;
     const analysis = run ? analysisByRunId.get(run.id) : null;
+    const manifest = PortfolioAnalysisManifest.safeParse(run?.manifestJson);
+    const marketAnalysis = manifest.success ? manifest.data.portfolios.find(p => p.portfolioId === row.candidate.portfolioId)?.analyses.find(a => a.ticker === row.candidate.ticker)?.marketAnalysis : undefined;
     const risk = riskRows.find((snapshot) => snapshot.candidateId === row.candidate.id) ?? null;
     const valuation = valuationRows.find((scenario) => scenario.candidateId === row.candidate.id) ?? null;
     const analysisMode = run
@@ -148,7 +151,7 @@ export async function GET(req: Request) {
       reportUrl: run && (run.reportPdfUrl || run.status === 'completed' || run.status === 'imported')
         ? `/api/integrations/agentic/reports?externalRunId=${encodeURIComponent(run.externalRunId)}`
         : null,
-      analysis: analysis ?? null,
+      analysis: analysis ? { ...analysis, marketAnalysis: marketAnalysis ?? null } : null,
       risk: risk?.metricsJson ?? null,
       valuation,
       analysisMode,

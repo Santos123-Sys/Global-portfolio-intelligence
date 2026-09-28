@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { zodTextFormat } from 'openai/helpers/zod';
 import {
-  AnalysisOutput,
+  AnalysisModelOutput,
   DiscoveryCandidate,
   MarketDiscoveryOutput,
   ReportSynthesisOutput,
@@ -30,7 +30,7 @@ describe('agent schemas are expressible as strict Structured Outputs', () => {
   });
 
   it('keeps the other two agents expressible', () => {
-    expect(() => zodTextFormat(AnalysisOutput, 'security_analysis')).not.toThrow();
+    expect(() => zodTextFormat(AnalysisModelOutput, 'security_analysis')).not.toThrow();
     expect(() => zodTextFormat(ReportSynthesisOutput, 'portfolio_synthesis')).not.toThrow();
   });
 });

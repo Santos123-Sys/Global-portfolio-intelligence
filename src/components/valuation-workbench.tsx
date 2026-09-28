@@ -1,5 +1,8 @@
 'use client';
 
+import { MarketAnalysisReview } from './market-analysis-review';
+import { buildMarketPlan, reconcileValuations } from '@portfolio-intelligence/agentic-contract';
+import type { MarketPlan } from '@portfolio-intelligence/agentic-contract';
 import { useEffect, useRef, useState } from 'react';
 import { DcfAssumptionReview } from './dcf-assumption-review';
 import { deriveFcff, type FcffDerivation } from '@/lib/quant/fcff';
@@ -8,6 +11,8 @@ import { FinancialDocumentReview } from './financial-document-review';
 import { FinancialAnalysisReport } from './financial-analysis-report';
 
 interface ValuationSetup {
+  marketPlan: MarketPlan;
+  marketProfiles?: MarketPlan['profiles'];
   financialInputs?: Record<string, number>;
   fcffDerivation?: FcffDerivation;
   suitability: {
@@ -37,6 +42,7 @@ interface ValuationSetup {
 }
 
 interface ThreeCaseDcfResult {
+  market?: { plan: MarketPlan };
   review?: ValuationReview | null;
   fcffDerivation?: FcffDerivation;
   method: 'three_case_two_stage_fcff';
@@ -447,6 +453,7 @@ export function ValuationWorkbench({ candidateId, exchange, currency, country, o
     finally { setPrimarySourceBusy(false); }
   }
 
+  const displayedMarketPlan = review?.market ? buildMarketPlan(review.market.context, setup?.marketProfiles) : automaticResult?.market?.plan ?? setup?.marketPlan;
   const reviewedReady = Boolean(review && setup && setup.suitability.status !== 'alternative_method_recommended' && setup.defaults.netDebt != null && (setup.defaults.sharesOutstanding ?? 0) > 0 && (deriveFcff(setup.financialInputs ?? {}, review.fcff).value ?? 0) > 0);
 
   if (busy && !setup && compsBusy && !compsSetup) return <p className="note">Loading valuation evidence…</p>;
@@ -484,11 +491,15 @@ export function ValuationWorkbench({ candidateId, exchange, currency, country, o
       <h4 id="dcf-model">Automatic FCFF DCF</h4>
       <p className={setup.suitability.status === 'review_required' ? 'note' : 'caveat'}>{setup.suitability.rationale}</p>
       <p className="note">Currency: {setup.defaults.currency} · Financial evidence as of {setup.defaults.dataAsOf ? new Date(setup.defaults.dataAsOf).toLocaleDateString() : 'unknown'}.</p>
+      {automaticResult && compsResult && compsResult.impliedValuations.filter(v => v.statistic === 'Median' && v.impliedValuePerShare != null).flatMap(v =>
+        reconcileValuations({ currency: automaticResult.currency, valuePerShare: automaticResult.scenarios.find(s => s.name === 'base_case')!.result.fairValuePerShare },
+          { currency: compsResult.currency, valuePerShare: v.impliedValuePerShare! }).map(issue => <p key={`${v.multiple}:${issue.code}`} className="caveat">{v.multiple}: {issue.detail}</p>))}
+      {displayedMarketPlan && <MarketAnalysisReview plan={displayedMarketPlan} />}
       <p className={setup.automaticReadiness.ready ? 'note' : 'caveat'}>{reviewedReady ? 'Reviewed inputs are ready for server validation and calculation.' : setup.automaticReadiness.message}</p>
       {!reviewedReady && setup.automaticReadiness.missingFinancialRecords.length > 0 && <p className="caveat">Missing primary-source financial records: {setup.automaticReadiness.missingFinancialRecords.join(', ')}.</p>}
       {!reviewedReady && setup.automaticReadiness.missingScenarioDrivers.length > 0 && <p className="caveat">Missing {setup.automaticReadiness.missingScenarioDrivers.length} sourced scenario rates. Complete the review below to supply explicit assumptions.</p>}
       <p className="note">The model calculates a five-year FCFF forecast for three scenarios. Use existing sourced drivers or review explicit assumptions below.</p>
-      {setup.financialInputs && <DcfAssumptionReview key={`${candidateId}:${reloadToken}`} facts={setup.financialInputs} currency={setup.defaults.currency} period={setup.defaults.dataAsOf} onChange={value => { setReviewStarted(true); setReview(value); }} />}
+      {setup.financialInputs && setup.marketPlan && <DcfAssumptionReview key={`${candidateId}:${reloadToken}`} marketContext={setup.marketPlan.context} profiles={setup.marketProfiles} facts={setup.financialInputs} currency={setup.defaults.currency} period={setup.defaults.dataAsOf} onChange={value => { setReviewStarted(true); setReview(value); }} />}
       {error && <p className="login-error" role="alert">{error}</p>}
       <button className="action-button" type="button" onClick={() => void generateAutomaticDcf()} disabled={busy || !(reviewedReady || (!reviewStarted && setup.automaticReadiness.ready))}>
         {busy ? 'Generating…' : 'Generate three-case DCF'}

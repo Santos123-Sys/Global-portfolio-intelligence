@@ -1,0 +1,48 @@
+id: US.USGAAP.USD
+version: 1.1.0
+country: US
+exchanges:
+  - NYSE
+  - NASDAQ
+  - XNYS
+  - XNAS
+  - NYSE_AMERICAN
+accounting:
+  - US_GAAP
+currency: USD
+accountingChecks:
+  - ASC 842 leases
+  - Stock compensation and dilution
+  - ASC 606 revenue recognition
+macroChecks:
+  - Treasury curve
+  - Inflation
+  - Rate-sensitive demand
+taxPolicy: >-
+  Source combined marginal federal/state tax and effective operating tax; no
+  universal 24.5% default.
+riskFreePolicy: >-
+  Use sourced default-free USD rate with the same nominal/real basis as cash
+  flows.
+crpRequired: false
+peerPolicy: >-
+  Economic sector, business mix, geography and size; issuer deduplication across
+  ADRs and share classes. Same exchange is a preference.
+minPeers: 4
+maxPeers: 10
+triggers: []
+mandatory:
+  - FinancialStatementAgent
+  - SectorSpecialistAgent
+  - ForecastingAgent
+  - DCFAgent
+  - PeerValuationAgent
+  - RiskAgent
+optional:
+  - MarketMacroAgent
+  - CountryRiskAgent
+  - CommodityFXAgent
+excluded: []
+sources:
+  - https://www.sec.gov/edgar
+  - https://fred.stlouisfed.org/series/DGS10

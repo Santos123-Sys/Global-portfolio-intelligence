@@ -1,3 +1,4 @@
+import { marketProfiles } from '@portfolio-intelligence/agentic-contract';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ sector: 'Industrials', facts: [] as Array<Record<string, unknown>>, saved: null as Record<string, unknown> | null, selects: 0 }));
 vi.mock('../src/lib/api-auth', () => ({ authenticateRequest: async () => ({ ok: true, auth: { userId: 'owner', email: 'owner@example.test' } }) }));
@@ -6,7 +7,7 @@ vi.mock('../src/lib/db', () => ({ db: {
   select: () => {
     state.selects++;
     return { from: () => ({ where: () => ({
-      limit: async () => [{ id: '11111111-1111-4111-8111-111111111111', securityId: 'security', analysisId: 'analysis', currency: 'CHF', sector: state.sector }],
+      limit: async () => [{ id: '11111111-1111-4111-8111-111111111111', securityId: 'security', analysisId: 'analysis', exchange: 'XSWX', ticker: 'TEST', runId: 'run', currency: 'CHF', sector: state.sector }],
       orderBy: async () => state.facts,
     }) }) };
   },
@@ -47,15 +48,21 @@ describe('valuation API method and evidence gates', () => {
     expect((await submit()).status).toBe(409);
     expect(state.saved).toBeNull();
   });
-  it('uses the financial fiscal date, not the latest retrieval date, in the saved scenario', async () => {
+  it('requires explicit market review even when older scenario rates exist', async () => {
     const response = await submit();
-    expect(response.status).toBe(201);
-    const body = await response.json();
-    expect(body.result.scenarios[1].result.assumptions.dataAsOf).toBe(fiscalDate);
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toContain('six market dimensions');
   });
 });
 
+const datum = (value: number) => ({ value, asOf: new Date().toISOString().slice(0, 10), sourceRef: 'https://issuer.test/assumptions' });
 const review = {
+  market: {
+    profileSnapshot: marketProfiles,
+    context: { incorporationCountry: 'CH', listingExchanges: ['XSWX'], reportingCurrency: 'CHF', accountingStandard: 'IFRS', revenueGeography: [{ country: 'CH', share: 1 }], regulatoryJurisdictions: ['CH'], sector: 'Industrials', commodityRevenueShare: null, exportRevenueShare: null,
+      sourceReferences: Object.fromEntries(['incorporationCountry', 'listingExchanges', 'reportingCurrency', 'accountingStandard', 'revenueGeography', 'regulatoryJurisdictions'].map(k => [k, 'https://issuer.test/annual'])) },
+    capital: { currency: 'CHF', cashFlowBasis: 'nominal', riskFreeBasis: 'nominal', riskFreeRate: datum(.04), expectedInflation: null, matureErp: datum(.05), countryRiskPremium: datum(0), beta: datum(1.2), taxRate: datum(.2), preTaxCostOfDebt: datum(.05), equityWeight: datum(1), debtIncludesCountryRisk: true, additionalDebtSpread: null },
+  },
   confirmed: true, financialPeriodEnd: fiscalDate, currency: 'CHF', asOf: '2026-09-25', sourceUrl: 'https://issuer.test/assumptions',
   rationale: 'Reviewed annual financials and currency-consistent cost of capital.',
   fcff: { method: 'ebit', workingCapitalInvestment: 20, interestIncludedInCfo: false },
@@ -72,6 +79,8 @@ it('derives FCFF and saves reviewed assumptions with original evidence', async (
   const response = await submitReview(review);
   expect(response.status).toBe(201);
   const body = await response.json();
+  expect(body.result.scenarios[1].result.assumptions.dataAsOf).toBe(fiscalDate);
+  expect(body.result.market.capital.wacc).toBeCloseTo(.1);
   expect(body.result.fcffDerivation.value).toBe(110);
   expect(body.result.scenarios[1].result.assumptions.startingFreeCashFlow).toBe(110);
   expect(state.saved?.status).toBe('human_confirmed');
@@ -92,4 +101,23 @@ it('does not let a reviewed form override missing sourced financial facts', asyn
 it('rejects unconfirmed and invalid rate reviews', async () => {
   expect((await submitReview({ ...review, confirmed: false })).status).toBe(400);
   expect((await submitReview({ ...review, scenarios: { ...review.scenarios, base_case: { annualGrowthRate: .04, discountRate: .02, terminalGrowthRate: .02 } } })).status).toBe(400);
+});
+
+it('binds reviewed market context to the saved security and rejects invalid computed capital', async () => {
+  derivedFacts();
+  for (const context of [{ ...review.market.context, listingExchanges: ['NYSE'] }, { ...review.market.context, sector: 'Technology' }]) {
+    expect((await submitReview({ ...review, market: { ...review.market, context } })).status).toBe(409);
+  }
+  const response = await submitReview({ ...review, market: { ...review.market, capital: { ...review.market.capital, beta: datum(10), matureErp: datum(.5) } } });
+  expect(response.status).toBe(400);
+  expect((await response.json()).error).toContain('Computed WACC');
+  expect(state.saved).toBeNull();
+});
+
+it('rejects a stale policy snapshot before saving a valuation', async () => {
+  derivedFacts();
+  const response = await submitReview({ ...review, market: { ...review.market, profileSnapshot: marketProfiles.map(p => ({ ...p, version: 'old' })) } });
+  expect(response.status).toBe(409);
+  expect((await response.json()).error).toContain('Market policies changed');
+  expect(state.saved).toBeNull();
 });

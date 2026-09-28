@@ -1,3 +1,6 @@
+import { MarketProfile, MarketContext, MarketAnalysis, buildMarketPlan, marketContextFromRecord } from './market-adaptive.js';
+export * from './market-adaptive.js';
+export * from './market-engines.js';
 import { z } from 'zod';
 import { ThesisPolicy } from './thesis-policy.js';
 import { evaluateThesisEligibility } from './thesis-domain.js';
@@ -113,6 +116,7 @@ export const ThesisExtractionResult = z.object({
 export type ThesisExtractionResult = z.infer<typeof ThesisExtractionResult>;
 
 export const AnalysisOutput = z.object({
+  marketAnalysis: MarketAnalysis.optional(),
   ticker: z.string().min(1),
   companyName: z.string().min(1),
   portfolioCandidate: z.boolean(),
@@ -134,6 +138,8 @@ export const AnalysisOutput = z.object({
   informationGaps: z.array(z.string()),
 }).strict();
 export type AnalysisOutput = z.infer<typeof AnalysisOutput>;
+/** Only this schema is model-authored; the execution report is attached by the service. */
+export const AnalysisModelOutput = AnalysisOutput.omit({ marketAnalysis: true });
 
 export const AnalysisDataMode = z.enum([
   'full_fundamentals',
@@ -142,6 +148,8 @@ export const AnalysisDataMode = z.enum([
 export type AnalysisDataMode = z.infer<typeof AnalysisDataMode>;
 
 export const GroundingBundle = z.object({
+  marketContext: MarketContext.optional(),
+  marketProfiles: z.array(MarketProfile).min(1).optional(),
   ticker: z.string().min(1),
   companyName: z.string().min(1),
   exchange: z.string().min(1),
@@ -502,6 +510,14 @@ export function validateAnalysisSemantics(output: AnalysisOutput): void {
 }
 
 export function validateGrounding(output: AnalysisOutput, bundle: GroundingBundle): void {
+  if (output.marketAnalysis) {
+    const expected = buildMarketPlan(bundle.marketContext ?? marketContextFromRecord(bundle), bundle.marketProfiles);
+    if (stableStringify(output.marketAnalysis.plan) !== stableStringify(expected)) throw new ContractValidationError('Market plan does not match the approved grounding context');
+    const refs = new Set([...Object.keys(bundle.fundamentals), ...Object.keys(bundle.computedMetrics), ...Object.keys(bundle.researchEvidence ?? {}), ...Object.keys(expected.context.sourceReferences).map(k => `market:${k}`)]);
+    if (output.marketAnalysis.executions.map(e => e.agent).join('|') !== expected.nodes.map(n => n.id).join('|')) throw new ContractValidationError('Market module execution coverage is incomplete');
+    for (const execution of output.marketAnalysis.executions) for (const finding of [...(execution.finding?.claims ?? []), ...(execution.finding?.risks ?? [])])
+      if (finding.evidenceRefs.some(ref => !refs.has(ref))) throw new ContractValidationError('Market module contains an unknown evidence reference');
+  }
   const available = new Set([
     ...Object.keys(bundle.computedMetrics),
     ...Object.keys(bundle.fundamentals),

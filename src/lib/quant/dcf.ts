@@ -1,3 +1,4 @@
+import { valueCashFlows } from '@portfolio-intelligence/agentic-contract';
 import type { FcffDerivation } from './fcff';
 import type { ValuationReview } from '../valuation-review';
 import { FCFF_METRIC } from '../financial-evidence';
@@ -123,20 +124,23 @@ export function discountedCashFlow(input: DcfAssumptions): DcfResult {
   validateDcfAssumptions(input);
   const projections: DcfProjection[] = [];
   let freeCashFlow = input.startingFreeCashFlow;
-  let projectedPresentValue = 0;
+
   for (let year = 1; year <= input.forecastYears; year += 1) {
     freeCashFlow *= 1 + input.annualGrowthRate;
     const discountFactor = 1 / (1 + input.discountRate) ** year;
     const presentValue = freeCashFlow * discountFactor;
-    projectedPresentValue += presentValue;
+
     projections.push({ year, freeCashFlow, discountFactor, presentValue });
   }
-  const terminalValue = freeCashFlow * (1 + input.terminalGrowthRate) /
-    (input.discountRate - input.terminalGrowthRate);
-  const terminalPresentValue = terminalValue / (1 + input.discountRate) ** input.forecastYears;
-  const enterpriseValue = projectedPresentValue + terminalPresentValue;
-  const equityValue = enterpriseValue - input.netDebt;
-  const fairValuePerShare = equityValue / input.sharesOutstanding;
+  const computed = valueCashFlows({ method: 'FCFF', currency: input.currency,
+    cashFlows: projections.map(p => p.freeCashFlow), discountRate: input.discountRate, terminalGrowth: input.terminalGrowthRate,
+    midYear: false, netDebt: input.netDebt, nonOperatingAssets: 0, minorityAndPreferred: 0,
+    shares: input.sharesOutstanding, terminalExit: null, sourceReferences: input.sourceReferences });
+  const terminalValue = computed.terminalValue;
+  const terminalPresentValue = computed.pvTerminal;
+  const enterpriseValue = computed.enterpriseValue!;
+  const equityValue = computed.equityValue;
+  const fairValuePerShare = computed.valuePerShare;
 
   for (const [name, value] of Object.entries({ terminalValue, terminalPresentValue, enterpriseValue, equityValue, fairValuePerShare })) assertFinite(name, value);
 

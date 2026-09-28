@@ -1,0 +1,48 @@
+id: BR.IFRS.BRL
+version: 1.1.0
+country: BR
+exchanges:
+  - B3
+  - BVMF
+  - BOVESPA
+accounting:
+  - IFRS
+currency: BRL
+accountingChecks:
+  - CVM/IFRS filing basis
+  - JCP classification
+  - BNDES borrowing terms
+  - Related parties and contingencies
+macroChecks:
+  - Selic and IPCA
+  - Sovereign spread
+  - Export and commodity exposure
+taxPolicy: >-
+  Source issuer-specific IRPJ/CSLL and JCP effects; turnover taxes are not an
+  income tax rate.
+riskFreePolicy: >-
+  NTN-B is a real sovereign yield: remove default risk and convert to nominal
+  using sourced expected inflation when forecasting nominal BRL.
+crpRequired: true
+peerPolicy: >-
+  Prefer comparable B3 issuers; disclose governance differences. Global peers
+  require comparability review, not an arbitrary haircut.
+minPeers: 3
+maxPeers: 10
+triggers: []
+mandatory:
+  - FinancialStatementAgent
+  - SectorSpecialistAgent
+  - ForecastingAgent
+  - DCFAgent
+  - PeerValuationAgent
+  - RiskAgent
+  - MarketMacroAgent
+  - CountryRiskAgent
+optional:
+  - CommodityFXAgent
+excluded: []
+sources:
+  - https://www.gov.br/cvm/
+  - https://www.bcb.gov.br/
+  - https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/ctryprem.html

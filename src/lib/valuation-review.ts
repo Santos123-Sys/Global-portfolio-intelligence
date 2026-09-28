@@ -1,3 +1,4 @@
+import { MarketValuationReview } from '@portfolio-intelligence/agentic-contract';
 import { z } from 'zod';
 import { isSupportedFiscalDate } from './financial-evidence';
 const scenario = z.object({
@@ -6,6 +7,7 @@ const scenario = z.object({
   terminalGrowthRate: z.number().finite().min(-0.05).max(0.05),
 }).strict().refine(value => value.discountRate > value.terminalGrowthRate, 'WACC must exceed terminal growth');
 export const valuationReviewSchema = z.object({
+  market: MarketValuationReview.optional(),
   confirmed: z.literal(true),
   financialPeriodEnd: z.string().refine(value => isSupportedFiscalDate(value)),
   currency: z.string().regex(/^[A-Z]{3}$/),

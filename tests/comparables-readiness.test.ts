@@ -3,7 +3,7 @@ const state = vi.hoisted(() => ({ facts: [] as Array<Record<string, unknown>>, s
 vi.mock('../src/lib/api-auth', () => ({ authenticateRequest: async () => ({ ok: true, auth: { userId: 'owner', email: 'owner@example.test' } }) }));
 vi.mock('../src/lib/auth', () => ({ assertSameOrigin: () => undefined }));
 vi.mock('../src/lib/db', () => ({ db: {
-  select: () => ({ from: () => ({ where: () => ({ limit: async () => [{ id: '11111111-1111-4111-8111-111111111111', securityId: 'security', analysisId: 'analysis', currency: 'CHF', companyName: 'Target' }], orderBy: async () => state.facts }) }) }),
+  select: () => ({ from: () => ({ where: () => ({ limit: async () => [{ id: '11111111-1111-4111-8111-111111111111', securityId: 'security', analysisId: 'analysis', currency: 'CHF', companyName: 'Target', exchange: 'XSWX', ticker: 'TARGET', sector: 'Industrials' }], orderBy: async () => state.facts }) }) }),
   insert: () => ({ values: (value: Record<string, unknown>) => { state.saved = value; return { returning: async () => [{ id: 'scenario', ...value }] }; } }),
 } }));
 import { POST } from '../src/app/api/discovery/comparables/route';
