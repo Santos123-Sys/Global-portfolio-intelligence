@@ -7,10 +7,12 @@
  * that for any portfolio pair in different native currencies).
  */
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { PortfolioSelector, type SelectablePortfolio } from '@/components/portfolio-selector';
 import { PortfolioWorkspaceNav } from '@/components/portfolio-workspace-nav';
 import { usePortfolioBreadcrumb } from '@/lib/portfolio-context';
+import { portfolioExposure } from '@/lib/portfolio-exposure';
 
 interface PositionRow {
   id: string;
@@ -19,31 +21,29 @@ interface PositionRow {
   sector: string | null;
   country: string | null;
   portfolioId: string;
+  currency: string;
   marketValueNative: string | number | null;
   weight: number | null;
+  lastPricedAt: string | null;
 }
 
 interface GroupRow {
   key: string;
   label: string;
-  value: number;
   weight: number;
 }
 
 const COLORS = ['#4a9eff', '#d9a441', '#6fcf97', '#bb86fc', '#e05c5c', '#56b8d1', '#8b949e'];
 
-function groupBy(rows: PositionRow[], keyFn: (r: PositionRow) => string | null): GroupRow[] {
+function groupBy(rows: Array<PositionRow & { effectiveWeight: number }>, keyFn: (r: PositionRow) => string | null): GroupRow[] {
   const totals = new Map<string, number>();
-  let grandTotal = 0;
   for (const r of rows) {
-    const key = keyFn(r) ?? 'Unclassified';
-    const value = Number(r.marketValueNative ?? 0);
-    totals.set(key, (totals.get(key) ?? 0) + value);
-    grandTotal += value;
+    const key = keyFn(r)?.trim() || 'Unclassified';
+    totals.set(key, (totals.get(key) ?? 0) + r.effectiveWeight);
   }
   return [...totals.entries()]
-    .map(([key, value]) => ({ key, label: key, value, weight: grandTotal > 0 ? value / grandTotal : 0 }))
-    .sort((a, b) => b.value - a.value);
+    .map(([key, weight]) => ({ key, label: key, weight }))
+    .sort((a, b) => b.weight - a.weight);
 }
 
 function DonutSection({ title, groups }: { title: string; groups: GroupRow[] }) {
@@ -57,14 +57,14 @@ function DonutSection({ title, groups }: { title: string; groups: GroupRow[] }) 
           <div style={{ width: '100%', height: 220 }}>
             <ResponsiveContainer>
               <PieChart>
-                <Pie data={groups} dataKey="value" nameKey="label" innerRadius={55} outerRadius={90} paddingAngle={2}>
+                <Pie data={groups} dataKey="weight" nameKey="label" innerRadius={55} outerRadius={90} paddingAngle={2}>
                   {groups.map((g, i) => (
                     <Cell key={g.key} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip
                   formatter={(value, name) => [
-                    Number(value ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 }),
+                    `${(Number(value ?? 0) * 100).toFixed(1)}%`,
                     String(name ?? ''),
                   ]}
                   contentStyle={{ background: 'var(--panel)', border: '1px solid var(--border)', fontSize: '0.8rem' }}
@@ -76,7 +76,6 @@ function DonutSection({ title, groups }: { title: string; groups: GroupRow[] }) 
             <thead>
               <tr>
                 <th>{title}</th>
-                <th className="num">Value</th>
                 <th className="num">Weight</th>
               </tr>
             </thead>
@@ -84,7 +83,6 @@ function DonutSection({ title, groups }: { title: string; groups: GroupRow[] }) 
               {groups.map((g) => (
                 <tr key={g.key}>
                   <td>{g.label}</td>
-                  <td className="num">{g.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
                   <td className="num">{(g.weight * 100).toFixed(2)}%</td>
                 </tr>
               ))}
@@ -114,6 +112,7 @@ export default function AllocationPage() {
         if (cancelled) return;
         setPortfolios(data.portfolios);
         if (data.portfolios.length > 0) setSelectedId((cur) => cur ?? data.portfolios[0].id);
+        else setLoading(false);
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
       }
@@ -133,6 +132,8 @@ export default function AllocationPage() {
     if (!selectedId) return;
     let cancelled = false;
     setLoading(true);
+    setPositions([]);
+    setError(null);
     fetch(`/api/positions?portfolioId=${selectedId}`)
       .then((res) => {
         if (!res.ok) throw new Error(`API returned ${res.status}`);
@@ -152,13 +153,13 @@ export default function AllocationPage() {
     };
   }, [selectedId]);
 
-  const sectorGroups = useMemo(() => groupBy(positions, (r) => r.sector), [positions]);
-  const countryGroups = useMemo(() => groupBy(positions, (r) => r.country), [positions]);
   const selectedPortfolio = portfolios.find((p) => p.id === selectedId) ?? null;
-  const assetClassGroups = useMemo(
-    () => (selectedPortfolio ? groupBy(positions, () => 'Equity') : []),
-    [positions, selectedPortfolio]
-  );
+  const exposure = useMemo(() => portfolioExposure(positions, selectedPortfolio?.baseCurrency ?? ''), [positions, selectedPortfolio?.baseCurrency]);
+  const sectorGroups = useMemo(() => groupBy(exposure.rows, (r) => r.sector), [exposure.rows]);
+  const countryGroups = useMemo(() => groupBy(exposure.rows, (r) => r.country), [exposure.rows]);
+  const currencyGroups = useMemo(() => groupBy(exposure.rows, (r) => r.currency), [exposure.rows]);
+  const largest = [...exposure.rows].sort((a, b) => b.effectiveWeight - a.effectiveWeight);
+  const priced = positions.filter((r) => r.lastPricedAt).length;
 
   if (error) {
     return (
@@ -182,22 +183,39 @@ export default function AllocationPage() {
     <main>
       <PortfolioWorkspaceNav />
       <h1>Allocation</h1>
-      <p className="sub">Weight breakdown by sector, country and asset class. One portfolio at a time — never blended.</p>
+      <p className="sub">See the holdings, exposures and concentration of one portfolio at a time.</p>
 
       <PortfolioSelector portfolios={portfolios} selectedId={selectedId} onSelect={setSelectedId} />
 
       {loading ? (
         <p className="note">Fetching...</p>
+      ) : !selectedPortfolio ? (
+        <div className="card"><h2>Create a portfolio to begin</h2><Link className="action-button inline-action" href="/portfolio-setup">Set up portfolio</Link></div>
       ) : positions.length === 0 ? (
         <div className="card">
-          <p className="note">No positions in this portfolio yet.</p>
+          <h2>No holdings in {selectedPortfolio.name} yet</h2>
+          <p className="note">Add a holding to see its sector, country, currency and concentration here.</p>
+          <Link className="action-button inline-action" href="/portfolio-setup">Add a holding</Link>
         </div>
       ) : (
+        <>
+        <section className="allocation-summary" aria-label="Allocation coverage">
+          <div className="card"><span className="note">Holdings</span><strong>{positions.length}</strong></div>
+          <div className="card"><span className="note">Weight source</span><strong>{exposure.source ?? 'Unavailable'}</strong></div>
+          <div className="card"><span className="note">Dated prices</span><strong>{priced}/{positions.length}</strong></div>
+        </section>
+        {exposure.reason ? <div className="card" role="status"><h2>Allocation needs data</h2><p className="note">{exposure.reason}</p><Link className="action-button inline-action" href="/positions">Review positions</Link></div> : <>
+        <p className="note">Weights describe recorded holdings only. Country is the security classification, not underlying revenue exposure. Target weights and fund look-through are not recorded.</p>
         <div className="grid">
           <DonutSection title="Sector" groups={sectorGroups} />
           <DonutSection title="Country" groups={countryGroups} />
-          <DonutSection title="Asset Class" groups={assetClassGroups} />
+          <DonutSection title="Currency" groups={currencyGroups} />
         </div>
+        <section className="card allocation-holdings"><h2>Largest holdings</h2><p className="note">Top {Math.min(5, largest.length)} account for {(largest.slice(0, 5).reduce((sum, row) => sum + row.effectiveWeight, 0) * 100).toFixed(1)}% of recorded holdings.</p>
+          <div className="table-scroll"><table><thead><tr><th>Holding</th><th>Sector</th><th>Country</th><th className="num">Weight</th></tr></thead><tbody>{largest.slice(0, 5).map((row) => <tr key={row.id}><td>{row.companyName} <span className="note">{row.ticker}</span></td><td>{row.sector || 'Unclassified'}</td><td>{row.country || 'Unclassified'}</td><td className="num">{(row.effectiveWeight * 100).toFixed(1)}%</td></tr>)}</tbody></table></div>
+        </section>
+        </>}
+        </>
       )}
     </main>
   );

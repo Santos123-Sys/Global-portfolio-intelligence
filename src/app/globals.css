@@ -453,6 +453,11 @@ td.num, th.num, .num { font-family: monospace; text-align: right; }
 /* Chart containers */
 .chart-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; }
 .chart-card h2 { font-size: 0.8125rem; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 0.75rem; }
+.allocation-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+.allocation-summary .card { display: grid; gap: 0.2rem; }
+.allocation-summary strong { font-size: 1.15rem; }
+.allocation-holdings { margin-top: 1rem; }
+@media (max-width: 620px) { .allocation-summary { grid-template-columns: 1fr; } }
 
 @media (max-width: 800px) {
   .app-header-row { flex-wrap: wrap; }

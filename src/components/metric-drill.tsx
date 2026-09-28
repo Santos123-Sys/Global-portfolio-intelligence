@@ -59,6 +59,7 @@ export function MetricDrill({ metric, isLoading = false }: { metric: DrillableMe
           <span className="cur">{metric.currency}</span>
         </span>
       </button>
+      <span className="note metric-drill-hint">{metric.dataAsOf ? `Data as of ${new Date(metric.dataAsOf).toLocaleDateString()}` : 'Data date not recorded'}</span>
       {!open && <span className="note metric-drill-hint">[click for methodology]</span>}
       {open && (
         <div className="metric-drill-detail">
