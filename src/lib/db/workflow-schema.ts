@@ -323,3 +323,24 @@ export const providerCalls = pgTable(
     endpointOutcomeIdx: index('provider_calls_endpoint_outcome_idx').on(t.provider, t.endpoint, t.outcome, t.calledAt),
   })
 );
+
+/** Immutable price/config/result snapshot; final audit can be written only once by a human. */
+export const portfolioWeightRuns = pgTable('portfolio_weight_runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  portfolioId: uuid('portfolio_id').references(() => portfolios.id, { onDelete: 'cascade' }).notNull(),
+  actorId: uuid('actor_id').references(() => users.id).notNull(),
+  pricesCsv: text('prices_csv').notNull(),
+  priceHash: text('price_hash').notNull(),
+  source: text('source').notNull(),
+  currency: text('currency').notNull(),
+  holdingsHash: text('holdings_hash').notNull(),
+  baseDecisionId: uuid('base_decision_id'),
+  configJson: jsonb('config_json').$type<import('../portfolio-weights').WeightConfig>().notNull(),
+  resultJson: jsonb('result_json').$type<import('../portfolio-weights').WeightResult>().notNull(),
+  finalJson: jsonb('final_json').$type<import('../portfolio-weights').FinalWeights>(),
+  confirmedBy: uuid('confirmed_by').references(() => users.id),
+  acknowledgedWarnings: jsonb('acknowledged_warnings').$type<string[]>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+}, t => ({ portfolioCreatedIdx: index('weight_runs_portfolio_created_idx').on(t.portfolioId, t.createdAt) }));

@@ -61,3 +61,36 @@ def financial_extraction(body: ExtractionRequest, authorization: str = Header(de
         raise HTTPException(422, 'Extracted issuer does not match candidate')
     analysis = analyze(extracted, body.expected_currency)
     return {'extraction': extracted.model_dump(), 'analysis': analysis}
+
+# Reuse the deployed private Python runtime; no LLM participates in allocation.
+from .weights_api import ComputeRequest, ConfirmRequest, compute, confirm
+from threading import BoundedSemaphore
+_weights_slot = BoundedSemaphore(1)
+
+
+def authorize_weights(authorization):
+    secret = os.getenv('FILINGS_INTERNAL_TOKEN', '')
+    if len(secret) < 32 or not hmac.compare_digest(authorization, f'Bearer {secret}'):
+        raise HTTPException(401, 'Unauthorized')
+
+
+@app.post('/v1/portfolio-weights/compute')
+def portfolio_weights_compute(body: ComputeRequest, authorization: str = Header(default='')):
+    authorize_weights(authorization)
+    if not _weights_slot.acquire(blocking=False):
+        raise HTTPException(429, 'Allocation engine is busy; retry shortly')
+    try:
+        return compute(body)
+    except (ValueError, TypeError, KeyError) as error:
+        raise HTTPException(422, str(error)) from error
+    finally:
+        _weights_slot.release()
+
+
+@app.post('/v1/portfolio-weights/finalize')
+def portfolio_weights_finalize(body: ConfirmRequest, authorization: str = Header(default='')):
+    authorize_weights(authorization)
+    try:
+        return confirm(body)
+    except (ValueError, TypeError, KeyError) as error:
+        raise HTTPException(422, str(error)) from error

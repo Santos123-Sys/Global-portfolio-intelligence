@@ -998,3 +998,14 @@ button.nav-link:hover, button.nav-link[aria-expanded="true"] { background: var(-
 .discovery-screening summary { cursor: pointer; font-weight: 600; padding-block: .5rem; }
 .discovery-screening li { margin-block: .75rem; }
 .discovery-screening p { max-width: 85ch; }
+
+.weight-planner { margin-top: 1.5rem; }
+.weight-planner label { display: block; margin: .85rem 0; }
+.weight-planner input:not([type="checkbox"]), .weight-planner select { display: block; width: 100%; min-height: 42px; margin-top: .35rem; }
+.weight-planner input[type="checkbox"] { margin-right: .5rem; }
+.weight-planner details { margin: 1rem 0; }
+.weight-planner summary { cursor: pointer; padding: .5rem 0; }
+.weight-planner fieldset { border: 1px solid var(--border); border-radius: 8px; margin: 1rem 0; padding: 1rem; min-width: 0; }
+.weight-settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: .75rem; }
+.weight-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
+.weight-planner .note { overflow-wrap: anywhere; }
