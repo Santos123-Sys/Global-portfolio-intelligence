@@ -9,7 +9,7 @@ for (const width of [390, 1440]) {
     await context.addCookies([{ name: 'portfolio_session', value: token, url: 'http://127.0.0.1:3100' }]);
     await page.route('**/api/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ account: { isPlatformAdmin: false }, accounts: [], portfolios: [] }) }));
     await page.goto('/how-it-works');
-    await expect(page.getByRole('heading', { name: 'Clarity at every decision.' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Choose your next step' })).toBeVisible();
     await page.keyboard.press('Tab');
     await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused();
     await page.keyboard.press('Enter');

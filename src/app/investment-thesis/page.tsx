@@ -386,7 +386,7 @@ export default function InvestmentThesisPage() {
       </section>
       <details className="card"><summary>Create a PDF from a questionnaire (optional)</summary>
         <h2>Build a thesis document</h2>
-        <p className="note">Answer the questions below. Portfolio Intelligence will prepare a professional, static PDF, download a copy for you, and send that exact document to the thesis extractor. You review and confirm the resulting mandate before it is used.</p>
+        <p className="note">Answer the questions below. Global Portfolio Intelligence will prepare a professional, static PDF, download a copy for you, and send that exact document to the thesis extractor. You review and confirm the resulting mandate before it is used.</p>
         <form className="thesis-generator" onSubmit={(event) => void generateThesis(event)}>
           <div className="grid">
             <label>Thesis title<input value={generator.title} maxLength={120} required onChange={(event) => setGenerator((current) => ({ ...current, title: event.target.value }))} /></label>
@@ -605,4 +605,3 @@ function ThesisSummary({
     </div>
   );
 }
-

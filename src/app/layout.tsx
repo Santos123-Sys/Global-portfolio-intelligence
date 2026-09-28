@@ -4,8 +4,8 @@ import './globals.css';
 import { AppShell } from '@/components/app-shell';
 
 export const metadata: Metadata = {
-  title: 'Portfolio Intelligence',
-  description: 'AI-assisted, thesis-driven investment management with a deterministic quantitative engine',
+  title: 'Global Portfolio Intelligence',
+  description: 'Evidence-led investment research, valuation and portfolio monitoring across global markets.',
   icons: {
     icon: '/brand/portfolio-intelligence-mark.svg',
     apple: '/brand/portfolio-intelligence-mark.svg',

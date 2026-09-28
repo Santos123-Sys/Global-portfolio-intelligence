@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { safeLocalReturnPath } from '@/lib/request-security';
 
 export default function LoginPage() {
@@ -45,11 +46,14 @@ export default function LoginPage() {
 
   return (
     <main className="login-page">
-      <section className="login-card">
-        <p className="login-eyebrow">Private investment workspace</p>
-        <h1>Portfolio Intelligence</h1>
-        <p className="sub">Sign in to access portfolio data, analysis history and agentic-system runs.</p>
-        <form onSubmit={submit} className="login-form">
+      <div className="login-content">
+        <Link href="/login" className="login-brand" aria-label="Global Portfolio Intelligence">
+          <Image src="/brand/portfolio-intelligence-mark.svg" alt="" width={30} height={30} priority />
+          <span>Global Portfolio Intelligence</span>
+        </Link>
+        <section className="login-card">
+          <h1>Log in</h1>
+          <form onSubmit={submit} className="login-form">
           <label>
             Email
             <input name="email" type="email" autoComplete="email" required />
@@ -74,11 +78,12 @@ export default function LoginPage() {
           {mfaRequired && <p className="login-help">Enter the six-digit code from your authenticator app, or one unused recovery code.</p>}
           {error && <p className="login-error" role="alert">{error}</p>}
           <button type="submit" disabled={submitting}>
-            {submitting ? 'Verifying…' : mfaRequired ? 'Verify and sign in' : 'Sign in'}
+            {submitting ? 'Verifying…' : mfaRequired ? 'Verify and log in' : 'Log in'}
           </button>
-        </form>
-        <p className="login-help">New client? <Link href="/register">Create an account</Link></p>
-      </section>
+          </form>
+        </section>
+        <p className="login-signup">Don’t have an account? <Link href="/register">Sign up</Link></p>
+      </div>
     </main>
   );
 }
