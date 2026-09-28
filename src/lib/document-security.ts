@@ -2,6 +2,8 @@ import {
   MAX_THESIS_BASE64_CHARACTERS,
   MAX_THESIS_PDF_BYTES,
   MAX_THESIS_TEXT_BYTES,
+  ThesisDocument as ThesisDocumentContract,
+  type ThesisDocument as AgenticThesisDocument,
 } from '@portfolio-intelligence/agentic-contract';
 import { PDFDict, PDFDocument, PDFName, PDFRawStream, PDFRef, PDFString, PDFHexString } from 'pdf-lib';
 
@@ -91,6 +93,19 @@ export function validateThesisDocument(input: {
     contentBase64: bytes.toString('base64'),
     byteLength: bytes.length,
   };
+}
+
+/** Keep dashboard-only validation metadata out of the strict agentic API contract. */
+export function toAgenticThesisDocument(
+  input: Pick<ReturnType<typeof validateThesisDocument>, 'fileName' | 'mimeType' | 'contentBase64'>,
+  version: number,
+): AgenticThesisDocument {
+  return ThesisDocumentContract.parse({
+    version,
+    fileName: input.fileName,
+    mimeType: input.mimeType,
+    contentBase64: input.contentBase64,
+  });
 }
 
 /** Build a page-only extraction copy. Links and C2PA manifests are metadata,
