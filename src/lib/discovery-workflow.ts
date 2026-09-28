@@ -1,3 +1,4 @@
+import { loadMarketProfiles } from '@portfolio-intelligence/agentic-contract/market-profile-loader';
 import { randomUUID } from 'node:crypto';
 import { getEnv } from './env';
 import { sql, and, or, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
@@ -5,6 +6,7 @@ import {
   AgenticRunRequest,
   DiscoveryCandidate,
   issuerKey,
+  marketContextFromRecord,
   listingKey,
   screenDiscoveryUniverse,
   DiscoveryRunRequest,
@@ -613,7 +615,11 @@ export async function startApprovedCandidateAnalysis(
   const computedMetrics: GroundingBundle['computedMetrics'] = {};
   for (const metric of risk) computedMetrics[`securityRiskMetric:${metric.metricName}:${metric.computedAt}`] = metric.value;
   computedMetrics[`marketPrice:close:${bars.at(-1)!.date}`] = bars.at(-1)!.close;
+  const discoveryRequest = DiscoveryRunRequest.parse(row.run.requestJson);
+  const universeRecord = discoveryRequest.universe.find(record => record.ticker === security.ticker && record.exchange === security.exchange);
   const bundle: GroundingBundle = {
+    marketProfiles: await loadMarketProfiles(),
+    marketContext: marketContextFromRecord(universeRecord ?? { exchange: security.exchange, sector: security.sector }),
     ticker: security.ticker,
     companyName: security.companyName,
     exchange: security.exchange,

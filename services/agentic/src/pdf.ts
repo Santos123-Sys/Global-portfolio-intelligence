@@ -297,6 +297,20 @@ export async function renderReportPdf(
       if (evidence?.analysisMode === 'limited_research_risk') {
         paragraph('Research scope: limited-data research and price-risk assessment. Structured financial statements were not supplied, so DCF valuation is intentionally locked.', eyebrow, { muted: true, size: 8.8 });
       }
+      if (analysis.marketAnalysis) {
+        const market = analysis.marketAnalysis;
+        sectionTitle('Market-adaptive review', eyebrow);
+        paragraph(`Profiles: ${market.plan.profiles.map(p => `${p.id} v${p.version}`).join(', ') || 'No supported profile'}. Incorporation: ${market.plan.context.incorporationCountry ?? 'unknown'}. Reporting currency: ${market.plan.context.reportingCurrency ?? 'unknown'}. Accounting: ${market.plan.context.accountingStandard ?? 'unknown'}.`, eyebrow);
+        bullets([...market.plan.issues, ...market.conflicts].map(issue => `${issue.severity}: ${issue.detail}`), eyebrow, 'No market-context inconsistency identified.');
+        for (const execution of market.executions) {
+          const label = execution.agent.replace(/Agent$/, '').replace(/([a-z])([A-Z])/g, '$1 $2');
+          paragraph(`${label}: ${execution.status.replaceAll('_', ' ')}. ${execution.detail}`, eyebrow, { bold: true, size: 8.8 });
+          if (execution.finding) bullets([
+            ...execution.finding.claims.map(claim => claim.statement),
+            ...execution.finding.risks.map(risk => `${risk.statement} — review ${risk.assumption.replaceAll('_', ' ')} in ${risk.scenario.replaceAll('_', ' ')}.`),
+          ], eyebrow, 'No supported finding.');
+        }
+      }
       riskPanel(evidence, eyebrow);
       doc.font('ReportBold').fontSize(8).fillColor(palette.navy).text('RESEARCH FRAMEWORK', margin, doc.y);
       paragraph(`Coverage rationale: ${analysis.researchFramework.coverageRationale}`, eyebrow, { size: 9 });

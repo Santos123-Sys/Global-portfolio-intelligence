@@ -1,3 +1,5 @@
+import { loadMarketProfiles } from '@portfolio-intelligence/agentic-contract/market-profile-loader';
+import { buildMarketPlan, marketContextFromRecord, screenMarketPeers } from '@portfolio-intelligence/agentic-contract';
 import { and, desc, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -13,6 +15,7 @@ import { readBoundedJson } from '@/lib/request-body';
 export const runtime = 'nodejs';
 
 const peerSchema = z.object({
+  issuerId: z.string().trim().min(1).max(120).optional(),
   companyName: z.string().trim().min(1).max(120),
   ticker: z.string().trim().min(1).max(30),
   currency: z.string().regex(/^[A-Z]{3}$/),
@@ -120,7 +123,11 @@ export async function POST(req: Request) {
   const data = await context(session.auth.userId, parsed.data.candidateId);
   if (!data) return NextResponse.json({ error: 'Complete the approved security analysis before comparable-company valuation' }, { status: 409 });
   try {
-    const result = { ...comparableCompanyAnalysis(data.target, parsed.data.peers), dataAsOf: data.dataAsOf };
+    const screened = screenMarketPeers(parsed.data.peers);
+    if (screened.accepted.length < 6) return NextResponse.json({ error: 'At least six distinct evidenced issuers are required after duplicate screening.', exclusions: screened.excluded }, { status: 409 });
+    const marketPlan = buildMarketPlan(marketContextFromRecord({ exchange: data.candidate.exchange, sector: data.candidate.sector }), await loadMarketProfiles());
+    const result = { ...comparableCompanyAnalysis(data.target, screened.accepted), dataAsOf: data.dataAsOf,
+      marketProfiles: marketPlan.profiles.map(p => ({ id: p.id, version: p.version, peerPolicy: p.peerPolicy })), exclusions: screened.excluded };
     result.caveats.push('Peer multiples use each peer’s stated currency; all amounts within a peer must share that currency and unit. Financial periods and market-data dates can differ and require review.');
     const [scenario] = await db.insert(valuationScenarios).values({
       ownerId: session.auth.userId,

@@ -1,3 +1,4 @@
+import { buildMarketPlan, marketContextFromRecord } from '@portfolio-intelligence/agentic-contract';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { buildFinancialAnalysisReport } from '../src/lib/financial-analysis-report';
@@ -40,6 +41,8 @@ test('thesis-matched discovery remains reviewable through approval and report ac
     if (pathname === '/api/auth/session') return json({ account: { isPlatformAdmin: true } });
     if (pathname === '/api/discovery/valuations' && method === 'POST') {
       const { review } = route.request().postDataJSON();
+      expect(review.market.context.incorporationCountry).toBe('CH');
+      expect(review.market.capital.countryRiskPremium.value).toBe(0);
       expect(review.financialPeriodEnd).toBe('2025-12-31');
       expect(review.scenarios.base_case.discountRate).toBe(.10);
       expect(review.fcff.workingCapitalInvestment).toBe(20);
@@ -48,7 +51,7 @@ test('thesis-matched discovery remains reviewable through approval and report ac
       savedDcf = true;
       return json({ scenario: { id: '33333333-3333-4333-8333-333333333333' }, result: { ...threeCaseDiscountedCashFlow(assumptions), fcffDerivation, review } }, 201);
     }
-    if (pathname === '/api/discovery/valuations') return json({ financialInputs, suitability: { status: 'insufficient_data', rationale: 'Review FCFF inputs.', missingFields: [] }, defaults: { currency: 'CHF', dataAsOf: '2025-12-31', netDebt: 30, sharesOutstanding: 10, sourceReferences: [] }, automaticReadiness: { ready: false, missingFinancialRecords: ['free_cash_flow_to_firm'], missingScenarioDrivers: ['review assumptions'], message: 'Review assumptions to calculate DCF.' }, latestScenario: null });
+    if (pathname === '/api/discovery/valuations') return json({ marketPlan: buildMarketPlan(marketContextFromRecord({ exchange: 'XSWX', sector: 'Consumer' })), financialInputs, suitability: { status: 'insufficient_data', rationale: 'Review FCFF inputs.', missingFields: [] }, defaults: { currency: 'CHF', dataAsOf: '2025-12-31', netDebt: 30, sharesOutstanding: 10, sourceReferences: [] }, automaticReadiness: { ready: false, missingFinancialRecords: ['free_cash_flow_to_firm'], missingScenarioDrivers: ['review assumptions'], message: 'Review assumptions to calculate DCF.' }, latestScenario: null });
     if (pathname === '/api/discovery/comparables') return json({ error: 'Peers not yet reviewed.' }, 409);
     if (pathname === '/api/discovery/financial-report') return json(buildFinancialAnalysisReport({ companyName: 'Nestle SA', ticker: 'NESN', exchange: 'XSWX', currency: 'CHF', now: new Date('2026-09-26'), observations: ['2024-12-31', '2025-06-30'].map((observationDate, index) => ({ metricName: 'revenue', valueNumeric: String(100 + index * 20), observationDate, currency: 'CHF', sourceUrl: `https://example.test/${observationDate}`, sourceName: 'Annual filing', provider: 'investor-relations', status: 'OK', retrievedAt: new Date('2026-09-25') })) }));
     if (pathname === '/api/accounts') return json({ accounts: [], activeAccountId: '' });
@@ -121,12 +124,30 @@ test('thesis-matched discovery remains reviewable through approval and report ac
   await expect(page.getByRole('heading', { name: 'DCF & peer valuation' })).toBeVisible();
   const generate = page.getByRole('button', { name: 'Generate three-case DCF' });
   await expect(generate).toBeDisabled();
+  await page.getByLabel('Incorporation country code').fill('CH');
+  await page.getByLabel('Company reporting currency').fill('CHF');
+  await page.getByLabel('Accounting standard', { exact: true }).selectOption('IFRS');
+  await page.getByLabel('Regulatory jurisdictions (country codes, comma separated)').fill('CH');
+  await page.getByRole('button', { name: 'Add revenue geography' }).click();
+  await page.getByLabel('Country code', { exact: true }).fill('CH');
+  await page.getByLabel('Revenue share (%)').fill('100');
+  await page.getByLabel('Default-free rate (%)', { exact: true }).fill('4');
+  await page.getByLabel('Mature-market equity risk premium (%)').fill('5');
+  await page.getByLabel('Company-exposure country risk premium').fill('0');
+  await page.getByLabel('Levered beta').fill('1.2');
+  await page.getByLabel('Marginal tax rate (%)').fill('20');
+  await page.getByLabel('Marginal debt yield').fill('5');
+  await page.getByLabel('Market-value equity weight (%)').fill('100');
+  await page.getByLabel('Inputs as of', { exact: true }).fill(new Date().toISOString().slice(0, 10));
+  await page.getByLabel('Filings / assumptions memo URL', { exact: true }).fill('https://example.test/assumptions');
+  await expect(page.getByText('Computed base WACC: 10.0000%')).toBeVisible();
   await page.getByLabel('FCFF method').selectOption('ebit');
   await page.getByLabel('Non-cash working-capital investment — optional').fill('20');
   for (const name of ['worst case', 'base case', 'optimistic case']) {
     const group = page.getByRole('group', { name, exact: true });
     await group.getByLabel('Annual FCFF growth (%)').fill('4');
-    await group.getByLabel('WACC (%)').fill('10');
+    if (name !== 'base case') await group.getByLabel('WACC (%)').fill('10');
+    else await expect(group.getByLabel('WACC (%)')).toHaveAttribute('readonly', '');
     await group.getByLabel('Terminal growth (%)').fill('2');
   }
   await page.getByLabel('Assumptions reviewed as of').fill('2026-09-25');
@@ -138,6 +159,10 @@ test('thesis-matched discovery remains reviewable through approval and report ac
   await generate.click();
   await expect(page.getByRole('link', { name: 'Open DCF PDF report' })).toBeVisible();
   expect(savedDcf).toBe(true);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: '/tmp/market-review-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.getByText('Base-case sensitivity: WACC and terminal growth', { exact: true }).click();
   await expect(page.getByRole('table').filter({ has: page.getByText('Value per share (CHF); unavailable cells violate model constraints.') })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'DCF and peers: compare the evidence' })).toBeVisible();

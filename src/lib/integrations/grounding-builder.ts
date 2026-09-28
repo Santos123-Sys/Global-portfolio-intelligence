@@ -1,6 +1,8 @@
+import { loadMarketProfiles } from '@portfolio-intelligence/agentic-contract/market-profile-loader';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import {
   AgenticRunRequest,
+  marketContextFromRecord,
   AgenticRunSelection,
   ThesisCriteria,
   validateRunRequestCoherence,
@@ -87,6 +89,7 @@ export function assembleGroundingBundle(
   }
 
   return {
+    marketContext: marketContextFromRecord(holding),
     ticker: holding.ticker,
     companyName: holding.companyName,
     exchange: holding.exchange,
@@ -223,6 +226,7 @@ export async function buildAgenticRunRequest(
     getActiveAgentCustomization(ownerId, 'portfolio_synthesis'),
   ]);
 
+  const profileSnapshot = await loadMarketProfiles();
   const request = AgenticRunRequest.parse({
     accountId,
     thesis: { versionId: thesis.id, criteria },
@@ -239,11 +243,11 @@ export async function buildAgenticRunRequest(
     })),
     groundingBundles: holdings.map((holding) => ({
       portfolioId: holding.portfolioId,
-      bundle: assembleGroundingBundle(
+      bundle: { marketProfiles: profileSnapshot, ...assembleGroundingBundle(
         holding,
         riskRows.filter((risk) => risk.portfolioId === holding.portfolioId),
         observationRows.filter((observation) => observation.securityId === holding.securityId)
-      ),
+      ) },
     })),
     origin: { kind: 'portfolio_monitoring' },
     agentConfigs: [securityAnalysisConfig, synthesisConfig],

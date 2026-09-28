@@ -4,6 +4,8 @@ import type { DiscoveryEvidenceScorecard } from '@/lib/discovery-evidence';
 
 import Link from 'next/link';
 import type { DiscoveryCandidate as ContractCandidate, MarketDiscoveryOutput } from '@portfolio-intelligence/agentic-contract';
+import { MarketAnalysisReview } from '@/components/market-analysis-review';
+import type { MarketAnalysis } from '@portfolio-intelligence/agentic-contract';
 import { DiscoveryScreeningReview, DiscoveryCandidateContext } from '@/components/discovery-screening-review';
 import { useCallback, useEffect, useState } from 'react';
 import { ValuationWorkbench } from '@/components/valuation-workbench';
@@ -125,6 +127,7 @@ interface Candidate {
     keyCatalysts: string[] | null;
     keyRisks: string[] | null;
     thesisBreakers: string[] | null;
+    marketAnalysis?: MarketAnalysis | null;
     researchFramework: ResearchFramework | null;
     groundedIn: string[] | null;
     informationGaps: string[] | null;
@@ -694,6 +697,7 @@ export default function AIStockDiscoveryPage() {
                     <p className="caveat"><strong>{t('risks')}:</strong> {(candidate.analysis.keyRisks ?? []).join(' · ')}</p>
                     <p className="caveat"><strong>{t('breakers')}:</strong> {(candidate.analysis.thesisBreakers ?? []).join(' · ')}</p>
                     <p className="note"><strong>{t('informationGaps')}:</strong> {(candidate.analysis.informationGaps ?? []).join(' · ') || t('noneRecorded')}</p>
+                    {candidate.analysis.marketAnalysis && <MarketAnalysisReview plan={candidate.analysis.marketAnalysis.plan} analysis={candidate.analysis.marketAnalysis} />}
                     {candidate.analysis.researchFramework && <section className="research-framework" aria-label="Research framework">
                       <div className="research-framework-heading">
                         <div>
