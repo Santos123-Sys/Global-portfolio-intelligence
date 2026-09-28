@@ -40,7 +40,7 @@ const PORTFOLIO_WORKSPACE_PATHS = new Set(['/positions', '/allocation', '/risk',
 
 function ThemeToggle() {
   const { t } = useLanguage();
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [theme, setTheme] = useState<'dark' | 'light'>('light');
 
   useEffect(() => {
     try {
@@ -50,7 +50,7 @@ function ThemeToggle() {
         document.documentElement.dataset.theme = stored;
       }
     } catch {
-      // localStorage unavailable — stay on the dark default.
+      // localStorage unavailable — stay on the light default.
     }
   }, []);
 
@@ -202,7 +202,7 @@ export function Header() {
   return (
     <header className="app-header">
       <div className="app-header-row">
-        <Link href="/" className="brand">
+        <Link href="/" className="brand" aria-label="Global Portfolio Intelligence home">
           <Image
             src="/brand/portfolio-intelligence-mark.svg"
             alt=""
@@ -212,8 +212,7 @@ export function Header() {
             priority
           />
           <span className="brand-copy">
-            <strong>Portfolio Intelligence</strong>
-            <span>Thesis-driven investment management</span>
+            <strong>Global Portfolio Intelligence</strong>
           </span>
         </Link>
 
