@@ -3,7 +3,7 @@ import { desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { assertSameOrigin } from '@/lib/auth';
 import { authenticateRequest } from '@/lib/api-auth';
-import { DocumentValidationError, validateThesisDocument } from '@/lib/document-security';
+import { DocumentValidationError, toAgenticThesisDocument, validateThesisDocument } from '@/lib/document-security';
 import { db } from '@/lib/db';
 import { thesisVersions } from '@/lib/db/schema';
 import { externalThesisExtractions } from '@/lib/db/workflow-schema';
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
       .where(eq(thesisVersions.ownerId, session.auth.userId)).orderBy(desc(thesisVersions.versionNumber)).limit(1);
     const requestedVersion = (latest?.versionNumber ?? 0) + 1;
     const agentConfig = await getActiveAgentCustomization(session.auth.userId, 'thesis_extraction');
-    const remote = await startExternalThesisExtraction({ document: { ...document, version: requestedVersion }, agentConfig });
+    const remote = await startExternalThesisExtraction({ document: toAgenticThesisDocument(document, requestedVersion), agentConfig });
     const [extraction] = await db.insert(externalThesisExtractions).values({
       ownerId: session.auth.userId, externalExtractionId: remote.externalExtractionId, status: remote.status, requestedVersion,
       sourceFileName: document.fileName, sourceMimeType: document.mimeType, resultJson: remote.result, errorMessage: remote.errorMessage,
