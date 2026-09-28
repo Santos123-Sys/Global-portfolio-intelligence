@@ -1,5 +1,7 @@
 """Meaningful numerical and sandbox-boundary checks for the teaching example."""
 import unittest
+import json
+from pathlib import Path
 import numpy as np
 from .example_portfolio import EXAMPLE_ASSETS, EXAMPLE_STARTING_WEIGHTS, compute_example
 
@@ -26,6 +28,11 @@ class ExamplePortfolioTests(unittest.TestCase):
 
     def test_repeated_requests_are_deterministic(self):
         self.assertIs(compute_example(), self.result)
+
+    def test_checked_in_dashboard_fixture_matches_the_current_engine(self):
+        fixture = Path(__file__).resolve().parents[2] / 'src' / 'lib' / 'example-portfolio-allocation.json'
+        with fixture.open(encoding='utf-8') as source:
+            self.assertEqual(json.load(source), self.result)
 
 if __name__ == '__main__':
     unittest.main()
