@@ -185,6 +185,7 @@ export default function AllocationPage() {
       <PortfolioWorkspaceNav />
       <h1>Allocation</h1>
       <p className="sub">See the holdings, exposures and concentration of one portfolio at a time.</p>
+      <p><Link className="text-link" href="/example-portfolio">Explore a populated example portfolio</Link></p>
 
       <PortfolioSelector portfolios={portfolios} selectedId={selectedId} onSelect={setSelectedId} />
 

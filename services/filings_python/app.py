@@ -94,3 +94,15 @@ def portfolio_weights_finalize(body: ConfirmRequest, authorization: str = Header
         return confirm(body)
     except (ValueError, TypeError, KeyError) as error:
         raise HTTPException(422, str(error)) from error
+
+
+@app.get('/v1/portfolio-weights/example')
+def portfolio_weights_example(authorization: str = Header(default='')):
+    authorize_weights(authorization)
+    if not _weights_slot.acquire(blocking=False):
+        raise HTTPException(429, 'Allocation engine is busy; retry shortly')
+    try:
+        from .example_portfolio import compute_example
+        return compute_example()
+    finally:
+        _weights_slot.release()
