@@ -118,7 +118,7 @@ export default function RiskDetailPage() {
         <p className="note">Fetching...</p>
       ) : !selectedId ? (
         <div className="card"><h2>Create a portfolio to begin</h2><Link className="action-button inline-action" href="/portfolio-setup">Set up portfolio</Link></div>
-      ) : metrics.length === 0 ? (
+      ) : holdingCount === 0 || metrics.length === 0 ? (
         <div className="card">
           <h2>{holdingCount === 0 ? 'Add a holding to assess risk' : 'Waiting for risk history'}</h2>
           <p className="note">{holdingCount === 0 ? 'This portfolio has no recorded holdings. Add one first; risk estimates need sufficient market-price history.' : `${holdingCount ?? 0} holdings are recorded, but no risk estimates have been computed yet. Metrics appear after a price refresh has sufficient history.`}</p>
