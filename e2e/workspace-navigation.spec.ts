@@ -17,6 +17,14 @@ for (const width of [390, 1440]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: `/tmp/workspace-${width}.png`, fullPage: true, animations: 'disabled' });
     if (width < 640) await page.getByRole('button', { name: 'Menu', exact: true }).click();
+    await page.getByRole('button', { name: 'Investment Review' }).click();
+    await expect(page.getByRole('link', { name: 'Research & Analysis Inbox' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Investment Control' })).toBeVisible();
+    await page.getByRole('button', { name: 'Investment Review' }).click();
+    await page.getByRole('button', { name: 'More' }).click();
+    await expect(page.getByRole('link', { name: 'Existing-Holdings Analysis' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Admin Activity' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'More' }).click();
     await page.getByRole('button', { name: 'Find a page' }).click();
     await page.getByLabel('Find a page', { exact: true }).fill('security');
     await expect(page.locator('#page-finder').getByRole('link', { name: 'Account Security' })).toBeVisible();

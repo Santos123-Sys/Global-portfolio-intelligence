@@ -246,6 +246,7 @@ export default function PositionsPage() {
       <PortfolioWorkspaceNav />
       <h1>Positions</h1>
       <p className="sub">Every row is a single portfolio&apos;s holding. Values stay in that portfolio&apos;s native currency.</p>
+      <p><Link className="text-link" href="/securities">Open the portfolio security directory →</Link></p>
 
       <section className="card" id="add-position">
         <div className="section-heading">

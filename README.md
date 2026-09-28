@@ -154,15 +154,24 @@ Components; every query is bound to the current session:
 | `/positions` | Sortable, filterable position table across portfolios |
 | `/portfolio-setup` | Authenticated portfolio and holding creation; analysis-readiness status |
 | `/security/[ticker]` | Market & fundamentals, position, AI analysis, grounding audit trail |
-| `/intelligence` | AI analysis feed — new candidates, changed recommendations, thesis violations |
+| `/research` | Unified research inbox — candidate analyses, new/changed research, and thesis violations |
 | `/risk` | Every risk metric, drillable into full methodology, plus the VaR/normality caveat |
-| `/decisions` | Append-only, searchable decision log |
+| `/governance` | Portfolio guardrails, investment-control review, and recent decision history |
 
-Supporting pages — `/portfolio-setup`, `/portfolio`, `/risk-kpis`, `/ai-insights`,
-`/securities`, `/investment-thesis`, `/ai-stock-discovery`, `/agentic-system`,
-`/candidates` — cover ground the spec's seven pages don't (thesis upload,
-human-in-the-loop candidate review, provenance browsing) and remain reachable
-under the Header's "More" menu rather than deleted.
+The main workflow remains `/investment-thesis` → `/ai-stock-discovery` →
+`/positions`; Discovery owns human candidate decisions and analysis/valuation.
+The Research & Analysis Inbox combines the former `/candidates` and
+`/intelligence` views, while linking decision actions back to Discovery. Those
+two old paths redirect to `/research`. The searchable append-only decision log
+remains available from Investment Control to platform administrators.
+
+Supporting routes retain focused or operational work: `/research-history` is
+the administrator's cross-workflow activity view, `/agentic-system` is the
+optional existing-holdings analysis tool, and `/securities` is the portfolio
+security directory linked from Positions. The security master and run/decision
+records remain in the data model; consolidating their screens does not remove
+them. `/portfolio-setup`, `/portfolio`, `/risk-kpis`, and `/ai-insights` remain
+compatibility/support routes pending usage telemetry and redirect tests.
 
 ---
 
