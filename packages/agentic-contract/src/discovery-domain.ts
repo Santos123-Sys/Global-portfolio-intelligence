@@ -9,7 +9,7 @@ export const EligibilityRuleResult = z.object({
 }).strict();
 export const DiscoveryScreening = z.object({
   portfolioId: z.string().uuid(), ticker: z.string(), exchange: z.string(), issuerKey: z.string(),
-  status: z.enum(['eligible', 'ineligible', 'unverified', 'duplicate', 'already_known']),
+  status: z.enum(['eligible', 'ineligible', 'unverified', 'duplicate', 'already_known', 'budget_deferred']),
   reasons: z.array(z.string()), rules: z.array(EligibilityRuleResult),
 }).strict();
 export const DiscoveryContext = z.object({
@@ -17,11 +17,20 @@ export const DiscoveryContext = z.object({
   channel: z.literal('structured_universe'), eligibility: DiscoveryScreening,
   evidence: z.array(z.object({
     url: z.string().url(), provider: z.string(),
-    kind: z.enum(['structured_record', 'search_result']),
+    kind: z.enum(['structured_record', 'search_result', 'primary_document']),
     tier: z.enum(['primary', 'data_provider', 'unclassified']),
     retrievedAt: z.string().datetime().nullable(), observedAt: z.string().datetime().optional(), publishedAt: z.string().nullable(),
     snippet: z.string().optional(),
-  }).strict()),
+    contentHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+    verification: z.literal('issuer_identity_matched').optional(),
+  }).strict().superRefine((source, context) => {
+    if (source.kind === 'primary_document' && (source.tier !== 'primary' || !source.contentHash || source.verification !== 'issuer_identity_matched')) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Primary evidence requires matched issuer identity and a content digest' });
+    }
+    if (source.tier === 'primary' && source.kind !== 'primary_document') {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: 'Search snippets cannot be certified as primary evidence' });
+    }
+  })),
 }).strict();
 export const ScreeningAudit = z.object({
   thesisVersionId: z.string().uuid(), records: z.array(DiscoveryScreening),
@@ -73,7 +82,13 @@ export function screenDiscoveryUniverse(request: DiscoveryRunRequest) {
       }
       records.push(row);
     }
-    eligibleByPortfolio.set(portfolio.id, selected);
+    const budget = request.researchBudgetPerPortfolio ?? selected.length;
+    for (const record of selected.slice(budget)) {
+      const row = records.find(r => r.portfolioId === portfolio.id && r.ticker === record.ticker && r.exchange === record.exchange)!;
+      row.status = 'budget_deferred';
+      row.reasons.push('Passed eligibility; deferred by the per-portfolio research budget, not a thesis failure. Primary listings then listing identifiers determine stable processing order, not investment attractiveness.');
+    }
+    eligibleByPortfolio.set(portfolio.id, selected.slice(0, budget));
   }
   return { records, eligibleByPortfolio };
 }

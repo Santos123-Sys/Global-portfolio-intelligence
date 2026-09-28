@@ -171,7 +171,7 @@ export class EodhdProvider implements PriceProvider {
   private async request(
     path: string,
     params: Record<string, string>,
-    options: FundamentalsRequestOptions = {}
+    options: FundamentalsRequestOptions & { timeoutMs?: number } = {}
   ): Promise<unknown> {
     const url = new URL(path, 'https://eodhd.com');
     for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
@@ -184,7 +184,7 @@ export class EodhdProvider implements PriceProvider {
       perform: () =>
         fetch(url, {
           cache: 'no-store',
-          signal: AbortSignal.timeout(30_000),
+          signal: AbortSignal.timeout(options.timeoutMs ?? 30_000),
           headers: { accept: 'application/json' },
         }),
       classify: classifyEodhdResponse,
@@ -195,28 +195,37 @@ export class EodhdProvider implements PriceProvider {
     return response.json();
   }
 
+  /** A small, optional post-screen lookup; never requested for the full exchange directory. */
+  async getDiscoveryIssuerProfile(ticker: string, exchange: string) {
+    const info = exchangeInfo(exchange);
+    const symbol = `${normalizedTicker(ticker)}.${info.code}`;
+    const payload = object(await this.request(`/api/fundamentals/${encodeURIComponent(symbol)}`, { filter: 'General' }, { timeoutMs: 8_000 }));
+    const general = object(payload.General ?? payload);
+    return { name: text(first(general, 'Name')), isin: text(first(general, 'ISIN')),
+      website: text(first(general, 'WebURL')) };
+  }
+
   /**
-   * Builds the discovery universe, preferring the richest source the plan allows.
-   *
-   *   1. /api/screener            ranked by market capitalisation. Best, but it
-   *                               is an All-World-Extended / All-In-One feature
-   *                               and 403s on smaller plans.
-   *   2. /api/exchange-symbol-list ships with every plan including the free tier.
-   *      + /api/eod-bulk-last-day  one extra call for last close and volume, so
-   *                               the list can be ranked by turnover instead of
-   *                               arbitrarily truncated.
-   *   3. /api/exchange-symbol-list alone, unranked, with the limitation recorded
-   *                               on each record so the agent must disclose it.
-   *
-   * Why the ranking in step 2 is not optional: the symbol list carries no size
-   * field, and an exchange list truncated alphabetically drops Nestlé, Novartis,
-   * Roche and UBS off a Swiss universe while keeping every company beginning
-   * with A. That is worse than useless for a quality thesis, and it would fail
-   * silently — the run would look successful and simply never consider the
-   * large caps. Turnover (close x volume) is a coarse proxy for size, but it is
-   * a real, provider-supplied number and it keeps the large caps in.
+   * Broad requests use the exchange directory for identity coverage; a bounded
+   * screener enrichment is optional. The screener endpoint stops at offset 999,
+   * so its metrics never imply full-directory financial coverage. Short legacy
+   * requests retain the ranked screener-first behavior.
    */
   async getSecurityUniverse(exchange: string, limit: number): Promise<SecurityUniverseRecord[]> {
+    if (limit > 100) {
+      const listings = await this.symbolListUniverse(exchange, limit);
+      try {
+        const metrics = await this.screenerUniverse(exchange, Math.min(limit, 1000));
+        const byTicker = new Map(metrics.map(record => [record.ticker, record]));
+        return listings.map(record => {
+          const metric = byTicker.get(record.ticker);
+          return metric ? { ...record, sector: metric.sector, industry: metric.industry,
+            attributes: { ...metric.attributes, ...record.attributes, metric_source_url: metric.sourceUrl } } : record;
+        });
+      } catch {
+        return listings.map(record => ({ ...record, attributes: { ...record.attributes, financial_enrichment_status: 'unavailable' } }));
+      }
+    }
     try {
       return await this.screenerUniverse(exchange, limit);
     } catch (error) {
@@ -261,7 +270,7 @@ export class EodhdProvider implements PriceProvider {
 
   private async symbolListUniverse(exchange: string, limit: number): Promise<SecurityUniverseRecord[]> {
     const info = exchangeInfo(exchange);
-    const boundedLimit = Math.max(1, Math.min(limit, 500));
+    const boundedLimit = Math.max(1, Math.min(limit, 4000));
     const endpoint = `/api/exchange-symbol-list/${encodeURIComponent(info.code)}`;
     const payload = await this.request(endpoint, {});
     const rows = Array.isArray(payload) ? payload : [];
@@ -294,6 +303,8 @@ export class EodhdProvider implements PriceProvider {
         universe_source: 'exchange-symbol-list',
         universe_ranking: ranked ? 'last_close_turnover' : 'unranked',
         universe_truncated: truncated,
+        universe_eligible_count: candidates.length,
+        universe_selected_count: Math.min(candidates.length, boundedLimit),
       };
       const isin = text(first(row, 'Isin', 'isin'));
       if (isin) attributes.isin = isin;
@@ -322,17 +333,20 @@ export class EodhdProvider implements PriceProvider {
 
   private async screenerUniverse(exchange: string, limit: number): Promise<SecurityUniverseRecord[]> {
     const info = exchangeInfo(exchange);
-    const boundedLimit = Math.max(1, Math.min(limit, 100));
-    const payload = await this.request('/api/screener', {
-      filters: JSON.stringify([
-        ['exchange', '=', info.code],
-      ]),
-      sort: 'market_capitalization.desc',
-      limit: String(boundedLimit),
-      offset: '0',
-    });
-    const root = object(payload);
-    const rows = Array.isArray(root.data) ? root.data : Array.isArray(payload) ? payload : [];
+    const boundedLimit = Math.max(1, Math.min(limit, 1000));
+    const rows: unknown[] = [];
+    for (let offset = 0; offset < boundedLimit; offset += 100) {
+      const pageSize = Math.min(100, boundedLimit - offset);
+      const payload = await this.request('/api/screener', {
+        filters: JSON.stringify([['exchange', '=', info.code]]),
+        sort: 'market_capitalization.desc', limit: String(pageSize), offset: String(offset),
+      });
+      const root = object(payload);
+      const page = Array.isArray(root.data) ? root.data : Array.isArray(payload) ? payload : null;
+      if (!page) throw new Error('Invalid screener page');
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
     const observedAt = new Date().toISOString();
     return rows.flatMap((value): SecurityUniverseRecord[] => {
       const row = object(value);

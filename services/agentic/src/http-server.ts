@@ -1,3 +1,4 @@
+import { DispatchConflictError } from './types.js';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import {
@@ -222,7 +223,7 @@ export function createAgenticHttpServer(deps: HttpServerDependencies) {
       if (url.pathname === '/v1/discovery-runs' && request.method === 'POST') {
         const parsed = DiscoveryRunRequest.safeParse(await readJson(request, 8 * 1024 * 1024));
         if (!parsed.success) throw new HttpError(400, 'Discovery run request failed contract validation');
-        const externalId = createExternalId('discovery');
+        const externalId = parsed.data.dispatchId ? `discovery_${parsed.data.dispatchId}` : createExternalId('discovery');
         const job = await deps.repository.create('market_discovery', externalId, parsed.data, 1);
         return sendJson(response, 202, discoveryStatus(job));
       }
@@ -295,10 +296,11 @@ export function createAgenticHttpServer(deps: HttpServerDependencies) {
 
       throw new HttpError(404, 'Not found');
     } catch (error) {
-      const status = error instanceof HttpError ? error.status : 500;
-      const message = error instanceof HttpError ? error.message : 'Internal agentic service error';
+      const status = error instanceof DispatchConflictError ? 409 : error instanceof HttpError ? error.status : 500;
+      const message = error instanceof HttpError || error instanceof DispatchConflictError ? error.message : 'Internal agentic service error';
       if (!response.headersSent) sendJson(response, status, { error: message });
       else response.destroy();
     }
   });
 }
+

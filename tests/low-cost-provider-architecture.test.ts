@@ -16,7 +16,7 @@ const refreshRoute = readFileSync('src/app/api/cron/refresh/route.ts', 'utf8');
 describe('low-cost provider architecture', () => {
   it('separates discovery from EODHD validation', () => {
     expect(env).toContain("DISCOVERY_PROVIDER: z.enum(['eodhd', 'finnhub'])");
-    expect(workflow).toContain('loadDiscoveryUniverse(exchange, 25)');
+    expect(workflow).toContain('loadDiscoveryUniverse(exchange, getEnv().DISCOVERY_UNIVERSE_LIMIT)');
     expect(workflow).toContain('const provider = getPriceProvider();');
   });
 
@@ -59,3 +59,4 @@ describe('low-cost provider architecture', () => {
     expect(discoveryRoute).toContain('.max(7).default(6)');
   });
 });
+

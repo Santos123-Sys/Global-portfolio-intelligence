@@ -1,3 +1,4 @@
+import { DispatchConflictError } from '../src/types.js';
 import { randomUUID } from 'node:crypto';
 import type {
   MarketDiscoveryOutput,
@@ -14,6 +15,11 @@ export class MemoryRepository implements JobRepository {
   async close() {}
 
   async create(kind: JobKind, externalId: string, payload: unknown, progressTotal: number) {
+    const existing = [...this.jobs.values()].find(job => job.externalId === externalId);
+    if (existing) {
+      if (existing.kind !== kind || JSON.stringify(existing.payload) !== JSON.stringify(payload)) throw new DispatchConflictError();
+      return existing;
+    }
     const now = new Date();
     const job: AgenticJob = {
       id: randomUUID(),
@@ -161,3 +167,4 @@ export class MemoryRepository implements JobRepository {
     }
   }
 }
+

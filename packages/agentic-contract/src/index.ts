@@ -288,6 +288,7 @@ export const SecurityUniverseRecord = z.object({
 export type SecurityUniverseRecord = z.infer<typeof SecurityUniverseRecord>;
 
 export const DiscoveryRunRequest = z.object({
+  dispatchId: z.string().uuid().optional(),
   thesis: z.object({
     versionId: z.string().uuid(),
     criteria: ThesisCriteria,
@@ -299,7 +300,8 @@ export const DiscoveryRunRequest = z.object({
     baseCurrency: z.string().trim().min(1),
     investmentObjective: z.string(),
   }).strict()).min(1),
-  universe: z.array(SecurityUniverseRecord).min(1).max(500),
+  universe: z.array(SecurityUniverseRecord).min(1).max(10000),
+  researchBudgetPerPortfolio: z.number().int().min(1).max(100).optional(),
   universeFailures: z.array(z.object({ exchange: z.string(), reason: z.string() }).strict()).optional(),
   knownSecurities: z.array(z.object({
     portfolioId: z.string().uuid(), ticker: z.string(), exchange: z.string(),

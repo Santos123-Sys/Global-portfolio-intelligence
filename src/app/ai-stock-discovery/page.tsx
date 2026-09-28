@@ -298,7 +298,7 @@ export default function AIStockDiscoveryPage() {
   }, [loadCandidates, selectedRunId]);
 
   const hasActiveWork =
-    runs.some((run) => run.status === 'queued' || run.status === 'running') ||
+    runs.some((run) => run.status === 'dispatching' || run.status === 'queued' || run.status === 'running') ||
     candidates.some((candidate) =>
       candidate.workflowStatus === 'analysis_preparing' ||
       candidate.analysisRunStatus === 'queued' ||
@@ -514,6 +514,7 @@ export default function AIStockDiscoveryPage() {
               <span className={`badge ${latestRun!.status === 'failed' ? 'breach' : latestRun!.status === 'completed' ? 'ok' : 'watch'}`}>{t(latestRun!.status === 'failed' ? 'failed' : latestRun!.status === 'completed' ? 'completed' : latestRun!.status === 'running' ? 'running' : 'queued')}</span>{' '}
               · {latestRun!.candidateCount} {t('candidates')}
             </p>
+            {latestRun!.status === 'dispatching' && <p role="status">Request saved. Confirming delivery; retries reuse this run.</p>}
             {latestRun!.resultJson?.thesisVersion && <p>Approved thesis version {latestRun!.resultJson.thesisVersion}</p>}
             {latestRun!.progress && latestRun!.status !== 'completed' && <p role="status">{latestRun!.progress.currentStage} · {latestRun!.progress.completed}/{latestRun!.progress.total} stages</p>}
             <div className="preflight-checks" aria-label="Research outcome by portfolio">

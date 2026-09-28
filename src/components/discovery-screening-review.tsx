@@ -14,7 +14,7 @@ export function DiscoveryScreeningReview({ audit, portfolios }: { audit?: Audit;
       const count = (status: Audit['records'][number]['status']) => rows.filter(row => row.status === status).length;
       return <div key={portfolio.portfolioId}>
         <h4>{portfolio.portfolioName}</h4>
-        <p>{rows.length} considered · {count('eligible')} eligible for research · {count('ineligible')} failed constraints · {count('unverified')} unknown · {count('duplicate')} duplicate listings · {count('already_known')} already held or reviewed</p>
+        <p>{rows.length} considered · {count('eligible')} eligible for research · {count('ineligible')} failed constraints · {count('unverified')} unknown · {count('duplicate')} duplicate listings · {count('already_known')} already held or reviewed · {count('budget_deferred')} eligible but deferred by research budget</p>
         <details><summary>Inspect eligibility and exclusions</summary>
           <ul>{rows.map(row => <li key={`${row.exchange}:${row.ticker}`}>
             <strong>{row.ticker} · {row.exchange}</strong> — {row.status.replaceAll('_', ' ')}
@@ -36,8 +36,9 @@ export function DiscoveryCandidateContext({ context }: { context?: Context }) {
     <ul>{context.eligibility.rules.map((rule, i) => <li key={i}>{rule.status}: {rule.criterion} — {rule.reason}</li>)}</ul>
     <p className="note">Source type describes provenance, not independent verification. Search results remain unclassified until reviewed. Retrieval date does not establish when a financial fact was true.</p>
     <ul>{context.evidence.map((evidence, i) => <li key={`${evidence.url}:${i}`}>
-      <a className="text-link" href={evidence.url} target="_blank" rel="noreferrer">{evidence.provider} · {evidence.kind === 'structured_record' ? 'Structured record' : 'Search result'}</a>
+      <a className="text-link" href={evidence.url} target="_blank" rel="noreferrer">{evidence.provider} · {evidence.kind === 'structured_record' ? 'Structured record' : evidence.kind === 'primary_document' ? 'Retrieved primary document' : 'Search result'}</a>
       <p>{evidence.tier.replaceAll('_', ' ')} · retrieved {evidence.retrievedAt?.slice(0, 10) ?? 'unknown'} · published {evidence.publishedAt ?? 'unknown'}{evidence.observedAt ? ` · record as of ${evidence.observedAt.slice(0, 10)}` : ''}</p>
+      {evidence.verification && <p>Issuer identity matched in retrieved text; this verifies source provenance, not the truth of every claim.</p>}
       {evidence.snippet && <p>{evidence.snippet}</p>}
     </li>)}</ul>
   </details>;

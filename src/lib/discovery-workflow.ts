@@ -1,9 +1,12 @@
+import { randomUUID } from 'node:crypto';
+import { getEnv } from './env';
 import { sql, and, or, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import {
   AgenticRunRequest,
   DiscoveryCandidate,
   issuerKey,
   listingKey,
+  screenDiscoveryUniverse,
   DiscoveryRunRequest,
   MarketDiscoveryOutput,
   PortfolioRole,
@@ -16,7 +19,7 @@ import {
 import { getActiveAgentCustomization } from './agent-config';
 import { decisionJournalAuditText, type DecisionJournal } from './decision-journal';
 import { getPriceProvider } from './connectors';
-import { loadDiscoveryUniverse } from './discovery-provider';
+import { enrichDiscoveryIssuerSources, loadDiscoveryUniverse } from './discovery-provider';
 import { db } from './db';
 import { accounts, aiAnalyses, decisionLog, portfolios, positions, priceHistory, securities, thesisVersions } from './db/schema';
 import {
@@ -25,7 +28,7 @@ import {
   externalDiscoveryRuns,
   securityRiskSnapshots,
 } from './db/workflow-schema';
-import { startExternalAgenticRun, startExternalDiscoveryRun } from './integrations/agentic-client';
+import { startExternalAgenticRun, startExternalDiscoveryRun, fetchExternalDiscoveryRun } from './integrations/agentic-client';
 import { computeStandaloneSecurityRisk } from './quant/security-risk';
 import { recordPriceObservation } from './services/provenance';
 import { isUnspecifiedThesisMandateCurrency, normalizeThesisMandateCurrency } from './thesis-currency';
@@ -141,7 +144,7 @@ export async function buildDiscoveryRunRequest(
   const exchanges = [...new Set(equityPortfolios.map((portfolio) => ROLE_EXCHANGE[portfolio.role]!))];
   // Provider lists are capped before screening; dated seed supplements may
   // expand them. Report this bounded coverage instead of claiming a full market.
-  const attempts = await Promise.allSettled(exchanges.map((exchange) => loadDiscoveryUniverse(exchange, 25)));
+  const attempts = await Promise.allSettled(exchanges.map((exchange) => loadDiscoveryUniverse(exchange, getEnv().DISCOVERY_UNIVERSE_LIMIT)));
   const universeFailures = attempts.flatMap((result, i) => result.status === 'rejected'
     ? [{ exchange: exchanges[i], reason: 'Market universe could not be retrieved; check provider access and retry.' }] : []);
   const loaded = attempts.flatMap(result => result.status === 'fulfilled' ? [result.value] : []);
@@ -177,6 +180,7 @@ export async function buildDiscoveryRunRequest(
     portfolios: equityPortfolios,
     universe,
     maxCandidatesPerPortfolio,
+    researchBudgetPerPortfolio: getEnv().DISCOVERY_RESEARCH_BUDGET,
     knownSecurities,
     universeFailures,
     agentConfig,
@@ -234,6 +238,13 @@ export async function startDiscoveryRunForOwner(input: {
     input.maxCandidatesPerPortfolio ?? 6,
     input.thesisVersionId
   );
+  const screened = screenDiscoveryUniverse(built.request);
+  const selected = new Set([...screened.eligibleByPortfolio.values()].flat().map(record => listingKey(record)));
+  const selectedRecords = built.request.universe.filter(record => selected.has(listingKey(record)));
+  const profiles = await enrichDiscoveryIssuerSources(selectedRecords);
+  const byListing = new Map(profiles.map(record => [listingKey(record), record]));
+  built.request = DiscoveryRunRequest.parse({ ...built.request,
+    universe: built.request.universe.map(record => byListing.get(listingKey(record)) ?? record) });
   // Serialize against confirmation/exclusion. Recheck after provider loading, just
   // before dispatch; a previously loaded mandate must not start after supersession.
   const dispatched = await db.transaction(async tx => {
@@ -243,26 +254,83 @@ export async function startDiscoveryRunForOwner(input: {
       isNull(thesisVersions.excludedAt), isNull(thesisVersions.supersededAt)
     )).limit(1);
     if (!active) throw new Error('The thesis changed before Discovery started. Review the active version and retry.');
-    if (input.reuseExistingForThesis) {
+    {
       const [existing] = await tx.select().from(externalDiscoveryRuns).where(and(
         eq(externalDiscoveryRuns.ownerId, input.ownerId), eq(externalDiscoveryRuns.thesisVersionId, built.thesisVersionId)
       )).orderBy(desc(externalDiscoveryRuns.requestedAt)).limit(1);
-      if (existing && existing.status !== 'failed') return { run: existing, remote: null, reused: true as const };
+      if (existing && (existing.status === 'dispatching' || (input.reuseExistingForThesis && existing.status !== 'failed'))) return { run: existing, remote: null, reused: true as const };
     }
-    const remote = await startExternalDiscoveryRun(built.request);
+    const dispatchId = randomUUID();
+    const request = DiscoveryRunRequest.parse({ ...built.request, dispatchId });
     const [created] = await tx.insert(externalDiscoveryRuns).values({
       ownerId: input.ownerId, thesisVersionId: built.thesisVersionId,
-      externalDiscoveryId: remote.externalDiscoveryId, status: remote.status,
-      provider: built.provider, requestJson: built.request, resultJson: remote.result,
-      errorMessage: remote.errorMessage,
-      completedAt: remote.status === 'completed' || remote.status === 'failed' ? new Date() : null,
+      externalDiscoveryId: `discovery_${dispatchId}`, status: 'dispatching',
+      provider: built.provider, requestJson: request,
     }).returning();
-    return { run: created, remote, reused: false as const };
+    return { run: created, remote: null, reused: false as const };
   });
-  if (dispatched.remote?.status === 'completed') {
-    return { ...dispatched, run: await synchronizeDiscoveryRun(dispatched.run.id, input.ownerId, dispatched.remote) };
+  if (dispatched.run.status === 'dispatching') {
+    const run = await recoverDiscoveryDispatch(dispatched.run.id, input.ownerId);
+    return { ...dispatched, run };
   }
   return dispatched;
+}
+
+/** The durable row exists before HTTP; repeat delivery always uses its immutable ID. */
+export async function recoverDiscoveryDispatch(runId: string, ownerId: string) {
+  const sent = await db.transaction(async tx => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${ownerId}))`);
+    const [run] = await tx.select().from(externalDiscoveryRuns).where(and(
+      eq(externalDiscoveryRuns.id, runId), eq(externalDiscoveryRuns.ownerId, ownerId)
+    )).limit(1);
+    if (!run) throw new Error('Discovery run not found');
+    if (run.status !== 'dispatching') return { run, remote: null };
+    const [active] = await tx.select().from(thesisVersions).where(and(
+      eq(thesisVersions.id, run.thesisVersionId), eq(thesisVersions.ownerId, ownerId),
+      isNull(thesisVersions.excludedAt), isNull(thesisVersions.supersededAt)
+    )).limit(1);
+    try {
+      // A superseded intent must never create new work. Its stable ID still
+      // lets us reconcile work accepted before the thesis changed.
+      const remote = active
+        ? await startExternalDiscoveryRun(DiscoveryRunRequest.parse(run.requestJson))
+        : await fetchExternalDiscoveryRun(run.externalDiscoveryId);
+      if (remote.externalDiscoveryId !== run.externalDiscoveryId) throw new Error('Dispatch identity changed');
+      // Leave the intent pending until synchronize commits status AND result.
+      // A crash here must remain retryable, including terminal remote results.
+      return { run, remote };
+    } catch (error) {
+      const rejected = error instanceof Error && /returned (400|409)/.test(error.message);
+      const notFound = !active && error instanceof Error && /returned 404/.test(error.message);
+      const [updated] = await tx.update(externalDiscoveryRuns).set({
+        status: notFound || rejected ? 'failed' : 'dispatching',
+        errorMessage: rejected ? 'The service rejected this saved request. Check deployment compatibility and request validation before starting another run.' : notFound ? 'Thesis changed before dispatch; start a new Discovery run.' : 'Delivery is unconfirmed. Automatic reconciliation will reuse the saved request; no new run is needed.',
+        completedAt: notFound || rejected ? new Date() : null,
+      }).where(eq(externalDiscoveryRuns.id, run.id)).returning();
+      return { run: updated, remote: null };
+    }
+  });
+  return sent.remote ? synchronizeDiscoveryRun(sent.run.id, ownerId, sent.remote) : sent.run;
+}
+
+/** Invoked by authenticated cron as well as normal owner polling. */
+export async function reconcilePendingDiscoveryDispatches() {
+  const pending = eq(externalDiscoveryRuns.status, 'dispatching');
+  const [{ total }] = await db.select({ total: sql<number>`count(*)::int` }).from(externalDiscoveryRuns).where(pending);
+  if (!total) return { considered: 0, recovered: 0 };
+  // Move the bounded window each day, so permanently unavailable old intents
+  // cannot starve newer owners in the scheduled reconciliation.
+  const start = (Math.floor(Date.now() / 86_400_000) * 10) % total;
+  const read = (offset: number, limit: number) => db.select({ id: externalDiscoveryRuns.id, ownerId: externalDiscoveryRuns.ownerId })
+    .from(externalDiscoveryRuns).where(pending).orderBy(externalDiscoveryRuns.requestedAt, externalDiscoveryRuns.id).limit(limit).offset(offset);
+  const rows = await read(start, 10);
+  if (rows.length < 10 && start > 0) rows.push(...await read(0, 10 - rows.length));
+  let recovered = 0;
+  for (const row of rows) {
+    try { if ((await recoverDiscoveryDispatch(row.id, row.ownerId)).status !== 'dispatching') recovered++; }
+    catch { /* durable intent remains available for the next cycle */ }
+  }
+  return { considered: rows.length, recovered };
 }
 
 export async function synchronizeDiscoveryRun(
@@ -641,4 +709,3 @@ export async function candidateAnalysisIds(runIds: string[]) {
     .where(inArray(externalAgenticRuns.externalRunId, runIds));
   return new Map(rows.map((row) => [row.externalRunId, row.analysisId]));
 }
-

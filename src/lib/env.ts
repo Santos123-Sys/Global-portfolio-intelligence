@@ -17,6 +17,8 @@ const schema = z.object({
   DISCOVERY_FALLBACK_PROVIDER: z.enum(['none', 'eodhd']).default('none'),
   FINNHUB_API_KEY: z.string().min(1).optional(),
   /** How long a successful discovery-universe snapshot can satisfy a fallback request. */
+  DISCOVERY_UNIVERSE_LIMIT: z.coerce.number().int().min(100).max(4000).default(2000),
+  DISCOVERY_RESEARCH_BUDGET: z.coerce.number().int().min(1).max(100).default(40),
   DISCOVERY_UNIVERSE_CACHE_HOURS: z.coerce.number().int().min(1).max(24 * 30).default(168),
   // Self-imposed ceilings the provider gateway enforces before making a call,
   // not a measurement of what the vendor actually allows — docs/architecture.md
@@ -135,3 +137,4 @@ export function assertCronAuthorized(req: Request): void {
     throw new Error('Unauthorized cron invocation');
   }
 }
+

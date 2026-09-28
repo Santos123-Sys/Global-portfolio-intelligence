@@ -1,7 +1,8 @@
 import {beforeEach,describe,it,expect,vi} from 'vitest';
 const mocks=vi.hoisted(()=>({select:vi.fn(),transaction:vi.fn(),start:vi.fn(),load:vi.fn(),events:[] as string[]}));
+vi.mock('../src/lib/env',()=>({getEnv:()=>({DISCOVERY_UNIVERSE_LIMIT:2000,DISCOVERY_RESEARCH_BUDGET:40})}));
 vi.mock('../src/lib/db',()=>({db:{select:mocks.select,transaction:mocks.transaction}}));
-vi.mock('../src/lib/discovery-provider',()=>({loadDiscoveryUniverse:mocks.load}));
+vi.mock('../src/lib/discovery-provider',()=>({loadDiscoveryUniverse:mocks.load,enrichDiscoveryIssuerSources:async(records:unknown[])=>records}));
 vi.mock('../src/lib/agent-config',()=>({getActiveAgentCustomization:async()=>undefined}));
 vi.mock('../src/lib/integrations/agentic-client',()=>({startExternalDiscoveryRun:mocks.start,startExternalAgenticRun:vi.fn()}));
 import {startDiscoveryRunForOwner} from '../src/lib/discovery-workflow';

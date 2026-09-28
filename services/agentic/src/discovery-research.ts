@@ -6,7 +6,7 @@ export const DISCOVERY_RESEARCH_GAP = 'Web research could not be retrieved for t
 /** Keep successes from other securities; an outage is never evidence of ineligibility. */
 export async function collectDiscoveryResearch(
   universe: SecurityUniverseRecord[],
-  research: (companyName: string, ticker: string) => Promise<WebResearchEvidence>,
+  research: (companyName: string, ticker: string, record: SecurityUniverseRecord) => Promise<WebResearchEvidence>,
 ) {
   const evidence = new Map<string, WebResearchEvidence>();
   const failures = new Set<string>();
@@ -15,7 +15,7 @@ export async function collectDiscoveryResearch(
     const key = `${record.exchange}:${record.ticker}`;
     if (evidence.has(key) || failures.has(key)) continue;
     try {
-      evidence.set(key, await research(record.companyName, record.ticker));
+      evidence.set(key, await research(record.companyName, record.ticker, record));
     } catch {
       // Do not persist raw provider errors: they may include request credentials.
       failures.add(key);
@@ -23,3 +23,4 @@ export async function collectDiscoveryResearch(
   }
   return { evidence, failures };
 }
+

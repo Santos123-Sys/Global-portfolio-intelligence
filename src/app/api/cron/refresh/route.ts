@@ -9,6 +9,8 @@ import { fetchEcbRates } from '@/lib/fx';
 import { recordPriceObservation, recordUnavailableObservation } from '@/lib/services/provenance';
 import { pruneAuthenticationSecurityData } from '@/lib/auth-security';
 
+import { reconcilePendingDiscoveryDispatches } from '@/lib/discovery-workflow';
+
 export const runtime = 'nodejs';
 
 /**
@@ -25,6 +27,7 @@ export async function GET(req: Request) {
   }
 
   const outcome = await withLock('daily_refresh', async () => {
+    const discoveryDispatches = await reconcilePendingDiscoveryDispatches();
     const provider = getPriceProvider();
     const authenticationDataPruned = await pruneAuthenticationSecurityData();
     const allSecurities = await db.select().from(securities);
@@ -74,6 +77,7 @@ export async function GET(req: Request) {
 
     const recomputed = await recomputeAll();
     return {
+      discoveryDispatches,
       pricesWritten,
       priceErrors,
       fxWritten,
@@ -88,3 +92,4 @@ export async function GET(req: Request) {
   }
   return NextResponse.json({ ok: true, ...outcome.result });
 }
+
