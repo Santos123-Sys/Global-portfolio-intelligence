@@ -32,6 +32,14 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: services/filings_python/requirements.txt
+      - run: pip install -r services/filings_python/requirements.txt
+      - run: python -m unittest services.filings_python.test_analysis services.filings_python.test_weights -v
+      - run: python services/filings_python/run_weights_demo.py
       - run: npm ci
       - name: Reject production advisories and severe toolchain advisories
         run: |

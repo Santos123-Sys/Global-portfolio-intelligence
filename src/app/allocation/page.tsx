@@ -13,6 +13,7 @@ import { PortfolioSelector, type SelectablePortfolio } from '@/components/portfo
 import { PortfolioWorkspaceNav } from '@/components/portfolio-workspace-nav';
 import { usePortfolioBreadcrumb } from '@/lib/portfolio-context';
 import { portfolioExposure } from '@/lib/portfolio-exposure';
+import { PortfolioWeightPlanner } from '@/components/portfolio-weight-planner';
 
 interface PositionRow {
   id: string;
@@ -205,7 +206,7 @@ export default function AllocationPage() {
           <div className="card"><span className="note">Dated prices</span><strong>{priced}/{positions.length}</strong></div>
         </section>
         {exposure.reason ? <div className="card" role="status"><h2>Allocation needs data</h2><p className="note">{exposure.reason}</p><Link className="action-button inline-action" href="/positions">Review positions</Link></div> : <>
-        <p className="note">Weights describe recorded holdings only. Country is the security classification, not underlying revenue exposure. Target weights and fund look-through are not recorded.</p>
+        <p className="note">Weights describe recorded holdings only. Country is the security classification, not underlying revenue exposure. Fund look-through is not recorded. Confirmed targets are shown separately below.</p>
         <div className="grid">
           <DonutSection title="Sector" groups={sectorGroups} />
           <DonutSection title="Country" groups={countryGroups} />
@@ -217,6 +218,7 @@ export default function AllocationPage() {
         </>}
         </>
       )}
+      {selectedPortfolio && !loading && <PortfolioWeightPlanner key={selectedPortfolio.id} portfolioId={selectedPortfolio.id} currency={selectedPortfolio.baseCurrency} holdings={exposure.rows.length ? exposure.rows : positions} />}
     </main>
   );
 }
