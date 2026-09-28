@@ -447,6 +447,10 @@ td.num, th.num, .num { font-family: monospace; text-align: right; }
 .feed-item.new { border-left-color: var(--accent); }
 .feed-item.changed { border-left-color: var(--warn); }
 .feed-item.violated { border-left-color: var(--danger); }
+.research-inbox-search { display: grid; gap: .4rem; max-width: 520px; margin: 0 0 1.25rem; }
+.research-inbox-search input { min-height: 42px; }
+.research-inbox-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); }
+.research-inbox-actions { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; }
 .feed-diff { display: flex; gap: 0.75rem; align-items: baseline; font-family: monospace; font-size: 0.875rem; }
 .feed-diff .arrow { color: var(--muted); }
 
