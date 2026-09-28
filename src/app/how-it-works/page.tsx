@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 
-export const metadata: Metadata = { title: 'Research workspace · Portfolio Intelligence' };
+export const metadata: Metadata = { title: 'Research workspace · Global Portfolio Intelligence' };
 
 const workspaces = [
   { number: '01', title: 'Define your thesis', description: 'Set your objectives, markets and exclusions. Confirm the criteria before starting research.', href: '/investment-thesis', action: 'Open thesis', detail: 'Your investment framework' },
@@ -11,14 +11,6 @@ const workspaces = [
 
 export default function HowItWorksPage() {
   return <main className="workspace-home">
-    <section className="workspace-hero" aria-labelledby="workspace-title">
-      <div><p className="analysis-eyebrow">Your investment workspace</p>
-        <h1 id="workspace-title">Clarity at every decision.</h1>
-        <p className="workspace-intro">Turn an investment thesis into research you can evaluate, decisions you can explain, and a portfolio you can monitor.</p>
-        <Link className="action-button workspace-primary" href="/ai-stock-discovery#candidate-review">Continue candidate review <span aria-hidden="true">↗</span></Link>
-      </div>
-      <aside className="workspace-principle"><span className="workspace-orbit" aria-hidden="true">◎</span><h2>Evidence first.<br />{' '}Your decision.</h2><p>Review the sources, challenge the assumptions, and approve the next step.</p></aside>
-    </section>
     <section aria-labelledby="workspace-actions">
       <div className="workspace-section-heading"><h2 id="workspace-actions">Choose your next step</h2><span className="note">Start with a thesis if you’re new here</span></div>
       <div className="workspace-action-grid">{workspaces.map((item) => <article className="workspace-action-card" key={item.number}>
