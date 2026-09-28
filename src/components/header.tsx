@@ -20,15 +20,13 @@ const WORKFLOW_NAV = [
 ] as const satisfies ReadonlyArray<readonly [string, TranslationKey]>;
 
 const REVIEW_NAV = [
-  ['/decisions', 'nav.decisionLog'],
-  ['/candidates', 'nav.candidateRecords'],
-  ['/agentic-system', 'nav.portfolioReview'],
+  ['/research', 'nav.researchInbox'],
+  ['/governance', 'nav.investmentControl'],
 ] as const satisfies ReadonlyArray<readonly [string, TranslationKey]>;
 
 const SUPPORT_NAV = [
-  ['/research-history', 'nav.researchHistory'],
-  ['/intelligence', 'nav.aiFeed'],
-  ['/securities', 'nav.securities'],
+  ['/agentic-system', 'nav.existingHoldingsAnalysis'],
+  ['/research-history', 'nav.adminActivity'],
 ] as const satisfies ReadonlyArray<readonly [string, TranslationKey]>;
 
 const SETTINGS_NAV = [
@@ -191,7 +189,7 @@ export function Header() {
     };
   }, [openMenu, mobileNavigationOpen]);
 
-  const reviewNav = REVIEW_NAV.filter(([href]) => isPlatformAdmin || href !== '/decisions');
+  const reviewNav = REVIEW_NAV;
   const supportNav = SUPPORT_NAV.filter(([href]) => isPlatformAdmin || href !== '/research-history');
   const settingsNav = SETTINGS_NAV.filter(([href]) => isPlatformAdmin || href !== '/agent-settings');
   const reviewActive = REVIEW_NAV.some(([href]) => pathname === href);

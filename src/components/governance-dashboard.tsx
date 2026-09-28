@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { PortfolioWorkspaceNav } from '@/components/portfolio-workspace-nav';
 
 type Severity = 'info' | 'watch' | 'breach';
@@ -28,6 +29,7 @@ export function GovernanceDashboard() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -39,7 +41,12 @@ export function GovernanceDashboard() {
     } catch (cause) { setError((cause as Error).message); }
     finally { setLoading(false); }
   }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    void load();
+    fetch('/api/auth/session').then((response) => response.ok ? response.json() : null)
+      .then((session) => setIsPlatformAdmin(Boolean(session?.account?.isPlatformAdmin)))
+      .catch(() => undefined);
+  }, []);
   const queue = useMemo(() => data?.reviewQueue ?? [], [data]);
 
   async function savePolicy() {
@@ -106,7 +113,7 @@ export function GovernanceDashboard() {
 
     <section className="card governance-section"><h2>Provider health</h2><p className="note">Aggregated call outcomes are operational diagnostics; no credentials or request payloads are exposed here.</p>{data.providerHealth.length === 0 ? <p className="note">No provider calls have been recorded.</p> : <div className="table-scroll"><table><thead><tr><th>Provider</th><th>Endpoint</th><th>OK</th><th>Errors</th><th>Plan limits</th><th>Rate limits</th><th>Last call</th></tr></thead><tbody>{data.providerHealth.map((item) => <tr key={`${item.provider}:${item.endpoint}`}><td>{item.provider}</td><td><code>{item.endpoint}</code></td><td>{item.ok}</td><td>{item.errors}</td><td>{item.planLimits}</td><td>{item.rateLimited}</td><td>{new Date(item.lastCalledAt).toLocaleString()}</td></tr>)}</tbody></table></div>}</section>
 
-    <section className="card governance-section"><h2>Versioned governance record</h2><div className="governance-versioning"><div><strong>Thesis history</strong>{data.versioning.thesisVersions.map((thesis) => <p key={thesis.version}>Version {thesis.version} · effective {new Date(thesis.effectiveDate).toLocaleDateString()}{thesis.excludedAt ? ' · excluded' : thesis.supersededAt ? ' · superseded' : ' · active'}</p>)}</div><div><strong>Recent immutable decisions</strong>{data.versioning.decisions.map((decision, index) => <p key={`${decision.date}:${index}`}>{new Date(decision.date).toLocaleDateString()} · {decision.decision} · {decision.title}{decision.metadata?.thesisVersionId ? ' · thesis snapshot retained' : ''}</p>)}</div></div></section>
+    <section className="card governance-section" id="decision-history"><h2>Thesis and decision history</h2><p className="note">Guardrails and recent human decisions are reviewed together here. Decision records remain append-only.</p><div className="governance-versioning"><div><strong>Thesis history</strong>{data.versioning.thesisVersions.map((thesis) => <p key={thesis.version}>Version {thesis.version} · effective {new Date(thesis.effectiveDate).toLocaleDateString()}{thesis.excludedAt ? ' · excluded' : thesis.supersededAt ? ' · superseded' : ' · active'}</p>)}</div><div><strong>Recent immutable decisions</strong>{data.versioning.decisions.map((decision, index) => <p key={`${decision.date}:${index}`}>{new Date(decision.date).toLocaleDateString()} · {decision.decision} · {decision.title}{decision.metadata?.thesisVersionId ? ' · thesis snapshot retained' : ''}</p>)}{isPlatformAdmin && <Link className="text-link" href="/decisions">Search full decision log →</Link>}</div></div></section>
 
     <section className="card governance-section"><h2>Guardrail policy</h2><p className="note">These defaults produce review prompts, not buy/sell recommendations. Tune them to the mandate after you decide your intended portfolio concentration.</p><div className="governance-policy-grid"><label>Maximum position (%)<input type="number" min="2" max="100" value={(policy.maxPositionWeight * 100).toFixed(0)} onChange={(event) => updatePolicy('maxPositionWeight', event.target.value, true)} /></label><label>Maximum sector (%)<input type="number" min="5" max="100" value={(policy.maxSectorWeight * 100).toFixed(0)} onChange={(event) => updatePolicy('maxSectorWeight', event.target.value, true)} /></label><label>Maximum country (%)<input type="number" min="5" max="100" value={(policy.maxCountryWeight * 100).toFixed(0)} onChange={(event) => updatePolicy('maxCountryWeight', event.target.value, true)} /></label><label>Minimum holdings<input type="number" min="1" max="100" value={policy.minimumHoldings} onChange={(event) => updatePolicy('minimumHoldings', event.target.value)} /></label><label>Price stale after (days)<input type="number" min="1" max="30" value={policy.stalePriceDays} onChange={(event) => updatePolicy('stalePriceDays', event.target.value)} /></label><label>Research stale after (days)<input type="number" min="7" max="730" value={policy.staleResearchDays} onChange={(event) => updatePolicy('staleResearchDays', event.target.value)} /></label><label>Review interval (days)<input type="number" min="7" max="365" value={policy.reviewIntervalDays} onChange={(event) => updatePolicy('reviewIntervalDays', event.target.value)} /></label></div><button className="action-button" type="button" onClick={() => void savePolicy()} disabled={saving}>{saving ? 'Saving…' : 'Save guardrails'}</button></section>
   </main>;

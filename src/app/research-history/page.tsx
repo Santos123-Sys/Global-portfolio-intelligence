@@ -18,8 +18,8 @@ export default function ResearchHistoryPage() {
     return () => controller.abort();
   }, []);
   return <main>
-    <h1>Research history</h1>
-    <p className="sub">A single organized record of work completed by the framework. Technical run IDs are intentionally hidden.</p>
+    <h1>Admin activity</h1>
+    <p className="sub">Run and extraction history for troubleshooting thesis uploads, market discovery and existing-holdings analysis. Technical run IDs are hidden.</p>
     {error && <p className="login-error" role="alert">{error}</p>}
     <div className="history-folders">{folders.map((folder) => <section className="card history-folder" key={folder.key}>
       <h2>{folder.title}</h2><p className="note">{folder.description}</p>

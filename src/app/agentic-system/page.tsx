@@ -97,7 +97,7 @@ export default function AgenticSystemPage() {
     <main>
       <h1>Existing-Holdings Analysis</h1>
       <p className="sub">
-        Review positions you already own. For new ideas, start with Thesis and Discover; this page is not a prerequisite for market research.
+        Optional analysis for positions you already own. For new ideas, start with Thesis and Discover; this page is not a prerequisite for market research.
       </p>
 
       <div className="grid">
