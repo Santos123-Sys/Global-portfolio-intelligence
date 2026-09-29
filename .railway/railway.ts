@@ -70,6 +70,9 @@ export default defineRailway((context) => {
       INITIAL_ADMIN_PASSWORD: preserve(),
       MARKET_DATA_PROVIDER: 'eodhd',
       MARKET_DATA_API_KEY: context.shared.MARKET_DATA_API_KEY,
+      // Primary B3 discovery data. It is intentionally dashboard-only: no
+      // client bundle or agentic service receives this credential.
+      BRAPI_API_KEY: preserve(),
       // These two preserve manually managed Finnhub values. Finnhub is used
       // only for broad-universe discovery; the key remains server-only and is
       // never used by approved-candidate analysis.

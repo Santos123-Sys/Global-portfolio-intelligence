@@ -56,12 +56,13 @@ Never apply this file to an existing project without reconciling a plan first.
 1. In the Railway web dashboard, add a project/environment shared variable named
    `OPENAI_API_KEY`. Enter the real OpenAI API key there; never put it in Git or
    this document.
-2. Add a second shared secret named `MARKET_DATA_API_KEY` containing an EODHD
-   token whose plan includes the End-of-Day history and Fundamentals APIs.
-   The implementation separates broad discovery from validation: set
-   `DISCOVERY_PROVIDER=finnhub` and `FINNHUB_API_KEY` directly on the dashboard
-   once a Finnhub key is available. The current EODHD discovery behavior remains
-   safe until then.
+2. Add a shared secret named `MARKET_DATA_API_KEY` containing an EODHD token
+   for non-Brazilian price history and the explicit fallback path. Add
+   `BRAPI_API_KEY` directly on the **portfolio-intelligence dashboard service**.
+   BrAPI is selected automatically as the primary provider for B3 (`BVMF`)
+   listings, quotes, volume, market cap and sector; EODHD is used there only
+   after BrAPI and any valid cached BrAPI universe are unavailable. Keep
+   `DISCOVERY_FALLBACK_PROVIDER=eodhd`.
 3. When the Tavily key is ready, set these two variables on the private
    `agentic-worker` service only (not the dashboard):
 
@@ -105,8 +106,9 @@ plan or apply can occur.
 `.railway/railway.ts` manages `DATABASE_URL`, `PUBLIC_APP_URL`, the private
 agentic URL, the generated shared bearer key, provider modes and `NODE_ENV`.
 It binds the project-level `MARKET_DATA_API_KEY` to the dashboard and selects
-`MARKET_DATA_PROVIDER=eodhd`; the token is never sent to the browser or agentic
-services.
+`MARKET_DATA_PROVIDER=eodhd` for price history. `BRAPI_API_KEY` is preserved
+on the dashboard service and becomes the B3 discovery primary. Neither token
+is ever sent to the browser or agentic services.
 It preserves the existing `SESSION_SECRET`, `MFA_ENCRYPTION_KEY` and temporary
 `INITIAL_ADMIN_*` values. Before the first IaC apply, verify both preserved
 security keys already contain different random values of at least 32

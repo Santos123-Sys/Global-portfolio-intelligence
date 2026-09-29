@@ -49,6 +49,9 @@ FINNHUB_API_KEY=<Finnhub API key>
 DISCOVERY_FALLBACK_PROVIDER=eodhd
 DISCOVERY_UNIVERSE_CACHE_HOURS=168
 
+# The dashboard service only. Automatically primary for B3/BVMF discovery.
+BRAPI_API_KEY=<BrAPI API key>
+
 WEB_SEARCH_PROVIDER=tavily
 WEB_SEARCH_API_KEY=<Tavily API key>
 

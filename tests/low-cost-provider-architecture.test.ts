@@ -12,16 +12,22 @@ const railway = readFileSync('.railway/railway.ts', 'utf8');
 const discoveryPage = readFileSync('src/app/ai-stock-discovery/page.tsx', 'utf8');
 const discoveryRoute = readFileSync('src/app/api/discovery/runs/route.ts', 'utf8');
 const refreshRoute = readFileSync('src/app/api/cron/refresh/route.ts', 'utf8');
+const discoveryTranslations = readFileSync('src/lib/discovery-translations.ts', 'utf8');
 
 describe('low-cost provider architecture', () => {
   it('separates discovery from EODHD validation', () => {
     expect(env).toContain("DISCOVERY_PROVIDER: z.enum(['eodhd', 'finnhub'])");
+    expect(env).toContain('BRAPI_API_KEY');
     expect(workflow).toContain('loadDiscoveryUniverse(exchange, getEnv().DISCOVERY_UNIVERSE_LIMIT)');
     expect(workflow).toContain('const provider = getPriceProvider();');
   });
 
   it('keeps Finnhub discovery-only and uses limited research-and-risk analysis', () => {
     expect(discovery).toContain("env.DISCOVERY_PROVIDER === 'finnhub'");
+    expect(discovery).toContain("exchange === 'BVMF'");
+    expect(discovery).toContain('BrapiDiscoveryProvider');
+    expect(discovery).toContain("env.DISCOVERY_FALLBACK_PROVIDER === 'eodhd' && primary.name !== 'eodhd'");
+    expect(discoveryTranslations).toContain('B3 discovery uses BrAPI');
     expect(workflow).toContain("analysisMode: 'limited_research_risk'");
     expect(workflow).toContain('researchEvidence,');
     expect(workflow).not.toContain('FINNHUB_API_KEY');
@@ -50,6 +56,7 @@ describe('low-cost provider architecture', () => {
   it('keeps manual provider credentials in the owning Railway services', () => {
     expect(railway).toContain('DISCOVERY_PROVIDER: preserve()');
     expect(railway).toContain('FINNHUB_API_KEY: preserve()');
+    expect(railway).toContain('BRAPI_API_KEY: preserve()');
     expect(railway).toContain('WEB_SEARCH_PROVIDER: preserve()');
     expect(railway).toContain('WEB_SEARCH_API_KEY: preserve()');
   });
@@ -59,4 +66,3 @@ describe('low-cost provider architecture', () => {
     expect(discoveryRoute).toContain('.max(7).default(6)');
   });
 });
-

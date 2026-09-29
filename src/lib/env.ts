@@ -15,6 +15,8 @@ const schema = z.object({
   /** Low-cost breadth provider. Market validation deliberately remains separate. */
   DISCOVERY_PROVIDER: z.enum(['eodhd', 'finnhub']).default('eodhd'),
   DISCOVERY_FALLBACK_PROVIDER: z.enum(['none', 'eodhd']).default('none'),
+  /** Brazil-specific primary source for B3 listings, quotes and basic indicators. */
+  BRAPI_API_KEY: z.string().min(1).optional(),
   FINNHUB_API_KEY: z.string().min(1).optional(),
   /** How long a successful discovery-universe snapshot can satisfy a fallback request. */
   DISCOVERY_UNIVERSE_LIMIT: z.coerce.number().int().min(100).max(4000).default(2000),
@@ -109,6 +111,7 @@ export function getEnv(): Env {
     ...process.env,
     MARKET_DATA_API_KEY: optional(process.env.MARKET_DATA_API_KEY),
     FINNHUB_API_KEY: optional(process.env.FINNHUB_API_KEY),
+    BRAPI_API_KEY: optional(process.env.BRAPI_API_KEY),
     WEB_SEARCH_API_KEY: optional(process.env.WEB_SEARCH_API_KEY),
     CRON_SECRET: optional(process.env.CRON_SECRET),
     AGENTIC_SYSTEM_BASE_URL: optional(process.env.AGENTIC_SYSTEM_BASE_URL),
@@ -137,4 +140,3 @@ export function assertCronAuthorized(req: Request): void {
     throw new Error('Unauthorized cron invocation');
   }
 }
-
