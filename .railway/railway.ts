@@ -70,6 +70,9 @@ export default defineRailway((context) => {
       INITIAL_ADMIN_PASSWORD: preserve(),
       MARKET_DATA_PROVIDER: 'eodhd',
       MARKET_DATA_API_KEY: context.shared.MARKET_DATA_API_KEY,
+      // Primary B3 discovery data. It is intentionally dashboard-only: no
+      // client bundle or agentic service receives this credential.
+      BRAPI_API_KEY: preserve(),
       // These two preserve manually managed Finnhub values. Finnhub is used
       // only for broad-universe discovery; the key remains server-only and is
       // never used by approved-candidate analysis.
@@ -84,10 +87,11 @@ export default defineRailway((context) => {
       MARKET_DATA_GATEWAY_CALLS_PER_MINUTE: '60',
       MARKET_DATA_GATEWAY_CALLS_PER_DAY: '2000',
       MARKET_DATA_GATEWAY_PLAN_LIMIT_MEMORY_HOURS: '24',
-      // Web research is intentionally worker-only. Keeping this dashboard
-      // variable disabled prevents a Tavily credential from being injected
-      // into the public application service.
-      WEB_SEARCH_PROVIDER: 'none',
+      // Comparable-peer discovery is a server-side dashboard route. These
+      // credentials are preserved here (never NEXT_PUBLIC_*) so its source
+      // search uses the same provider configuration as the private worker.
+      WEB_SEARCH_PROVIDER: preserve(),
+      WEB_SEARCH_API_KEY: preserve(),
       AGENTIC_SYSTEM_API_KEY: agenticApi.env.AGENTIC_SYSTEM_API_KEY,
       AGENTIC_SYSTEM_BASE_URL:
         'http://${{agentic-api.RAILWAY_PRIVATE_DOMAIN}}:${{agentic-api.PORT}}',

@@ -8,7 +8,7 @@ import { getProviderGateway } from './services/provider-gateway';
 import { mergeResearchUniverse } from './research-universe';
 
 export interface MarketDiscoveryProvider {
-  readonly name: 'eodhd' | 'finnhub';
+  readonly name: 'brapi' | 'eodhd' | 'finnhub';
   getSecurityUniverse(exchange: string, limit: number): Promise<SecurityUniverseRecordType[]>;
 }
 
@@ -105,6 +105,118 @@ export class FinnhubDiscoveryProvider implements MarketDiscoveryProvider {
   }
 }
 
+type BrapiListResponse = {
+  stocks?: unknown[];
+  currentPage?: unknown;
+  totalPages?: unknown;
+  totalCount?: unknown;
+  hasNextPage?: unknown;
+};
+
+function brapiRecord(row: Record<string, unknown>): SecurityUniverseRecordType | null {
+  const ticker = typeof row.stock === 'string' ? row.stock.trim().toUpperCase() : '';
+  const companyName = typeof row.name === 'string' ? row.name.trim() : '';
+  const assetType = typeof row.type === 'string' && row.type.trim() ? row.type.trim() : 'stock';
+  const subType = typeof row.subType === 'string' ? row.subType.trim().toLowerCase() : '';
+  if (!ticker || !companyName || assetType.toLowerCase() !== 'stock' || (subType && !['stock', 'unit'].includes(subType))) return null;
+
+  const attributes: SecurityUniverseRecordType['attributes'] = {
+    provider_symbol: ticker,
+    listing_country: 'Brazil',
+  };
+  const close = finite(row.close);
+  const change = finite(row.change);
+  const volume = finite(row.volume);
+  const marketCap = finite(row.market_cap ?? row.marketCap);
+  if (close != null) attributes.latest_close = close;
+  if (change != null) attributes.day_change_percent = change;
+  if (volume != null) attributes.regular_market_volume = volume;
+  if (marketCap != null) attributes.market_capitalization = marketCap;
+  if (subType) attributes.listing_subtype = subType;
+
+  return {
+    ticker,
+    exchange: 'BVMF',
+    companyName,
+    currency: 'BRL',
+    country: 'Brazil',
+    sector: typeof row.sector === 'string' && row.sector.trim() ? row.sector.trim() : null,
+    industry: null,
+    assetType: subType || assetType,
+    observedAt: new Date().toISOString(),
+    provider: 'brapi',
+    sourceUrl: 'https://brapi.dev/docs/acoes/list',
+    attributes,
+  };
+}
+
+/**
+ * BrAPI's B3 list endpoint is the primary Brazil universe. It contains the
+ * listing identity together with current close, change, volume and market cap,
+ * so discovery need not spend EODHD entitlement on the same first pass.
+ */
+export class BrapiDiscoveryProvider implements MarketDiscoveryProvider {
+  readonly name = 'brapi' as const;
+  constructor(private readonly apiKey: string) {}
+
+  async getSecurityUniverse(exchange: string, limit: number): Promise<SecurityUniverseRecordType[]> {
+    if (exchange !== 'BVMF') throw new Error(`BrAPI only supports the Brazilian B3 universe, not ${exchange}`);
+    const cappedLimit = Math.max(1, Math.min(limit, 4_000));
+    const pageSize = Math.min(100, cappedLimit);
+    const rows: SecurityUniverseRecordType[] = [];
+    let page = 1;
+    let totalCount: number | null = null;
+    let hasNextPage = true;
+
+    while (hasNextPage && rows.length < cappedLimit) {
+      const payload = await getProviderGateway().run({
+        provider: this.name,
+        endpoint: '/api/quote/list',
+        perform: async () => {
+          const url = new URL('https://brapi.dev/api/quote/list');
+          url.searchParams.set('type', 'stock');
+          url.searchParams.set('page', String(page));
+          url.searchParams.set('limit', String(pageSize));
+          const response = await fetch(url, {
+            headers: { accept: 'application/json', authorization: `Bearer ${this.apiKey}` },
+            signal: AbortSignal.timeout(20_000),
+          });
+          if (!response.ok) throw new Error(`BrAPI B3 listing request failed: ${response.status} ${response.statusText}`);
+          return response.json() as Promise<BrapiListResponse>;
+        },
+        classify: () => ({ outcome: 'ok', httpStatus: 200 }),
+      });
+
+      const stockRows = Array.isArray(payload.stocks) ? payload.stocks : [];
+      const normalized = stockRows.flatMap((value) => value && typeof value === 'object'
+        ? [brapiRecord(value as Record<string, unknown>)] : [])
+        .filter((value): value is SecurityUniverseRecordType => value !== null);
+      rows.push(...normalized);
+
+      const reportedTotal = finite(payload.totalCount);
+      if (reportedTotal != null) totalCount = reportedTotal;
+      const reportedPages = finite(payload.totalPages);
+      hasNextPage = payload.hasNextPage === true || (reportedPages != null && page < reportedPages);
+      if (stockRows.length === 0) hasNextPage = false;
+      page += 1;
+    }
+
+    const unique = [...new Map(rows.map((record) => [`${record.exchange}:${record.ticker}`, record])).values()];
+    const selected = unique.slice(0, cappedLimit);
+    const eligibleCount = totalCount ?? unique.length;
+    return selected.map((record) => ({
+      ...record,
+      attributes: {
+        ...record.attributes,
+        universe_truncated: eligibleCount > selected.length,
+        universe_ranking: 'unranked',
+        universe_eligible_count: eligibleCount,
+        universe_selected_count: selected.length,
+      },
+    }));
+  }
+}
+
 class EodhdDiscoveryProvider implements MarketDiscoveryProvider {
   readonly name = 'eodhd' as const;
   constructor(private readonly provider: EodhdProvider) {}
@@ -113,8 +225,12 @@ class EodhdDiscoveryProvider implements MarketDiscoveryProvider {
   }
 }
 
-export function getDiscoveryProvider(): MarketDiscoveryProvider {
+export function getDiscoveryProvider(exchange?: string): MarketDiscoveryProvider {
   const env = getEnv();
+  if (exchange === 'BVMF') {
+    if (!env.BRAPI_API_KEY) throw new Error('BRAPI_API_KEY is required for the Brazilian B3 discovery universe');
+    return new BrapiDiscoveryProvider(env.BRAPI_API_KEY);
+  }
   if (env.DISCOVERY_PROVIDER === 'finnhub') {
     if (!env.FINNHUB_API_KEY) throw new Error('FINNHUB_API_KEY is required when DISCOVERY_PROVIDER=finnhub');
     return new FinnhubDiscoveryProvider(env.FINNHUB_API_KEY);
@@ -192,7 +308,7 @@ async function saveUniverse(provider: string, exchange: string, records: Securit
  */
 export async function loadDiscoveryUniverse(exchange: string, limit: number): Promise<{ records: SecurityUniverseRecordType[]; provider: string; cached: boolean }> {
   const env = getEnv();
-  const primary = getDiscoveryProvider();
+  const primary = getDiscoveryProvider(exchange);
   try {
     const records = await primary.getSecurityUniverse(exchange, limit);
     if (!records.length) throw new Error(`${primary.name} returned an empty security universe`);
