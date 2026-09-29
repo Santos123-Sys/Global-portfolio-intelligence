@@ -33,7 +33,7 @@ Index maintenance vacuums and analyzes weekly. During the first seven days of ea
 
 ## Monitoring and recovery
 
-Platform administrators can inspect `/admin/document-intelligence`. Each ingestion job retains counts, timestamps, bounded errors, and structured log entries. Document rows move through `pending`, `downloading`, `parsing`, `embedding`, and `indexed`; failures retry through scheduled rediscovery up to the configured document retry boundary, after which they remain visible as permanent failures.
+Platform administrators can inspect `/admin/document-intelligence`. Each ingestion job retains counts, timestamps, bounded errors, and structured log entries. Document rows move through `pending`, `downloading`, `parsing`, `chunking`, `embedding`, and `indexed`; failures retry through scheduled rediscovery up to the configured document retry boundary, after which they remain visible as permanent failures.
 
 For deployment verification, open an existing holding, follow **Open document intelligence**, run **Refresh sources**, and confirm that a document reaches `indexed`. Ask a question whose answer is present in that filing and confirm the answer includes numbered citations. For news, run the current scraper first, then invoke `news_sync` and confirm `NEWS_ARTICLE` rows appear in the document library.
 
