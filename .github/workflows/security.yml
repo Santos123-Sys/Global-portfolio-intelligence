@@ -38,7 +38,7 @@ jobs:
           cache: pip
           cache-dependency-path: services/filings_python/requirements.txt
       - run: pip install -r services/filings_python/requirements.txt
-      - run: python -m unittest services.filings_python.test_analysis services.filings_python.test_weights services.filings_python.test_example_portfolio -v
+      - run: python -m unittest services.filings_python.test_analysis services.filings_python.test_weights services.filings_python.test_example_portfolio services.filings_python.test_ibkr_portfolio -v
       - run: python services/filings_python/run_weights_demo.py
       - run: npm ci
       - name: Reject production advisories and severe toolchain advisories
