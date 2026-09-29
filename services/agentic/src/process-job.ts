@@ -1,6 +1,7 @@
 import {
   AgenticRunRequest,
   DiscoveryRunRequest,
+  MarketBriefRequest,
   ThesisExtractionRequest,
   validateRunRequestCoherence,
   type AnalysisOutput,
@@ -14,7 +15,7 @@ import type { AgenticJob, JobRepository } from './types.js';
 
 export interface ProcessingDependencies {
   repository: JobRepository;
-  pipeline: Pick<OpenAIAgenticPipeline, 'extractThesis' | 'discoverSecurities' | 'analyzeSecurity' | 'synthesizePortfolio'>;
+  pipeline: Pick<OpenAIAgenticPipeline, 'extractThesis' | 'discoverSecurities' | 'researchMarket' | 'analyzeSecurity' | 'synthesizePortfolio'>;
   storage: Pick<ReportStorage, 'put'>;
   renderPdf?: typeof renderReportPdf;
 }
@@ -36,6 +37,18 @@ export async function processJob(job: AgenticJob, deps: ProcessingDependencies):
       await deps.repository.updateProgress(job.id, 0, 1, 'market_discovery', job.attemptCount);
       const result = await deps.pipeline.discoverSecurities(request.data, (completed, total, stage) => deps.repository.updateProgress(job.id, completed, total, stage, job.attemptCount));
       await deps.repository.completeDiscovery(job.id, result, job.attemptCount);
+      return;
+    }
+
+    if (job.kind === 'market_brief') {
+      const request = MarketBriefRequest.safeParse(job.payload);
+      if (!request.success) throw new AgenticPipelineError('market_brief', 'Stored market brief payload failed contract validation');
+      await deps.repository.updateProgress(job.id, 0, 5, 'market_brief_sources', job.attemptCount);
+      const result = await deps.pipeline.researchMarket(request.data, async (stage) => {
+        const completed = stage === 'market_brief_synthesis' ? 4 : Math.max(0, ['maritaca_data_ocean', 'brapi_financial_indicators', 'sec_edgar_filings', 'independent_web_research'].indexOf(stage));
+        await deps.repository.updateProgress(job.id, completed, 5, stage, job.attemptCount);
+      });
+      await deps.repository.completeMarketBrief(job.id, result, job.attemptCount);
       return;
     }
 
@@ -106,7 +119,7 @@ export async function processJob(job: AgenticJob, deps: ProcessingDependencies):
   } catch (error) {
     const stage = error instanceof AgenticPipelineError || error instanceof ProcessingStageError
       ? error.stage
-      : job.kind === 'thesis_extraction' ? 'extraction' : 'analysis';
+      : job.kind === 'thesis_extraction' ? 'extraction' : job.kind === 'market_brief' ? 'market_brief' : 'analysis';
     const safeMessage = error instanceof AgenticPipelineError || error instanceof ProcessingStageError
       ? error.message
       : 'Agentic job failed unexpectedly; no security was silently omitted';
@@ -120,4 +133,3 @@ class ProcessingStageError extends Error {
     this.name = 'ProcessingStageError';
   }
 }
-

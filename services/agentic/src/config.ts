@@ -20,7 +20,7 @@ const apiSchema = commonSchema.extend({
 
 const workerSchema = commonSchema.extend({
   OPENAI_API_KEY: z.string().min(1),
-  OPENAI_MODEL: z.string().min(1).default('gpt-5.6'),
+  OPENAI_MODEL: z.string().min(1).default('gpt-6-sol'),
   OPENAI_REASONING_EFFORT: reasoningEffort.default('medium'),
   // Per-stage overrides. Unset means "use OPENAI_REASONING_EFFORT". The four
   // agents do not benefit equally from reasoning depth: extraction is close to
@@ -31,6 +31,11 @@ const workerSchema = commonSchema.extend({
   OPENAI_REASONING_EFFORT_ANALYSIS: reasoningEffort.optional(),
   OPENAI_REASONING_EFFORT_SYNTHESIS: reasoningEffort.optional(),
   OPENAI_REASONING_EFFORT_DISCOVERY: reasoningEffort.optional(),
+  OPENAI_REASONING_EFFORT_MARKET_BRIEF: reasoningEffort.optional(),
+  MARITACA_API_KEY: z.string().min(1).optional(),
+  MARITACA_DATA_MODEL: z.string().min(1).default('sabia-4-thinking'),
+  BRAPI_API_KEY: z.string().min(1).optional(),
+  SEC_USER_AGENT: z.string().min(12).optional(),
   WEB_SEARCH_PROVIDER: z.enum(['none', 'brave', 'tavily']).default('none'),
   WEB_SEARCH_API_KEY: z.string().min(1).optional(),
   DASHBOARD_IMPORT_URL: z.string().url(),
@@ -108,6 +113,7 @@ export function stageReasoningEffort(config: WorkerConfig) {
     analysis: config.OPENAI_REASONING_EFFORT_ANALYSIS ?? config.OPENAI_REASONING_EFFORT,
     synthesis: config.OPENAI_REASONING_EFFORT_SYNTHESIS ?? config.OPENAI_REASONING_EFFORT,
     discovery: config.OPENAI_REASONING_EFFORT_DISCOVERY ?? config.OPENAI_REASONING_EFFORT,
+    market_brief: config.OPENAI_REASONING_EFFORT_MARKET_BRIEF ?? config.OPENAI_REASONING_EFFORT,
   };
 }
 

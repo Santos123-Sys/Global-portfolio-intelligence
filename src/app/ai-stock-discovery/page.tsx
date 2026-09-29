@@ -3,7 +3,7 @@
 import type { DiscoveryEvidenceScorecard } from '@/lib/discovery-evidence';
 
 import Link from 'next/link';
-import type { DiscoveryCandidate as ContractCandidate, MarketDiscoveryOutput } from '@portfolio-intelligence/agentic-contract';
+import type { DiscoveryCandidate as ContractCandidate, MarketBrief, MarketDiscoveryOutput } from '@portfolio-intelligence/agentic-contract';
 import { MarketAnalysisReview } from '@/components/market-analysis-review';
 import type { MarketAnalysis } from '@portfolio-intelligence/agentic-contract';
 import { DiscoveryScreeningReview, DiscoveryCandidateContext } from '@/components/discovery-screening-review';
@@ -13,6 +13,7 @@ import { ResearchWorkspace } from '@/components/research-workspace';
 import { useLanguage } from '@/lib/i18n';
 import { discoveryDate, discoveryText } from '@/lib/discovery-translations';
 import { decisionJournalSchema } from '@/lib/decision-journal';
+import { MarketBriefReview } from '@/components/market-brief-review';
 
 interface DiscoveryRun {
   id: string;
@@ -87,6 +88,10 @@ interface Candidate {
   decision: string;
   workflowStatus: string;
   externalAnalysisRunId: string | null;
+  externalMarketBriefId: string | null;
+  marketBriefStatus: string;
+  marketBriefJson: MarketBrief | null;
+  marketBriefErrorMessage: string | null;
   analysisRunStatus: string | null;
   analysisRunError: string | null;
   analysisErrorMessage: string | null;
@@ -303,7 +308,10 @@ export default function AIStockDiscoveryPage() {
   const hasActiveWork =
     runs.some((run) => run.status === 'dispatching' || run.status === 'queued' || run.status === 'running') ||
     candidates.some((candidate) =>
+      candidate.workflowStatus === 'market_research_preparing' ||
+      candidate.workflowStatus === 'market_research_dispatching' ||
       candidate.workflowStatus === 'analysis_preparing' ||
+      ['dispatching', 'queued', 'running'].includes(candidate.marketBriefStatus) ||
       candidate.analysisRunStatus === 'queued' ||
       candidate.analysisRunStatus === 'running'
     );
@@ -447,6 +455,21 @@ export default function AIStockDiscoveryPage() {
     } finally {
       setBusy(null);
     }
+  }
+
+  async function marketBriefAction(candidate: Candidate, action: 'approve_and_analyze' | 'retry') {
+    setBusy(`market-brief:${candidate.id}`);
+    setError(null);
+    try {
+      const response = await fetch('/api/discovery/market-brief', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ candidateId: candidate.id, action }),
+      });
+      const body = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(body.error ?? `Market brief action failed (${response.status})`);
+      if (selectedRunId) await loadCandidates(selectedRunId);
+    } catch (cause) { setError((cause as Error).message); }
+    finally { setBusy(null); }
   }
 
   function toggleCandidateReview(runId: string) {
@@ -655,6 +678,22 @@ export default function AIStockDiscoveryPage() {
                     <span className={`badge ${analysisStatus.badgeClass}`}>{analysisStatus.label}</span>
                   </div>
                   <p className="analysis-status-copy" aria-live="polite">{analysisStatus.description}</p>
+                  {candidate.marketBriefStatus !== 'completed' && candidate.workflowStatus.startsWith('market_research') && <section className="market-brief-review" aria-live="polite">
+                    <p className="analysis-eyebrow">Top-down market research</p>
+                    <h3>{candidate.marketBriefStatus === 'dispatching' || candidate.marketBriefStatus === 'queued' || candidate.marketBriefStatus === 'running'
+                      ? 'Preparing market brief' : candidate.marketBriefStatus === 'failed' ? 'Market research needs attention' : 'Market brief not started'}</h3>
+                    {(candidate.marketBriefStatus === 'dispatching' || candidate.marketBriefStatus === 'queued' || candidate.marketBriefStatus === 'running')
+                      ? <p className="note">{candidate.marketBriefStatus === 'running' ? 'Research is in progress; this view updates automatically.' : 'The research request is being delivered to the durable agentic worker.'}</p>
+                      : candidate.marketBriefErrorMessage && <p className="caveat" role="alert">{candidate.marketBriefErrorMessage}</p>}
+                    {candidate.marketBriefStatus === 'failed' && <button className="action-button" type="button" disabled={busy !== null} onClick={() => void marketBriefAction(candidate, 'retry')}>
+                      {busy === `market-brief:${candidate.id}` ? 'Retrying market research…' : 'Retry market research'}
+                    </button>}
+                  </section>}
+                  {candidate.marketBriefStatus === 'completed' && candidate.marketBriefJson && <MarketBriefReview
+                    brief={candidate.marketBriefJson}
+                    busy={busy === `market-brief:${candidate.id}`}
+                    onApprove={() => void marketBriefAction(candidate, 'approve_and_analyze')}
+                  />}
                   {candidate.analysisMode === 'limited_research_risk' && <div className="analysis-scope">
                     <strong>{t('scope')}</strong>
                     <p>{t('scopeDetail')}</p>
@@ -758,4 +797,3 @@ export default function AIStockDiscoveryPage() {
     </main>
   );
 }
-

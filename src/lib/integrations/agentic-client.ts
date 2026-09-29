@@ -4,6 +4,8 @@ import {
   DiscoveryRunRequest,
   DiscoveryRunStatus,
   ExternalRunStatus,
+  MarketBriefRequest,
+  MarketBriefStatus,
   ThesisExtractionRequest,
   ThesisExtractionStatus,
 } from './agentic-contract';
@@ -43,6 +45,21 @@ export async function startExternalDiscoveryRun(
     body: JSON.stringify(input),
   });
   return DiscoveryRunStatus.parse(await response.json());
+}
+
+export async function startExternalMarketBrief(input: MarketBriefRequest): Promise<MarketBriefStatus> {
+  const response = await agenticFetch('/v1/market-briefs', { method: 'POST', signal: AbortSignal.timeout(30_000), body: JSON.stringify(input) });
+  return MarketBriefStatus.parse(await response.json());
+}
+
+export async function fetchExternalMarketBrief(externalMarketBriefId: string): Promise<MarketBriefStatus> {
+  const response = await agenticFetch(`/v1/market-briefs/${encodeURIComponent(externalMarketBriefId)}`, { signal: AbortSignal.timeout(30_000) });
+  return MarketBriefStatus.parse(await response.json());
+}
+
+export async function retryExternalMarketBrief(externalMarketBriefId: string): Promise<MarketBriefStatus> {
+  const response = await agenticFetch(`/v1/market-briefs/${encodeURIComponent(externalMarketBriefId)}/retry`, { method: 'POST' });
+  return MarketBriefStatus.parse(await response.json());
 }
 
 export async function fetchExternalDiscoveryRun(
@@ -157,4 +174,3 @@ async function agenticFetch(path: string, init: RequestInit = {}): Promise<Respo
   }
   return response;
 }
-

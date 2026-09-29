@@ -243,6 +243,18 @@ td.num, th.num, .num { font-family: monospace; text-align: right; }
 .analysis-stage h3, .valuation-panel h3 { margin: 0; font-size: 1rem; }
 .analysis-stage-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .analysis-stage-heading .badge { flex: 0 0 auto; }
+.market-brief-review { display: grid; gap: 0.8rem; margin-top: 1rem; padding: 1rem; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); }
+.market-brief-review > p, .market-brief-review h3, .market-brief-review h4 { margin-top: 0; }
+.market-brief-review h4 { margin-bottom: 0.35rem; font-size: 0.9rem; }
+.market-brief-definition { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.55rem; margin: 0; }
+.market-brief-definition > div, .market-brief-sections > section { min-width: 0; padding: 0.7rem; border: 1px solid var(--border); border-radius: 7px; }
+.market-brief-definition dt { color: var(--muted); font-size: 0.7rem; }
+.market-brief-definition dd { margin: 0.2rem 0 0; font-size: 0.8rem; }
+.market-brief-sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.55rem; }
+.market-brief-sections p, .market-brief-review details p { overflow-wrap: anywhere; }
+.market-brief-review details { padding-top: 0.5rem; border-top: 1px solid var(--border); }
+.market-brief-review summary { cursor: pointer; color: var(--accent); }
+.market-brief-review .caveat { margin: 0; }
 .analysis-eyebrow { margin: 0 0 0.25rem; color: var(--accent); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; }
 .analysis-status-copy { margin: 0.65rem 0 0; color: var(--muted); font-size: 0.82rem; }
 .analysis-scope { margin: 0.9rem 0; padding: 0.8rem 0.9rem; border-left: 3px solid var(--warn); background: color-mix(in srgb, var(--warn) 7%, transparent); }

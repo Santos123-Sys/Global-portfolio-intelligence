@@ -1,6 +1,7 @@
 import { DispatchConflictError } from './types.js';
 import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
+import type { MarketBrief, PortfolioAnalysisManifest } from '@portfolio-intelligence/agentic-contract';
 import type { AgenticJob, CallbackStatus, JobKind, JobRepository, JobStatus } from './types.js';
 
 type Sql = ReturnType<typeof postgres>;
@@ -160,9 +161,22 @@ export class PostgresJobRepository implements JobRepository {
     if (!rows.length) throw new Error('Job claim is no longer current');
   }
 
+  async completeMarketBrief(id: string, result: MarketBrief, attempt?: number): Promise<void> {
+    const rows = await this.sql`
+      update agentic_jobs
+      set status = 'completed', result_json = ${this.sql.json(result as never)}, current_stage = 'completed',
+          progress_completed = progress_total, completed_at = now(), updated_at = now(),
+          lease_owner = null, lease_expires_at = null
+      where id = ${id} and kind = 'market_brief'
+        and (${attempt ?? null}::integer is null or (status = 'running' and attempt_count = ${attempt ?? null} and lease_expires_at > now()))
+      returning id
+    `;
+    if (!rows.length) throw new Error('Job claim is no longer current');
+  }
+
   async completeAnalysis(
     id: string,
-    manifest: Extract<AgenticJob['result'], { schemaVersion: string }>,
+    manifest: PortfolioAnalysisManifest,
     manifestHash: string,
     report: { objectKey: string | null; bytes: Buffer | null },
     attempt?: number
@@ -232,4 +246,3 @@ export class PostgresJobRepository implements JobRepository {
     `;
   }
 }
-

@@ -109,13 +109,13 @@ describe('provider error classification', () => {
 describe('per-stage reasoning effort', () => {
   it('applies a single effort to every stage', () => {
     expect(resolveStageEffort('high')).toEqual({
-      extraction: 'high', analysis: 'high', synthesis: 'high', discovery: 'high',
+      extraction: 'high', analysis: 'high', synthesis: 'high', discovery: 'high', market_brief: 'high',
     });
   });
 
   it('falls back per stage for gaps in a partial map', () => {
     expect(resolveStageEffort({ analysis: 'xhigh', discovery: 'high' }, 'low')).toEqual({
-      extraction: 'low', analysis: 'xhigh', synthesis: 'low', discovery: 'high',
+      extraction: 'low', analysis: 'xhigh', synthesis: 'low', discovery: 'high', market_brief: 'low',
     });
   });
 

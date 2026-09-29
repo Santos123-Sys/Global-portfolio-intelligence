@@ -33,9 +33,9 @@ function readerEvidence(bundle: GroundingBundle) {
   };
 }
 
-export function createExternalId(kind: 'run' | 'extraction' | 'discovery', now = new Date()): string {
+export function createExternalId(kind: 'run' | 'extraction' | 'discovery' | 'market_brief', now = new Date()): string {
   const timestamp = now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
-  const prefix = kind === 'run' ? 'agent-run' : kind === 'extraction' ? 'thesis-extraction' : 'market-discovery';
+  const prefix = kind === 'run' ? 'agent-run' : kind === 'extraction' ? 'thesis-extraction' : kind === 'discovery' ? 'market-discovery' : 'market-brief';
   return `${prefix}-${timestamp}-${randomUUID()}`;
 }
 

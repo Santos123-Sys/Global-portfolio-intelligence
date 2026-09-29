@@ -13,10 +13,14 @@ authenticated manifest callback.
 
 ## Single-model policy
 
-Every language-model operation uses the OpenAI Responses API through
-`OpenAIAgenticPipeline`. Thesis extraction, per-security analysis and portfolio
-synthesis all use `OPENAI_MODEL` (default `gpt-5.6`). There is no Anthropic
-adapter, voting layer, manager model or provider fallback.
+GPT-6 Sol (`OPENAI_MODEL`) is the production analysis and synthesis baseline.
+The separate Brazilian evidence-retrieval integration calls Maritaca Sabiá 4
+Thinking only when Brazilian research is requested and `MARITACA_API_KEY` is
+configured; GPT-6 Sol remains the TDMRA brief writer. BrAPI supplies targeted
+financial indicators for B3 tickers; SEC EDGAR supplies US issuer filings and
+XBRL facts. SEC EDGAR is not a market-quote feed. All provider outputs enter a
+source register and unsupported claims are rejected by the market-brief
+contract. There is no model voting layer or automatic model fallback.
 
 ## Local commands
 
@@ -43,6 +47,9 @@ POST /v1/analysis-runs
 GET  /v1/analysis-runs/{externalRunId}
 POST /v1/analysis-runs/{externalRunId}/retry
 GET  /v1/analysis-runs/{externalRunId}/report
+POST /v1/market-briefs
+GET  /v1/market-briefs/{externalMarketBriefId}
+POST /v1/market-briefs/{externalMarketBriefId}/retry
 GET  /health
 ```
 
