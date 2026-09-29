@@ -26,6 +26,7 @@ describe('Railway environment validation', () => {
       SECRET_ACCESS_KEY: 'secret',
     });
     expect(config.AGENTIC_BUCKET_NAME).toBe('reports');
-    expect(config.OPENAI_MODEL).toBe('gpt-5.6');
+    expect(config.OPENAI_MODEL).toBe('gpt-6-sol');
+    expect(config.MARITACA_DATA_MODEL).toBe('sabia-4-thinking');
   });
 });

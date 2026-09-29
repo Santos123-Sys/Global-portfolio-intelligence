@@ -21,9 +21,10 @@ import {
 } from '@/lib/db/workflow-schema';
 import {
   approveCandidateForAnalysis,
-  failCandidateAnalysisPreparation,
+  failCandidateMarketResearchPreparation,
   rejectOrWatchCandidate,
-  startApprovedCandidateAnalysis,
+  startApprovedCandidateMarketBrief,
+  synchronizeCandidateMarketBrief,
 } from '@/lib/discovery-workflow';
 import {
   analysisModeFromRequest,
@@ -49,7 +50,7 @@ export async function GET(req: Request) {
   if (!parsedRunId.success) {
     return NextResponse.json({ error: 'A valid discovery runId is required' }, { status: 400 });
   }
-  const rows = await db.select({
+  let rows = await db.select({
     candidate: discoveryCandidates,
     portfolioName: portfolios.name,
     discoveryRequestedAt: externalDiscoveryRuns.requestedAt,
@@ -66,6 +67,17 @@ export async function GET(req: Request) {
       isNull(thesisVersions.excludedAt)
     ))
     .orderBy(desc(discoveryCandidates.createdAt));
+  if (rows.some(({ candidate }) => ['dispatching', 'queued', 'running'].includes(candidate.marketBriefStatus))) {
+    await Promise.all(rows.filter(({ candidate }) => ['dispatching', 'queued', 'running'].includes(candidate.marketBriefStatus))
+      .map(({ candidate }) => synchronizeCandidateMarketBrief(session.auth.userId, candidate.id).catch(() => null)));
+    rows = await db.select({ candidate: discoveryCandidates, portfolioName: portfolios.name, discoveryRequestedAt: externalDiscoveryRuns.requestedAt })
+      .from(discoveryCandidates).innerJoin(portfolios, eq(discoveryCandidates.portfolioId, portfolios.id))
+      .innerJoin(externalDiscoveryRuns, eq(discoveryCandidates.runId, externalDiscoveryRuns.id))
+      .innerJoin(thesisVersions, eq(externalDiscoveryRuns.thesisVersionId, thesisVersions.id))
+      .where(and(eq(discoveryCandidates.ownerId, session.auth.userId), eq(discoveryCandidates.runId, parsedRunId.data),
+        ne(discoveryCandidates.decision, 'rejected'), isNull(thesisVersions.excludedAt)))
+      .orderBy(desc(discoveryCandidates.createdAt));
+  }
   let latestPrices = new Map();
   try {
     latestPrices = await loadDiscoveryLatestPrices(rows.map((row) => ({
@@ -185,15 +197,15 @@ export async function POST(req: Request) {
       );
       after(async () => {
         try {
-          await startApprovedCandidateAnalysis(session.auth.userId, parsed.data.candidateId);
+          await startApprovedCandidateMarketBrief(session.auth.userId, parsed.data.candidateId);
         } catch (error) {
-          console.error('[candidate-analysis] Preparation failed', {
+          console.error('[candidate-market-brief] Preparation failed', {
             candidateId: parsed.data.candidateId,
             ownerId: session.auth.userId,
             error: error instanceof Error ? error.message : 'Unknown failure',
           });
           try {
-            await failCandidateAnalysisPreparation(session.auth.userId, parsed.data.candidateId, error);
+            await failCandidateMarketResearchPreparation(session.auth.userId, parsed.data.candidateId, error);
           } catch (stateError) {
             console.error('[candidate-analysis] Could not persist preparation failure', {
               candidateId: parsed.data.candidateId,

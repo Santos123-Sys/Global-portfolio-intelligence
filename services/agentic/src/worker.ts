@@ -15,7 +15,9 @@ const pipeline = new OpenAIAgenticPipeline(
   config.OPENAI_MODEL,
   stageReasoningEffort(config),
   undefined,
-  { provider: config.WEB_SEARCH_PROVIDER, apiKey: config.WEB_SEARCH_API_KEY }
+  { provider: config.WEB_SEARCH_PROVIDER, apiKey: config.WEB_SEARCH_API_KEY },
+  { maritacaApiKey: config.MARITACA_API_KEY, maritacaModel: config.MARITACA_DATA_MODEL,
+    brapiApiKey: config.BRAPI_API_KEY, secUserAgent: config.SEC_USER_AGENT }
 );
 const storage = new ReportStorage(config);
 const workerId = `worker-${randomUUID()}`;

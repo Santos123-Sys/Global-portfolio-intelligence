@@ -3,7 +3,7 @@ import type { AgenticJob } from './types.js';
 
 export function callbackPayload(job: AgenticJob, reportBaseUrl?: string): AgenticImportRequest {
   if (job.kind !== 'analysis_run') throw new Error('Only analysis runs have callbacks');
-  if (job.status === 'completed' && job.result && 'schemaVersion' in job.result) {
+  if (job.status === 'completed' && job.result && 'portfolios' in job.result) {
     return {
       externalRunId: job.externalId,
       status: 'completed',

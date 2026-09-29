@@ -374,6 +374,94 @@ export const MarketDiscoveryOutput = z.object({
 }).strict();
 export type MarketDiscoveryOutput = z.infer<typeof MarketDiscoveryOutput>;
 
+/** Source-backed market research is reviewed before it can continue into financial analysis. */
+export const MarketBriefRequest = z.object({
+  dispatchId: z.string().uuid().optional(),
+  thesisVersionId: z.string().uuid(),
+  candidateId: z.string().uuid(),
+  thesis: ThesisCriteria,
+  security: z.object({
+    ticker: z.string().trim().min(1),
+    exchange: z.string().trim().min(1),
+    companyName: z.string().trim().min(1),
+    currency: z.string().trim().min(1),
+    country: z.string().nullable(),
+    sector: z.string().nullable(),
+    industry: z.string().nullable(),
+  }).strict(),
+  marketContext: MarketContext.optional(),
+  discoveryEvidence: z.object({
+    rationale: z.string().min(1),
+    matchedCriteria: z.array(z.string()),
+    violatedCriteria: z.array(z.string()),
+    informationGaps: z.array(z.string()),
+    sourceUrls: z.array(z.string().url()),
+  }).strict(),
+}).strict();
+export type MarketBriefRequest = z.infer<typeof MarketBriefRequest>;
+
+export const MarketBriefEvidence = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  publisher: z.string().min(1),
+  url: z.string().url(),
+  sourceKind: z.enum(['regulatory_filing', 'official_statistics', 'issuer', 'market_data', 'research', 'other']),
+  publishedAt: z.string().nullable(),
+  retrievedAt: z.string().datetime(),
+  supports: z.array(z.string()),
+  excerpt: z.string().min(1),
+}).strict();
+
+const marketBriefClaim = z.object({
+  statement: z.string().min(1),
+  evidenceRefs: z.array(z.string()).min(1),
+  confidence: z.enum(['low', 'medium', 'high']),
+}).strict();
+
+export const MarketBrief = z.object({
+  schemaVersion: z.literal('1.0'),
+  security: z.object({ ticker: z.string(), exchange: z.string(), companyName: z.string() }).strict(),
+  executiveSummary: z.string().min(1),
+  marketDefinition: z.object({
+    industry: z.string().min(1),
+    productScope: z.string().min(1),
+    geography: z.string().min(1),
+    period: z.string().min(1),
+    assumptions: z.array(z.string()),
+  }).strict(),
+  marketSizing: z.array(z.object({
+    measure: z.enum(['TAM', 'SAM', 'SOM']),
+    value: z.string().min(1),
+    methodology: z.string().min(1),
+    claim: marketBriefClaim,
+  }).strict()),
+  macroAndPolicy: z.array(marketBriefClaim),
+  valueChain: z.array(marketBriefClaim),
+  demandAndCustomers: z.array(marketBriefClaim),
+  goToMarketAndChannels: z.array(marketBriefClaim),
+  competitiveLandscape: z.array(marketBriefClaim),
+  companyPositioning: z.array(marketBriefClaim),
+  thesisFit: z.object({ alignment: z.array(marketBriefClaim), tensions: z.array(marketBriefClaim) }).strict(),
+  monitoringQuestions: z.array(z.string()),
+  evidenceRegister: z.array(MarketBriefEvidence),
+  confidence: z.enum(['limited', 'developing', 'sufficient']),
+  informationGaps: z.array(z.string()),
+  generatedAt: z.string().datetime(),
+}).strict();
+export type MarketBrief = z.infer<typeof MarketBrief>;
+
+export const MarketBriefModelOutput = MarketBrief.omit({ generatedAt: true, evidenceRegister: true, security: true, schemaVersion: true });
+
+export const MarketBriefStatus = z.object({
+  externalMarketBriefId: z.string().min(1),
+  status: z.enum(['queued', 'running', 'completed', 'failed']),
+  progress: z.object({ completed: z.number().int().nonnegative(), total: z.number().int().nonnegative(), currentStage: z.string() }).strict().optional(),
+  result: MarketBrief.optional(),
+  errorMessage: z.string().min(1).optional(),
+  updatedAt: z.string().datetime(),
+}).strict();
+export type MarketBriefStatus = z.infer<typeof MarketBriefStatus>;
+
 export const DiscoveryRunStatus = z.object({
   externalDiscoveryId: z.string().min(1),
   status: z.enum(['queued', 'running', 'completed', 'failed']),
@@ -818,4 +906,3 @@ export function stableStringify(value: unknown): string {
     `${JSON.stringify(key)}:${stableStringify(record[key])}`
   ).join(',')}}`;
 }
-

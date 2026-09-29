@@ -11,6 +11,8 @@ import {
   screenDiscoveryUniverse,
   DiscoveryRunRequest,
   MarketDiscoveryOutput,
+  MarketBriefRequest,
+  MarketBrief,
   PortfolioRole,
   ThesisCriteria,
   validateDiscoveryOutput,
@@ -30,7 +32,7 @@ import {
   externalDiscoveryRuns,
   securityRiskSnapshots,
 } from './db/workflow-schema';
-import { startExternalAgenticRun, startExternalDiscoveryRun, fetchExternalDiscoveryRun } from './integrations/agentic-client';
+import { startExternalAgenticRun, startExternalDiscoveryRun, fetchExternalDiscoveryRun, startExternalMarketBrief, fetchExternalMarketBrief, retryExternalMarketBrief } from './integrations/agentic-client';
 import { computeStandaloneSecurityRisk } from './quant/security-risk';
 import { recordPriceObservation } from './services/provenance';
 import { isUnspecifiedThesisMandateCurrency, normalizeThesisMandateCurrency } from './thesis-currency';
@@ -487,7 +489,7 @@ export async function approveCandidateForAnalysis(ownerId: string, candidateId: 
   const row = await ownedCandidate(ownerId, candidateId);
   if (!row) throw new Error('Discovery candidate not found');
   if (row.candidate.externalAnalysisRunId) throw new Error('This candidate already has an analysis run; use Retry analysis if it failed');
-  const retryingPreparation = row.candidate.decision === 'approved' && row.candidate.workflowStatus === 'analysis_failed';
+  const retryingPreparation = row.candidate.decision === 'approved' && ['analysis_failed', 'market_research_failed'].includes(row.candidate.workflowStatus);
   if (row.candidate.decision !== 'pending' && row.candidate.decision !== 'watchlist' && !retryingPreparation) {
     throw new Error('Only pending or watchlist candidates can be approved');
   }
@@ -504,7 +506,7 @@ export async function approveCandidateForAnalysis(ownerId: string, candidateId: 
       rationale: journal.decisionReason,
       decisionJournal: journal,
       decidedAt: row.candidate.decidedAt ?? new Date(),
-      workflowStatus: 'analysis_preparing',
+      workflowStatus: 'market_research_preparing',
       analysisErrorMessage: null,
       updatedAt: new Date(),
     }).where(and(
@@ -521,7 +523,7 @@ export async function approveCandidateForAnalysis(ownerId: string, candidateId: 
       decision: 'approved',
       reasoning: journal.decisionReason,
       alternativesConsidered: decisionJournalAuditText(journal),
-      outcome: 'Financial analysis and valuation preparation requested.',
+      outcome: 'Candidate approved for a source-backed market brief. Financial analysis requires a separate review and approval of that brief.',
       relatedPortfolioId: row.portfolio.id,
       metadata: {
         thesisVersionId: row.run.thesisVersionId,
@@ -531,6 +533,120 @@ export async function approveCandidateForAnalysis(ownerId: string, candidateId: 
     });
     return { candidate };
   });
+}
+
+/** Dispatch a durable market-research job using the saved, stable dispatch id. */
+export async function startApprovedCandidateMarketBrief(ownerId: string, candidateId: string) {
+  const row = await ownedCandidate(ownerId, candidateId);
+  if (!row) throw new Error('Discovery candidate not found');
+  if (row.candidate.decision !== 'approved' || !['market_research_preparing', 'market_research_dispatching'].includes(row.candidate.workflowStatus))
+    throw new Error('Candidate must be approved for market research before a brief can start');
+  const discovery = DiscoveryCandidate.parse(row.candidate.discoveryJson);
+  const discoveryRequest = DiscoveryRunRequest.parse(row.run.requestJson);
+  const universeRecord = discoveryRequest.universe.find(record => record.ticker === row.candidate.ticker && record.exchange === row.candidate.exchange);
+  const [thesis] = await db.select().from(thesisVersions).where(and(
+    eq(thesisVersions.id, row.run.thesisVersionId), eq(thesisVersions.ownerId, ownerId), isNull(thesisVersions.excludedAt), isNull(thesisVersions.supersededAt)
+  )).limit(1);
+  if (!thesis) throw new Error('The active thesis changed before TDMRA research began');
+
+  const request = row.candidate.marketBriefRequestJson
+    ? MarketBriefRequest.parse(row.candidate.marketBriefRequestJson)
+    : MarketBriefRequest.parse({
+      dispatchId: randomUUID(), thesisVersionId: thesis.id, candidateId,
+      thesis: ThesisCriteria.parse(thesis.criteriaJson),
+      security: { ticker: row.candidate.ticker, exchange: row.candidate.exchange, companyName: row.candidate.companyName,
+        currency: row.candidate.currency, country: row.candidate.country, sector: row.candidate.sector, industry: row.candidate.industry },
+      marketContext: marketContextFromRecord(universeRecord ?? { exchange: row.candidate.exchange, sector: row.candidate.sector }),
+      discoveryEvidence: { rationale: discovery.rationale, matchedCriteria: discovery.matchedCriteria,
+        violatedCriteria: discovery.violatedCriteria, informationGaps: discovery.informationGaps, sourceUrls: discovery.sourceUrls },
+    });
+  const externalId = row.candidate.externalMarketBriefId ?? `market_brief_${request.dispatchId}`;
+  if (!row.candidate.externalMarketBriefId || !row.candidate.marketBriefRequestJson) {
+    const [saved] = await db.update(discoveryCandidates).set({ externalMarketBriefId: externalId,
+      marketBriefRequestJson: request, marketBriefStatus: 'dispatching', marketBriefErrorMessage: null,
+      workflowStatus: 'market_research_dispatching', updatedAt: new Date() }).where(and(
+        eq(discoveryCandidates.id, candidateId), eq(discoveryCandidates.ownerId, ownerId), eq(discoveryCandidates.decision, 'approved')
+      )).returning();
+    if (!saved) throw new Error('Candidate state changed before the market brief could be saved');
+  }
+  try {
+    let remote;
+    try { remote = await fetchExternalMarketBrief(externalId); }
+    catch { remote = await startExternalMarketBrief(request); }
+    if (remote.externalMarketBriefId !== externalId) throw new Error('Market brief dispatch identity changed');
+    const [updated] = await db.update(discoveryCandidates).set({ marketBriefStatus: remote.status,
+      ...(remote.result ? { marketBriefJson: remote.result } : {}),
+      marketBriefErrorMessage: remote.errorMessage ?? null,
+      workflowStatus: remote.status === 'completed' ? 'market_research_review' : remote.status === 'failed' ? 'market_research_failed' : 'market_research_queued',
+      updatedAt: new Date() }).where(and(eq(discoveryCandidates.id, candidateId), eq(discoveryCandidates.ownerId, ownerId))).returning();
+    return updated;
+  } catch (error) {
+    const message = error instanceof Error ? error.message.slice(0, 2_000) : 'Market brief dispatch is unconfirmed';
+    await db.update(discoveryCandidates).set({ marketBriefStatus: 'dispatching', marketBriefErrorMessage: message,
+      workflowStatus: 'market_research_dispatching', updatedAt: new Date() }).where(and(
+        eq(discoveryCandidates.id, candidateId), eq(discoveryCandidates.ownerId, ownerId)
+      ));
+    throw error;
+  }
+}
+
+export async function synchronizeCandidateMarketBrief(ownerId: string, candidateId: string) {
+  const row = await ownedCandidate(ownerId, candidateId);
+  if (!row?.candidate.externalMarketBriefId) return row?.candidate ?? null;
+  const activeStatuses = ['dispatching', 'queued', 'running'];
+  if (!activeStatuses.includes(row.candidate.marketBriefStatus)) return row.candidate;
+  let remote;
+  try { remote = await fetchExternalMarketBrief(row.candidate.externalMarketBriefId); }
+  catch {
+    if (row.candidate.marketBriefStatus !== 'dispatching' || !row.candidate.marketBriefRequestJson) return row.candidate;
+    try { remote = await startExternalMarketBrief(MarketBriefRequest.parse(row.candidate.marketBriefRequestJson)); }
+    catch { return row.candidate; }
+  }
+  const [updated] = await db.update(discoveryCandidates).set({ marketBriefStatus: remote.status,
+    ...(remote.result ? { marketBriefJson: remote.result } : {}), marketBriefErrorMessage: remote.errorMessage ?? null,
+    workflowStatus: remote.status === 'completed' ? 'market_research_review' : remote.status === 'failed' ? 'market_research_failed' : 'market_research_queued',
+    updatedAt: new Date() }).where(and(eq(discoveryCandidates.id, candidateId), eq(discoveryCandidates.ownerId, ownerId))).returning();
+  return updated ?? null;
+}
+
+export async function approveMarketBriefForFinancialAnalysis(ownerId: string, candidateId: string) {
+  const row = await synchronizeCandidateMarketBrief(ownerId, candidateId);
+  if (!row || row.decision !== 'approved') throw new Error('Approved candidate not found');
+  if (row.marketBriefStatus !== 'completed' || !row.marketBriefJson) throw new Error('A completed market brief must be reviewed before financial analysis');
+  const [updated] = await db.update(discoveryCandidates).set({ workflowStatus: 'analysis_preparing', updatedAt: new Date() }).where(and(
+    eq(discoveryCandidates.id, candidateId), eq(discoveryCandidates.ownerId, ownerId), eq(discoveryCandidates.workflowStatus, 'market_research_review')
+  )).returning();
+  if (!updated) throw new Error('Market brief review state changed; refresh and try again');
+  return updated;
+}
+
+export async function retryCandidateMarketBrief(ownerId: string, candidateId: string) {
+  const row = await ownedCandidate(ownerId, candidateId);
+  if (!row || row.candidate.decision !== 'approved' || row.candidate.marketBriefStatus !== 'failed')
+    throw new Error('Only a failed market brief for an approved candidate can be retried');
+  if (!row.candidate.externalMarketBriefId) {
+    const [preparing] = await db.update(discoveryCandidates).set({ workflowStatus: 'market_research_preparing',
+      marketBriefStatus: 'not_started', marketBriefErrorMessage: null, updatedAt: new Date() }).where(and(
+        eq(discoveryCandidates.id, candidateId), eq(discoveryCandidates.ownerId, ownerId)
+      )).returning();
+    return startApprovedCandidateMarketBrief(ownerId, candidateId).then(() => preparing);
+  }
+  const remote = await retryExternalMarketBrief(row.candidate.externalMarketBriefId);
+  const [updated] = await db.update(discoveryCandidates).set({ marketBriefStatus: remote.status,
+    marketBriefErrorMessage: null, workflowStatus: 'market_research_queued', updatedAt: new Date() }).where(and(
+      eq(discoveryCandidates.id, candidateId), eq(discoveryCandidates.ownerId, ownerId)
+    )).returning();
+  return updated;
+}
+
+export async function failCandidateMarketResearchPreparation(ownerId: string, candidateId: string, error: unknown) {
+  const message = (error instanceof Error ? error.message : 'Unknown market-research preparation failure').slice(0, 2_000);
+  const [candidate] = await db.update(discoveryCandidates).set({ workflowStatus: 'market_research_failed',
+    marketBriefStatus: 'failed', marketBriefErrorMessage: message, updatedAt: new Date() }).where(and(
+      eq(discoveryCandidates.id, candidateId), eq(discoveryCandidates.ownerId, ownerId),
+      eq(discoveryCandidates.workflowStatus, 'market_research_preparing'), isNull(discoveryCandidates.externalMarketBriefId)
+    )).returning();
+  return candidate ?? null;
 }
 
 /** Complete the slow provider and agentic handoff after approval is visible. */
@@ -612,6 +728,9 @@ export async function startApprovedCandidateAnalysis(
     [`research:information_gaps:${candidateId}`]: discoveryEvidence.informationGaps.join(' | ') || 'None recorded',
     [`research:source_urls:${candidateId}`]: discoveryEvidence.sourceUrls.join(' | '),
   };
+  const approvedMarketBrief = MarketBrief.parse(row.candidate.marketBriefJson);
+  researchEvidence[`research:market_brief:${row.candidate.externalMarketBriefId}`] = JSON.stringify(approvedMarketBrief);
+  researchEvidence[`research:market_brief_sources:${row.candidate.externalMarketBriefId}`] = approvedMarketBrief.evidenceRegister.map(source => source.url).join(' | ');
   const computedMetrics: GroundingBundle['computedMetrics'] = {};
   for (const metric of risk) computedMetrics[`securityRiskMetric:${metric.metricName}:${metric.computedAt}`] = metric.value;
   computedMetrics[`marketPrice:close:${bars.at(-1)!.date}`] = bars.at(-1)!.close;
