@@ -3,10 +3,13 @@ import base64
 import hmac
 import os
 import re
+import asyncio
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 from openai import OpenAI
 from .analysis import Extraction, analyze
+from .ibkr_portfolio import (IBKRSettings, OrderPreviewRequest, build_order_preview,
+                             build_snapshot, connect_session)
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -72,6 +75,52 @@ def authorize_weights(authorization):
     secret = os.getenv('FILINGS_INTERNAL_TOKEN', '')
     if len(secret) < 32 or not hmac.compare_digest(authorization, f'Bearer {secret}'):
         raise HTTPException(401, 'Unauthorized')
+
+
+def authorize_internal(authorization):
+    authorize_weights(authorization)
+
+
+_ibkr_slot = asyncio.Lock()
+
+
+@app.post('/v1/ibkr/snapshot')
+async def ibkr_snapshot(authorization: str = Header(default='')):
+    authorize_internal(authorization)
+    if _ibkr_slot.locked():
+        raise HTTPException(429, 'IBKR adapter is busy; retry shortly')
+    async with _ibkr_slot:
+        session = None
+        try:
+            settings = IBKRSettings.from_env()
+            session = await connect_session(settings)
+            return build_snapshot(session, settings.account)
+        except (ConnectionError, TimeoutError, OSError, ValueError) as error:
+            raise HTTPException(503, str(error)) from error
+        finally:
+            if session: session.disconnect()
+
+
+@app.post('/v1/ibkr/order-preview')
+async def ibkr_order_preview(body: OrderPreviewRequest, authorization: str = Header(default='')):
+    authorize_internal(authorization)
+    if _ibkr_slot.locked():
+        raise HTTPException(429, 'IBKR adapter is busy; retry shortly')
+    async with _ibkr_slot:
+        session = None
+        try:
+            settings = IBKRSettings.from_env()
+            session = await connect_session(settings)
+            snapshot = build_snapshot(session, settings.account)
+            price = await session.price(body)
+            position = next((row for row in snapshot['positions']
+                             if row['symbol'] == body.symbol and row['currency'] == body.currency), None)
+            return build_order_preview(body, price, snapshot['available_funds'], settings,
+                                       position['quantity'] if position else 0)
+        except (ConnectionError, TimeoutError, OSError, ValueError) as error:
+            raise HTTPException(503, str(error)) from error
+        finally:
+            if session: session.disconnect()
 
 
 @app.post('/v1/portfolio-weights/compute')

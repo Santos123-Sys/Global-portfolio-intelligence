@@ -243,6 +243,28 @@ td.num, th.num, .num { font-family: monospace; text-align: right; }
 .analysis-stage h3, .valuation-panel h3 { margin: 0; font-size: 1rem; }
 .analysis-stage-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .analysis-stage-heading .badge { flex: 0 0 auto; }
+.broker-panel { margin-bottom: 1rem; }
+.broker-panel .section-heading > div:last-child { display: flex; align-items: center; gap: 0.55rem; }
+.broker-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.55rem; margin: 0.9rem 0; }
+.broker-metrics > div { display: grid; gap: 0.2rem; padding: 0.75rem; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); }
+.broker-metrics span { color: var(--muted); font-size: 0.7rem; }
+.broker-allocation { display: flex; align-items: center; gap: 1.5rem; margin: 1rem 0; }
+.broker-donut { width: 150px; height: 150px; flex: 0 0 150px; display: grid; place-items: center; border-radius: 50%; position: relative; }
+.broker-donut::after { content: ''; position: absolute; inset: 30px; border-radius: 50%; background: var(--panel); }
+.broker-donut span { z-index: 1; display: grid; text-align: center; font-size: 1.15rem; font-weight: 600; }
+.broker-donut small { color: var(--muted); font-size: 0.65rem; font-weight: 400; }
+.broker-allocation ul { flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.45rem; margin: 0; padding: 0; list-style: none; }
+.broker-allocation li { display: grid; grid-template-columns: 0.65rem 1fr auto; align-items: center; gap: 0.4rem; font-size: 0.75rem; }
+.broker-allocation i { width: 0.65rem; height: 0.65rem; border-radius: 50%; }
+.broker-preview { margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid var(--border); }
+.broker-preview > summary { cursor: pointer; color: var(--accent); }
+.broker-preview-result { margin-top: 0.8rem; padding: 0.8rem; border: 1px solid var(--border); border-radius: 7px; }
+.broker-preview-result.eligible { border-color: var(--success); }
+.broker-preview-result.blocked { border-color: var(--danger); }
+@media (max-width: 640px) {
+  .broker-panel .section-heading > div:last-child { align-items: stretch; flex-direction: column; }
+  .broker-allocation { align-items: flex-start; flex-direction: column; }
+}
 .market-brief-review { display: grid; gap: 0.8rem; margin-top: 1rem; padding: 1rem; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); }
 .market-brief-review > p, .market-brief-review h3, .market-brief-review h4 { margin-top: 0; }
 .market-brief-review h4 { margin-bottom: 0.35rem; font-size: 0.9rem; }

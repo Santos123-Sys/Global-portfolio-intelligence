@@ -9,6 +9,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PortfolioWorkspaceNav } from '@/components/portfolio-workspace-nav';
+import { IbkrPortfolioPanel } from '@/components/ibkr-portfolio-panel';
 
 interface PositionRow {
   id: string;
@@ -247,6 +248,8 @@ export default function PositionsPage() {
       <h1>Positions</h1>
       <p className="sub">Every row is a single portfolio&apos;s holding. Values stay in that portfolio&apos;s native currency.</p>
       <p><Link className="text-link" href="/securities">Open the portfolio security directory →</Link></p>
+
+      <IbkrPortfolioPanel />
 
       <section className="card" id="add-position">
         <div className="section-heading">

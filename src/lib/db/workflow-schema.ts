@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, numeric, jsonb, index, uniqueIndex, integer, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, numeric, jsonb, index, uniqueIndex, integer, boolean, real } from 'drizzle-orm/pg-core';
 import { accounts, aiAnalyses, portfolios, securities, thesisVersions, users } from './schema';
 
 /**
@@ -349,3 +349,49 @@ export const portfolioWeightRuns = pgTable('portfolio_weight_runs', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
 }, t => ({ portfolioCreatedIdx: index('weight_runs_portfolio_created_idx').on(t.portfolioId, t.createdAt) }));
+
+/** Immutable, read-only snapshot retrieved from a connected broker session. */
+export const brokerAccountSnapshots = pgTable('broker_account_snapshots', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  provider: text('provider').notNull(),
+  accountMasked: text('account_masked').notNull(),
+  baseCurrency: text('base_currency').notNull(),
+  cash: numeric('cash', { precision: 24, scale: 8 }).notNull(),
+  netLiquidation: numeric('net_liquidation', { precision: 24, scale: 8 }).notNull(),
+  availableFunds: numeric('available_funds', { precision: 24, scale: 8 }).notNull(),
+  buyingPower: numeric('buying_power', { precision: 24, scale: 8 }).notNull(),
+  informationGaps: jsonb('information_gaps').$type<string[]>().notNull(),
+  capturedAt: timestamp('captured_at', { withTimezone: true }).notNull(),
+  syncedAt: timestamp('synced_at', { withTimezone: true }).defaultNow().notNull(),
+}, t => ({ ownerCapturedIdx: index('broker_snapshot_owner_captured_idx').on(t.ownerId, t.capturedAt) }));
+
+export const brokerPositionSnapshots = pgTable('broker_position_snapshots', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  snapshotId: uuid('snapshot_id').references(() => brokerAccountSnapshots.id, { onDelete: 'cascade' }).notNull(),
+  conId: text('con_id').notNull(),
+  symbol: text('symbol').notNull(),
+  exchange: text('exchange').notNull(),
+  currency: text('currency').notNull(),
+  quantity: numeric('quantity', { precision: 24, scale: 8 }).notNull(),
+  avgCost: numeric('avg_cost', { precision: 24, scale: 8 }).notNull(),
+  lastPrice: numeric('last_price', { precision: 24, scale: 8 }).notNull(),
+  costBasis: numeric('cost_basis', { precision: 24, scale: 8 }).notNull(),
+  marketValue: numeric('market_value', { precision: 24, scale: 8 }).notNull(),
+  unrealizedPnl: numeric('unrealized_pnl', { precision: 24, scale: 8 }).notNull(),
+  returnPct: real('return_pct'),
+  firstDetectedFill: text('first_detected_fill'),
+  daysSinceDetectedFill: integer('days_since_detected_fill'),
+  annualizedReturnPct: real('annualized_return_pct'),
+}, t => ({ snapshotValueIdx: index('broker_position_snapshot_value_idx').on(t.snapshotId, t.marketValue) }));
+
+/** Preview audit. Results can never represent submitted or filled orders. */
+export const brokerOrderPreviews = pgTable('broker_order_previews', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  snapshotId: uuid('snapshot_id').references(() => brokerAccountSnapshots.id, { onDelete: 'set null' }),
+  provider: text('provider').notNull(),
+  requestJson: jsonb('request_json').notNull(),
+  resultJson: jsonb('result_json').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, t => ({ ownerCreatedIdx: index('broker_preview_owner_created_idx').on(t.ownerId, t.createdAt) }));
