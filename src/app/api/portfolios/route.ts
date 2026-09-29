@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { portfolios, positions } from '@/lib/db/schema';
-import { and, eq, sql, sum } from 'drizzle-orm';
+import { portfolios, positions, thesisVersions } from '@/lib/db/schema';
+import { and, count, desc, eq, sql, sum } from 'drizzle-orm';
 import { fetchEcbRates, displayTotal } from '@/lib/fx';
 import { Currency } from '@/lib/quant/types';
 import { authenticateRequest } from '@/lib/api-auth';
 import { assertSameOrigin } from '@/lib/auth';
 import { portfolioCreateSchema } from '@/lib/portfolio-setup';
 import { readBoundedJson } from '@/lib/request-body';
+import { activeThesisPortfolioRoles, operationalPortfolioIds } from '@/lib/operational-portfolios';
 
 export const runtime = 'nodejs';
 
@@ -24,22 +25,30 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const displayCurrency = url.searchParams.get('displayCurrency') as Currency | null;
 
-  const rows = await db
-    .select({
-      id: portfolios.id,
-      name: portfolios.name,
-      portfolioType: portfolios.portfolioType,
-      baseCurrency: portfolios.baseCurrency,
-      investmentObjective: portfolios.investmentObjective,
-      totalValueNative: sum(positions.marketValueNative),
-    })
-    .from(portfolios)
-    .leftJoin(positions, eq(positions.portfolioId, portfolios.id))
-    .where(eq(portfolios.ownerId, session.auth.userId))
-    .groupBy(portfolios.id);
+  const [rows, thesisRows] = await Promise.all([
+    db.select({
+        id: portfolios.id,
+        name: portfolios.name,
+        portfolioType: portfolios.portfolioType,
+        baseCurrency: portfolios.baseCurrency,
+        investmentObjective: portfolios.investmentObjective,
+        totalValueNative: sum(positions.marketValueNative),
+        holdingCount: count(positions.id),
+      })
+      .from(portfolios)
+      .leftJoin(positions, eq(positions.portfolioId, portfolios.id))
+      .where(eq(portfolios.ownerId, session.auth.userId))
+      .groupBy(portfolios.id),
+    db.select({ criteriaJson: thesisVersions.criteriaJson, excludedAt: thesisVersions.excludedAt, supersededAt: thesisVersions.supersededAt })
+      .from(thesisVersions).where(eq(thesisVersions.ownerId, session.auth.userId)).orderBy(desc(thesisVersions.versionNumber)),
+  ]);
 
-  const items = rows.map((r) => ({
+  const activeRoles = activeThesisPortfolioRoles(thesisRows);
+  const visibleIds = operationalPortfolioIds(rows, new Set(rows.filter(row => Number(row.holdingCount) > 0).map(row => row.id)), activeRoles);
+
+  const items = rows.filter(row => visibleIds.has(row.id)).map((r) => ({
     ...r,
+    holdingCount: Number(r.holdingCount),
     totalValueNative: Number(r.totalValueNative ?? 0),
   }));
 

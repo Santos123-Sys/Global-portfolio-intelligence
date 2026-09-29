@@ -7,6 +7,7 @@ import { ThesisDraft } from '@/lib/thesis-draft';
 import { assessThesisReview } from '@/lib/thesis-review';
 import { ThesisDiscoveryPreview } from '@/components/thesis-discovery-preview';
 import { ThesisCriteriaEditor } from '@/components/thesis-criteria-editor';
+import { GovernancePolicyEditor } from '@/components/governance-policy-editor';
 import { canDismissThesisExtraction } from '@/lib/thesis-extraction-lifecycle';
 import { normalizeThesisMandateCurrency } from '@/lib/thesis-currency';
 
@@ -557,6 +558,13 @@ export default function InvestmentThesisPage() {
           ))}</div>
         )}
       </section>
+
+      <details className="card" id="portfolio-guardrails">
+        <summary>Optional portfolio monitoring guardrails</summary>
+        <h2>Monitoring guardrails</h2>
+        <p className="note">Set review prompts for portfolio concentration and evidence freshness after defining the mandate. These settings are optional: they do not block thesis approval, Discovery, analysis, or valuation, and they never submit trades.</p>
+        <GovernancePolicyEditor />
+      </details>
     </main>
   );
 }

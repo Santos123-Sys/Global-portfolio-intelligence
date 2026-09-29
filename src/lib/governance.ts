@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { db } from './db';
 import { portfolioExposure } from './portfolio-exposure';
+import { activeThesisPortfolioRoles, operationalPortfolioIds } from './operational-portfolios';
 import {
   aiAnalyses,
   alerts,
@@ -82,9 +83,12 @@ export async function saveGovernancePolicy(ownerId: string, policy: GovernancePo
  */
 export async function buildGovernanceDashboard(ownerId: string) {
   const policy = await getGovernancePolicy(ownerId);
-  const ownedPortfolios = await db.select().from(portfolios).where(eq(portfolios.ownerId, ownerId));
-  const portfolioIds = ownedPortfolios.map((portfolio) => portfolio.id);
-  const holdings = portfolioIds.length ? await db.select({
+  const [allOwnedPortfolios, theses] = await Promise.all([
+    db.select().from(portfolios).where(eq(portfolios.ownerId, ownerId)),
+    db.select().from(thesisVersions).where(eq(thesisVersions.ownerId, ownerId)).orderBy(desc(thesisVersions.versionNumber)),
+  ]);
+  const allPortfolioIds = allOwnedPortfolios.map(portfolio => portfolio.id);
+  const allHoldings = allPortfolioIds.length ? await db.select({
     positionId: positions.id,
     portfolioId: positions.portfolioId,
     quantity: positions.quantity,
@@ -98,9 +102,14 @@ export async function buildGovernanceDashboard(ownerId: string) {
     sector: securities.sector,
     country: securities.country,
   }).from(positions).innerJoin(securities, eq(positions.securityId, securities.id))
-    .where(inArray(positions.portfolioId, portfolioIds)) : [];
+    .where(inArray(positions.portfolioId, allPortfolioIds)) : [];
+  const activeRoles = activeThesisPortfolioRoles(theses);
+  const operationalIds = operationalPortfolioIds(allOwnedPortfolios, new Set(allHoldings.map(holding => holding.portfolioId)), activeRoles);
+  const ownedPortfolios = allOwnedPortfolios.filter(portfolio => operationalIds.has(portfolio.id));
+  const portfolioIds = ownedPortfolios.map(portfolio => portfolio.id);
+  const holdings = allHoldings.filter(holding => operationalIds.has(holding.portfolioId));
   const securityIds = [...new Set(holdings.map((holding) => holding.securityId))];
-  const [analysisRows, priceRows, observationRows, riskRows, candidates, valuations, ownedAlerts, decisions, theses, providerRows] = await Promise.all([
+  const [analysisRows, priceRows, observationRows, riskRows, rawCandidates, rawValuations, rawAlerts, decisions, providerRows] = await Promise.all([
     securityIds.length ? db.select().from(aiAnalyses).where(and(eq(aiAnalyses.ownerId, ownerId), inArray(aiAnalyses.securityId, securityIds))).orderBy(desc(aiAnalyses.analysisTimestamp)) : [],
     securityIds.length ? db.select().from(priceHistory).where(inArray(priceHistory.securityId, securityIds)).orderBy(desc(priceHistory.priceDate)) : [],
     securityIds.length ? db.select().from(marketDataObservations).where(inArray(marketDataObservations.securityId, securityIds)).orderBy(desc(marketDataObservations.retrievedAt)) : [],
@@ -109,9 +118,12 @@ export async function buildGovernanceDashboard(ownerId: string) {
     db.select().from(valuationScenarios).where(eq(valuationScenarios.ownerId, ownerId)).orderBy(desc(valuationScenarios.createdAt)),
     db.select().from(alerts).where(eq(alerts.ownerId, ownerId)).orderBy(desc(alerts.createdAt)),
     db.select().from(decisionLog).where(eq(decisionLog.ownerId, ownerId)).orderBy(desc(decisionLog.decisionDate)).limit(20),
-    db.select().from(thesisVersions).where(eq(thesisVersions.ownerId, ownerId)).orderBy(desc(thesisVersions.versionNumber)),
     db.select().from(providerCalls).orderBy(desc(providerCalls.calledAt)).limit(250),
   ]);
+  const candidates = rawCandidates.filter(candidate => operationalIds.has(candidate.portfolioId));
+  const candidateIds = new Set(candidates.map(candidate => candidate.id));
+  const valuations = rawValuations.filter(valuation => candidateIds.has(valuation.candidateId));
+  const ownedAlerts = rawAlerts.filter(alert => !alert.portfolioId || operationalIds.has(alert.portfolioId));
 
   const latestAnalysis = new Map<string, typeof analysisRows[number]>();
   for (const row of analysisRows) {
@@ -186,7 +198,9 @@ export async function buildGovernanceDashboard(ownerId: string) {
       .map((metric) => ({ ticker: metric.metricName.replace('ReturnContribution_', ''), contribution: metric.value, dataAsOf: metric.dataAsOf?.toISOString() ?? null }))
       .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution));
     return {
-      portfolioName: portfolio.name, currency: portfolio.baseCurrency, holdingCount: rows.length,
+      portfolioName: portfolio.name, currency: portfolio.baseCurrency,
+      mandateStatus: activeRoles.has(portfolio.portfolioType) ? 'active' as const : 'holdings_only' as const,
+      holdingCount: rows.length,
       weightsAvailable: exposure.source != null, weightSource: exposure.source, weightReason: exposure.reason,
       issues, sectors: [...sectors.entries()].map(([name, weight]) => ({ name, weight })).sort((a, b) => b.weight - a.weight),
       countries: [...countries.entries()].map(([name, weight]) => ({ name, weight })).sort((a, b) => b.weight - a.weight),

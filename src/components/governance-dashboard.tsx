@@ -5,11 +5,9 @@ import Link from 'next/link';
 import { PortfolioWorkspaceNav } from '@/components/portfolio-workspace-nav';
 
 type Severity = 'info' | 'watch' | 'breach';
-interface Policy { maxPositionWeight: number; maxSectorWeight: number; maxCountryWeight: number; minimumHoldings: number; stalePriceDays: number; staleResearchDays: number; reviewIntervalDays: number; }
 interface GovernanceData {
   generatedAt: string;
-  policy: Policy;
-  construction: Array<{ portfolioName: string; currency: string; holdingCount: number; weightsAvailable: boolean; weightSource: string | null; weightReason: string | null; issues: Array<{ severity: Severity; label: string; detail: string }>; sectors: Array<{ name: string; weight: number }>; countries: Array<{ name: string; weight: number }>; holdings: Array<{ ticker: string; companyName: string; weight: number | null }>; attribution: Array<{ ticker: string; contribution: number; dataAsOf: string | null }>; riskAsOf: string | null }>;
+  construction: Array<{ portfolioName: string; currency: string; mandateStatus: 'active' | 'holdings_only'; holdingCount: number; weightsAvailable: boolean; weightSource: string | null; weightReason: string | null; issues: Array<{ severity: Severity; label: string; detail: string }>; sectors: Array<{ name: string; weight: number }>; countries: Array<{ name: string; weight: number }>; holdings: Array<{ ticker: string; companyName: string; weight: number | null }>; attribution: Array<{ ticker: string; contribution: number; dataAsOf: string | null }>; riskAsOf: string | null }>;
   freshness: Array<{ portfolioName: string; ticker: string; companyName: string; priceAgeDays: number | null; analysisAgeDays: number | null; evidenceAgeDays: number | null; priceStatus: string; evidenceStatus: string; analysisStatus: string; lastPriceDate: string | null; latestProvider: string | null }>;
   reviewQueue: Array<{ severity: Severity; title: string; detail: string; portfolioName: string | null; ticker: string | null; category: string }>;
   providerHealth: Array<{ provider: string; endpoint: string; ok: number; errors: number; planLimits: number; rateLimited: number; lastCalledAt: string }>;
@@ -24,11 +22,8 @@ function age(value: number | null) { return value == null ? 'not available' : `$
 
 export function GovernanceDashboard() {
   const [data, setData] = useState<GovernanceData | null>(null);
-  const [policy, setPolicy] = useState<Policy | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
 
   async function load() {
@@ -37,7 +32,7 @@ export function GovernanceDashboard() {
       const response = await fetch('/api/governance');
       const body = await response.json().catch(() => ({})) as GovernanceData & { error?: string };
       if (!response.ok) throw new Error(body.error ?? `Governance data failed (${response.status})`);
-      setData(body); setPolicy(body.policy); setError(null);
+      setData(body); setError(null);
     } catch (cause) { setError((cause as Error).message); }
     finally { setLoading(false); }
   }
@@ -49,30 +44,14 @@ export function GovernanceDashboard() {
   }, []);
   const queue = useMemo(() => data?.reviewQueue ?? [], [data]);
 
-  async function savePolicy() {
-    if (!policy) return;
-    setSaving(true); setNotice(null);
-    try {
-      const response = await fetch('/api/governance', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(policy) });
-      const body = await response.json().catch(() => ({})) as { error?: string };
-      if (!response.ok) throw new Error(body.error ?? `Policy save failed (${response.status})`);
-      setNotice('Guardrails saved. They create review prompts only; they never place trades.');
-      await load();
-    } catch (cause) { setError((cause as Error).message); }
-    finally { setSaving(false); }
-  }
-  function updatePolicy(key: keyof Policy, value: string, percentInput = false) {
-    setPolicy((current) => current ? { ...current, [key]: percentInput ? Number(value) / 100 : Number(value) } : current);
-  }
   if (loading && !data) return <main><PortfolioWorkspaceNav /><h1>Investment control center</h1><p className="note">Loading governance evidence…</p></main>;
-  if (!data || !policy) return <main><PortfolioWorkspaceNav /><h1>Investment control center</h1><p className="login-error">{error ?? 'Governance data is unavailable.'}</p></main>;
+  if (!data) return <main><PortfolioWorkspaceNav /><h1>Investment control center</h1><p className="login-error">{error ?? 'Governance data is unavailable.'}</p></main>;
 
   return <main>
     <PortfolioWorkspaceNav />
     <h1>Investment control center</h1>
     <p className="sub">Construction, evidence freshness, valuation discipline, portfolio attribution, and review priorities. These are decision guardrails—not automated trading instructions.</p>
     {error && <p className="login-error" role="alert">{error}</p>}
-    {notice && <p className="security-state">{notice}</p>}
 
     <section className="governance-kpis" aria-label="Control summary">
       <article className="card"><span>Review queue</span><strong>{queue.length}</strong><p>{queue.filter((item) => item.severity === 'breach').length} breaches · {queue.filter((item) => item.severity === 'watch').length} watch items</p></article>
@@ -82,20 +61,21 @@ export function GovernanceDashboard() {
     </section>
 
     <section className="card governance-section">
-      <div className="section-heading"><div><h2>Priority review queue</h2><p className="note">Generated from stored data, alerts, approved thesis breakers, and the policy below.</p></div><button className="secondary-button" type="button" onClick={() => void load()}>Refresh</button></div>
+      <div className="section-heading"><div><h2>Priority review queue</h2><p className="note">Generated from stored data, alerts, approved thesis breakers, and the optional guardrails attached to the Thesis workflow.</p></div><button className="secondary-button" type="button" onClick={() => void load()}>Refresh</button></div>
       {queue.length === 0 ? <p className="note">No current review prompts. This does not prove the portfolio is risk-free; it means no configured, evidence-based trigger is currently open.</p> : <div className="governance-queue">{queue.map((item, index) => <article key={`${item.category}:${item.title}:${index}`} className={`governance-queue-item ${item.severity}`}><span className={`badge ${item.severity === 'info' ? 'ok' : item.severity}`}>{item.category}</span><div><strong>{item.title}</strong><p>{item.detail}</p><small>{item.portfolioName ?? 'All portfolios'}{item.ticker ? ` · ${item.ticker}` : ''}</small></div></article>)}</div>}
     </section>
 
     <section className="card governance-section">
       <h2>Portfolio construction and attribution</h2>
       <p className="note">Weights are evaluated only within each portfolio; native-currency portfolios are never summed into a misleading combined total.</p>
-      <div className="governance-portfolio-grid">{data.construction.map((portfolio) => <article className="governance-portfolio" key={portfolio.portfolioName}>
+      {data.construction.length === 0 ? <p className="note">No active thesis portfolio or invested legacy portfolio is available.</p> : <div className="governance-portfolio-grid">{data.construction.map((portfolio) => <article className="governance-portfolio" key={portfolio.portfolioName}>
         <h3>{portfolio.portfolioName} <span className="cur">{portfolio.currency}</span></h3>
+        {portfolio.mandateStatus === 'holdings_only' && <p className="caveat">The originating mandate is no longer active. This portfolio remains visible only because it contains holdings.</p>}
         <p className="note">{portfolio.holdingCount} holdings · {portfolio.weightSource ? `exposure from ${portfolio.weightSource}` : 'exposure unavailable'}</p>
         {portfolio.issues.length ? <ul className="caveat">{portfolio.issues.map((issue) => <li key={issue.label}><strong>{issue.label}:</strong> {issue.detail}</li>)}</ul> : portfolio.holdingCount === 0 ? <p className="note">Add holdings to assess construction against the guardrails.</p> : portfolio.weightsAvailable ? <p className="security-state">No baseline construction breach detected.</p> : <p className="note">{portfolio.weightReason}</p>}
         <div className="governance-exposures"><div><strong>Largest positions</strong>{portfolio.holdings.slice(0, 5).map((holding) => <p key={holding.ticker}>{holding.ticker} <span>{percent(holding.weight)}</span></p>)}</div><div><strong>Sector exposure</strong>{portfolio.sectors.slice(0, 4).map((item) => <p key={item.name}>{item.name} <span>{percent(item.weight)}</span></p>)}</div><div><strong>Country exposure</strong>{portfolio.countries.slice(0, 4).map((item) => <p key={item.name}>{item.name} <span>{percent(item.weight)}</span></p>)}</div></div>
         <div className="governance-attribution"><strong>Return contribution</strong>{portfolio.attribution.length ? portfolio.attribution.slice(0, 5).map((item) => <p key={item.ticker}>{item.ticker} <span>{percent(item.contribution)}</span></p>) : <p className="note">Not yet available—run the scheduled price refresh after at least two observations.</p>}</div>
-      </article>)}</div>
+      </article>)}</div>}
     </section>
 
     <section className="card governance-section">
@@ -113,8 +93,6 @@ export function GovernanceDashboard() {
 
     <section className="card governance-section"><h2>Provider health</h2><p className="note">Aggregated call outcomes are operational diagnostics; no credentials or request payloads are exposed here.</p>{data.providerHealth.length === 0 ? <p className="note">No provider calls have been recorded.</p> : <div className="table-scroll"><table><thead><tr><th>Provider</th><th>Endpoint</th><th>OK</th><th>Errors</th><th>Plan limits</th><th>Rate limits</th><th>Last call</th></tr></thead><tbody>{data.providerHealth.map((item) => <tr key={`${item.provider}:${item.endpoint}`}><td>{item.provider}</td><td><code>{item.endpoint}</code></td><td>{item.ok}</td><td>{item.errors}</td><td>{item.planLimits}</td><td>{item.rateLimited}</td><td>{new Date(item.lastCalledAt).toLocaleString()}</td></tr>)}</tbody></table></div>}</section>
 
-    <section className="card governance-section" id="decision-history"><h2>Thesis and decision history</h2><p className="note">Guardrails and recent human decisions are reviewed together here. Decision records remain append-only.</p><div className="governance-versioning"><div><strong>Thesis history</strong>{data.versioning.thesisVersions.map((thesis) => <p key={thesis.version}>Version {thesis.version} · effective {new Date(thesis.effectiveDate).toLocaleDateString()}{thesis.excludedAt ? ' · excluded' : thesis.supersededAt ? ' · superseded' : ' · active'}</p>)}</div><div><strong>Recent immutable decisions</strong>{data.versioning.decisions.map((decision, index) => <p key={`${decision.date}:${index}`}>{new Date(decision.date).toLocaleDateString()} · {decision.decision} · {decision.title}{decision.metadata?.thesisVersionId ? ' · thesis snapshot retained' : ''}</p>)}{isPlatformAdmin && <Link className="text-link" href="/decisions">Search full decision log →</Link>}</div></div></section>
-
-    <section className="card governance-section"><h2>Guardrail policy</h2><p className="note">These defaults produce review prompts, not buy/sell recommendations. Tune them to the mandate after you decide your intended portfolio concentration.</p><div className="governance-policy-grid"><label>Maximum position (%)<input type="number" min="2" max="100" value={(policy.maxPositionWeight * 100).toFixed(0)} onChange={(event) => updatePolicy('maxPositionWeight', event.target.value, true)} /></label><label>Maximum sector (%)<input type="number" min="5" max="100" value={(policy.maxSectorWeight * 100).toFixed(0)} onChange={(event) => updatePolicy('maxSectorWeight', event.target.value, true)} /></label><label>Maximum country (%)<input type="number" min="5" max="100" value={(policy.maxCountryWeight * 100).toFixed(0)} onChange={(event) => updatePolicy('maxCountryWeight', event.target.value, true)} /></label><label>Minimum holdings<input type="number" min="1" max="100" value={policy.minimumHoldings} onChange={(event) => updatePolicy('minimumHoldings', event.target.value)} /></label><label>Price stale after (days)<input type="number" min="1" max="30" value={policy.stalePriceDays} onChange={(event) => updatePolicy('stalePriceDays', event.target.value)} /></label><label>Research stale after (days)<input type="number" min="7" max="730" value={policy.staleResearchDays} onChange={(event) => updatePolicy('staleResearchDays', event.target.value)} /></label><label>Review interval (days)<input type="number" min="7" max="365" value={policy.reviewIntervalDays} onChange={(event) => updatePolicy('reviewIntervalDays', event.target.value)} /></label></div><button className="action-button" type="button" onClick={() => void savePolicy()} disabled={saving}>{saving ? 'Saving…' : 'Save guardrails'}</button></section>
+    <section className="card governance-section" id="decision-history"><h2>Thesis and decision history</h2><p className="note">Historical decisions remain append-only. Optional monitoring guardrails now sit with the investment thesis.</p><div className="governance-versioning"><div><strong>Thesis history</strong>{data.versioning.thesisVersions.map((thesis) => <p key={thesis.version}>Version {thesis.version} · effective {new Date(thesis.effectiveDate).toLocaleDateString()}{thesis.excludedAt ? ' · excluded' : thesis.supersededAt ? ' · superseded' : ' · active'}</p>)}</div><div><strong>Recent immutable decisions</strong>{data.versioning.decisions.map((decision, index) => <p key={`${decision.date}:${index}`}>{new Date(decision.date).toLocaleDateString()} · {decision.decision} · {decision.title}{decision.metadata?.thesisVersionId ? ' · thesis snapshot retained' : ''}</p>)}{isPlatformAdmin && <Link className="text-link" href="/decisions">Search full decision log →</Link>}</div></div><Link className="text-link" href="/investment-thesis#portfolio-guardrails">Review optional thesis guardrails →</Link></section>
   </main>;
 }

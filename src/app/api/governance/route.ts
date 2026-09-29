@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { assertSameOrigin } from '@/lib/auth';
 import { authenticateRequest } from '@/lib/api-auth';
-import { buildGovernanceDashboard, saveGovernancePolicy } from '@/lib/governance';
+import { buildGovernanceDashboard, getGovernancePolicy, saveGovernancePolicy } from '@/lib/governance';
 import { readBoundedJson } from '@/lib/request-body';
 
 export const runtime = 'nodejs';
@@ -22,6 +22,9 @@ const policySchema = z.object({
 export async function GET(req: Request) {
   const session = await authenticateRequest(req);
   if (!session.ok) return session.response;
+  if (new URL(req.url).searchParams.get('view') === 'policy') {
+    return NextResponse.json({ policy: await getGovernancePolicy(session.auth.userId) });
+  }
   return NextResponse.json(await buildGovernanceDashboard(session.auth.userId));
 }
 
@@ -36,7 +39,7 @@ export async function PUT(req: Request) {
   const body = await readBoundedJson(req, 8 * 1024);
   if (!body.ok) return NextResponse.json({ error: body.error }, { status: body.status });
   const parsed = policySchema.safeParse(body.value);
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues.map(issue => issue.message).join(' ') }, { status: 400 });
   const policy = await saveGovernancePolicy(session.auth.userId, parsed.data);
   return NextResponse.json({ policy });
 }
