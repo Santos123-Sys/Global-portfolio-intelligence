@@ -96,6 +96,7 @@ export default function SecurityDetailPage({ params }: { params: Promise<{ ticke
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [viewerMode, setViewerMode] = useState(false);
+  const [documentWorkspaceId, setDocumentWorkspaceId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,11 +119,12 @@ export default function SecurityDetailPage({ params }: { params: Promise<{ ticke
         setPosition(pos);
         setViewing({ id: pos.portfolioId, name: pos.portfolioName, currency: pos.currency });
 
-        const [riskRes, analysisRes, obsRes, authRes] = await Promise.all([
+        const [riskRes, analysisRes, obsRes, authRes, workspaceRes] = await Promise.all([
           fetch(`/api/risk?portfolioId=${pos.portfolioId}`),
           fetch(`/api/analysis?securityId=${pos.securityId}`),
           fetch(`/api/market-observations?securityId=${pos.securityId}`),
           fetch('/api/auth/session'),
+          fetch(`/api/workspaces?securityId=${encodeURIComponent(pos.securityId)}`),
         ]);
         if (cancelled) return;
 
@@ -140,6 +142,10 @@ export default function SecurityDetailPage({ params }: { params: Promise<{ ticke
         if (authRes.ok) {
           const auth = await authRes.json() as { user?: { role?: string } };
           setViewerMode(auth.user?.role === 'viewer');
+        }
+        if (workspaceRes.ok) {
+          const workspaceData = await workspaceRes.json() as { workspaces?: { id: string }[] };
+          setDocumentWorkspaceId(workspaceData.workspaces?.[0]?.id ?? null);
         }
       } catch (e) {
         if (!cancelled) setError((e as Error).message);
@@ -201,6 +207,7 @@ export default function SecurityDetailPage({ params }: { params: Promise<{ ticke
     <main>
       <h1>{position.companyName} <span className="cur">{position.ticker}</span></h1>
       <p className="sub">{position.exchange} · {position.currency}</p>
+      {documentWorkspaceId && <p><Link className="action-button inline-action" href={`/workspace/${documentWorkspaceId}`}>Open document intelligence</Link></p>}
 
       <div className="grid">
         {/* Region 1: Market & Fundamentals */}

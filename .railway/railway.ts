@@ -92,6 +92,18 @@ export default defineRailway((context) => {
       // search uses the same provider configuration as the private worker.
       WEB_SEARCH_PROVIDER: preserve(),
       WEB_SEARCH_API_KEY: preserve(),
+      GEMINI_API_KEY: preserve(),
+      DOCUMENT_STORAGE_PATH: '/app/storage/documents',
+      AWS_S3_BUCKET: ref(agenticArtifacts, 'BUCKET'),
+      AWS_ENDPOINT: ref(agenticArtifacts, 'ENDPOINT'),
+      AWS_ACCESS_KEY_ID: ref(agenticArtifacts, 'ACCESS_KEY_ID'),
+      AWS_SECRET_ACCESS_KEY: ref(agenticArtifacts, 'SECRET_ACCESS_KEY'),
+      AWS_REGION: ref(agenticArtifacts, 'REGION'),
+      NEWS_SCRAPER_DB_PATH: preserve(),
+      SEC_USER_AGENT: preserve(),
+      EMBEDDING_BATCH_SIZE: '100',
+      CHUNK_TARGET_SIZE: '800',
+      MAX_CONCURRENT_DOWNLOADS: '5',
       AGENTIC_SYSTEM_API_KEY: agenticApi.env.AGENTIC_SYSTEM_API_KEY,
       AGENTIC_SYSTEM_BASE_URL:
         'http://${{agentic-api.RAILWAY_PRIVATE_DOMAIN}}:${{agentic-api.PORT}}',

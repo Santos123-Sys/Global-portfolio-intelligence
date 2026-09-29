@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, numeric, jsonb, index, uniqueIndex, integer, boolean, real } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, numeric, jsonb, index, uniqueIndex, integer, boolean, real, date, vector, type AnyPgColumn } from 'drizzle-orm/pg-core';
 import { accounts, aiAnalyses, portfolios, securities, thesisVersions, users } from './schema';
 
 /**
@@ -395,3 +395,157 @@ export const brokerOrderPreviews = pgTable('broker_order_previews', {
   resultJson: jsonb('result_json').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, t => ({ ownerCreatedIdx: index('broker_preview_owner_created_idx').on(t.ownerId, t.createdAt) }));
+
+/** One logical, tenant-isolated document repository for a held security. */
+export const companyWorkspaces = pgTable('company_workspaces', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  securityId: uuid('security_id').references(() => securities.id, { onDelete: 'cascade' }).notNull(),
+  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  ticker: text('ticker').notNull(),
+  exchange: text('exchange').notNull(),
+  country: text('country'),
+  status: text('status').notNull().default('active'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  lastIngestedAt: timestamp('last_ingested_at', { withTimezone: true }),
+  documentCount: integer('document_count').notNull().default(0),
+  chunkCount: integer('chunk_count').notNull().default(0),
+  ragEnabled: boolean('rag_enabled').notNull().default(false),
+}, t => ({
+  securityOwnerIdx: uniqueIndex('cw_security_owner_idx').on(t.securityId, t.ownerId),
+  ownerIdx: index('cw_owner_idx').on(t.ownerId),
+}));
+
+export const intelligenceDocuments = pgTable('documents', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').references(() => companyWorkspaces.id, { onDelete: 'cascade' }).notNull(),
+  securityId: uuid('security_id').references(() => securities.id, { onDelete: 'cascade' }).notNull(),
+  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  folderType: text('folder_type').notNull(),
+  documentType: text('document_type').notNull(),
+  source: text('source').notNull(),
+  title: text('title').notNull(),
+  description: text('description'),
+  url: text('url'),
+  localPath: text('local_path'),
+  contentHash: text('content_hash'),
+  externalId: text('external_id'),
+  publishedDate: timestamp('published_date', { withTimezone: true }),
+  fiscalYearEnd: date('fiscal_year_end'),
+  fiscalPeriod: text('fiscal_period'),
+  retrievedAt: timestamp('retrieved_at', { withTimezone: true }).defaultNow().notNull(),
+  processedAt: timestamp('processed_at', { withTimezone: true }),
+  contentText: text('content_text'),
+  contentLength: integer('content_length'),
+  processingStatus: text('processing_status').notNull().default('pending'),
+  processingError: text('processing_error'),
+  retryCount: integer('retry_count').notNull().default(0),
+  language: text('language').default('en'),
+  pageCount: integer('page_count'),
+  fileFormat: text('file_format'),
+  isPrimarySource: boolean('is_primary_source').notNull().default(true),
+  isAmendment: boolean('is_amendment').default(false),
+  amendedDocumentId: uuid('amended_document_id').references((): AnyPgColumn => intelligenceDocuments.id),
+  supersededAt: timestamp('superseded_at', { withTimezone: true }),
+  metadataJson: jsonb('metadata_json'),
+}, t => ({
+  workspaceIdx: index('documents_workspace_idx').on(t.workspaceId),
+  securityIdx: index('documents_security_idx').on(t.securityId),
+  ownerIdx: index('documents_owner_idx').on(t.ownerId),
+  typeIdx: index('documents_type_idx').on(t.folderType, t.documentType),
+  statusIdx: index('documents_status_idx').on(t.processingStatus),
+  externalIdIdx: index('documents_external_id_idx').on(t.externalId),
+  contentHashIdx: index('documents_content_hash_idx').on(t.contentHash),
+  publishedDateIdx: index('documents_published_date_idx').on(t.publishedDate),
+}));
+
+export const documentChunks = pgTable('document_chunks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  documentId: uuid('document_id').references(() => intelligenceDocuments.id, { onDelete: 'cascade' }).notNull(),
+  workspaceId: uuid('workspace_id').references(() => companyWorkspaces.id, { onDelete: 'cascade' }).notNull(),
+  securityId: uuid('security_id').references(() => securities.id, { onDelete: 'cascade' }).notNull(),
+  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  chunkIndex: integer('chunk_index').notNull(),
+  chunkText: text('chunk_text').notNull(),
+  chunkLength: integer('chunk_length').notNull(),
+  contextBefore: text('context_before'),
+  contextAfter: text('context_after'),
+  sectionTitle: text('section_title'),
+  sectionType: text('section_type'),
+  chunkHash: text('chunk_hash').notNull(),
+  embeddingStatus: text('embedding_status').notNull().default('pending'),
+  embeddedAt: timestamp('embedded_at', { withTimezone: true }),
+}, t => ({
+  documentIdx: index('chunks_document_idx').on(t.documentId),
+  workspaceIdx: index('chunks_workspace_idx').on(t.workspaceId),
+  securityIdx: index('chunks_security_idx').on(t.securityId),
+  ownerIdx: index('chunks_owner_idx').on(t.ownerId),
+  statusIdx: index('chunks_embedding_status_idx').on(t.embeddingStatus),
+}));
+
+export const documentEmbeddings = pgTable('document_embeddings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  chunkId: uuid('chunk_id').references(() => documentChunks.id, { onDelete: 'cascade' }).notNull(),
+  documentId: uuid('document_id').references(() => intelligenceDocuments.id, { onDelete: 'cascade' }).notNull(),
+  workspaceId: uuid('workspace_id').references(() => companyWorkspaces.id, { onDelete: 'cascade' }).notNull(),
+  securityId: uuid('security_id').references(() => securities.id, { onDelete: 'cascade' }).notNull(),
+  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  embedding: vector('embedding', { dimensions: 768 }).notNull(),
+  embeddingModel: text('embedding_model').notNull().default('text-embedding-004'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, t => ({
+  documentIdx: index('emb_document_idx').on(t.documentId),
+  workspaceIdx: index('emb_workspace_idx').on(t.workspaceId),
+  securityIdx: index('emb_security_idx').on(t.securityId),
+  ownerIdx: index('emb_owner_idx').on(t.ownerId),
+  vectorIdx: index('document_embeddings_hnsw_idx').using('hnsw', t.embedding.op('vector_cosine_ops')).with({ m: 16, ef_construction: 64 }),
+}));
+
+export const ingestionJobs = pgTable('ingestion_jobs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').references(() => companyWorkspaces.id, { onDelete: 'cascade' }).notNull(),
+  securityId: uuid('security_id').references(() => securities.id, { onDelete: 'cascade' }).notNull(),
+  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  jobType: text('job_type').notNull(),
+  status: text('status').notNull().default('queued'),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  documentsDiscovered: integer('documents_discovered').default(0),
+  documentsIngested: integer('documents_ingested').default(0),
+  chunksCreated: integer('chunks_created').default(0),
+  chunksEmbedded: integer('chunks_embedded').default(0),
+  errorMessage: text('error_message'),
+  logJson: jsonb('log_json').$type<string[]>(),
+  triggeredBy: text('triggered_by').default('schedule'),
+}, t => ({
+  workspaceIdx: index('ij_workspace_idx').on(t.workspaceId),
+  statusIdx: index('ij_status_idx').on(t.status),
+  typeIdx: index('ij_type_idx').on(t.jobType, t.status),
+}));
+
+export const ragConversations = pgTable('rag_conversations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').references(() => companyWorkspaces.id, { onDelete: 'cascade' }).notNull(),
+  securityId: uuid('security_id').references(() => securities.id, { onDelete: 'cascade' }).notNull(),
+  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  title: text('title').default('New Conversation'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, t => ({
+  workspaceIdx: index('rag_conv_workspace_idx').on(t.workspaceId),
+  userIdx: index('rag_conv_user_idx').on(t.userId),
+}));
+
+export type RagCitation = { chunkId: string; documentId: string; documentTitle: string; source: string; publishedDate: string; excerpt: string; relevanceScore: number; isPrimarySource: boolean };
+export const ragMessages = pgTable('rag_messages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  conversationId: uuid('conversation_id').references(() => ragConversations.id, { onDelete: 'cascade' }).notNull(),
+  role: text('role').notNull(),
+  content: text('content').notNull(),
+  citationsJson: jsonb('citations_json').$type<RagCitation[]>(),
+  retrievedChunksJson: jsonb('retrieved_chunks_json'),
+  promptTokens: integer('prompt_tokens'),
+  completionTokens: integer('completion_tokens'),
+  model: text('model').default('gemini-1.5-flash'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, t => ({ conversationIdx: index('rag_msg_conversation_idx').on(t.conversationId) }));

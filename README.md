@@ -213,5 +213,6 @@ Stated plainly, because a spec that overstates completeness is worse than no spe
 | `docs/AGENTIC-SYSTEM-HANDOFF.md` | Implemented 16-point dashboard/agentic contract reference |
 | `docs/RAILWAY-DEPLOYMENT.md` | Railway services, variables, migration and bootstrap checklist |
 | `docs/MARKET-DATA.md` | Provider options and how to confirm SIX/B3 coverage before trusting one |
+| `docs/DOCUMENT-INTELLIGENCE.md` | Company document ingestion, grounded RAG, schedules, monitoring, deployment, and rollback |
 | `docs/superseded/` | The Python/Replit design and the original platform comparison, retained for their reasoning. Not live guidance. |
 | `CONTRIBUTING.md` | The architectural invariants that must not be broken |
