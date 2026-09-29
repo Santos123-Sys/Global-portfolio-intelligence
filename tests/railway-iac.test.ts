@@ -76,6 +76,8 @@ describe('Railway infrastructure definition', () => {
       name: 'MARKET_DATA_API_KEY',
     });
     expect(dashboard?.variables?.BRAPI_API_KEY).toEqual({ type: 'preserve' });
+    expect(dashboard?.variables?.WEB_SEARCH_PROVIDER).toEqual({ type: 'preserve' });
+    expect(dashboard?.variables?.WEB_SEARCH_API_KEY).toEqual({ type: 'preserve' });
     expect(worker?.variables?.AGENTIC_SYSTEM_API_KEY).toMatchObject({
       type: 'reference',
       resource: 'service.agentic-api',

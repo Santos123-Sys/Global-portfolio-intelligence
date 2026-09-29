@@ -59,6 +59,7 @@ describe('low-cost provider architecture', () => {
     expect(railway).toContain('BRAPI_API_KEY: preserve()');
     expect(railway).toContain('WEB_SEARCH_PROVIDER: preserve()');
     expect(railway).toContain('WEB_SEARCH_API_KEY: preserve()');
+    expect(railway).toContain('Comparable-peer discovery is a server-side dashboard route');
   });
 
   it('uses a candidate default accepted by the API', () => {

@@ -63,14 +63,16 @@ Never apply this file to an existing project without reconciling a plan first.
    listings, quotes, volume, market cap and sector; EODHD is used there only
    after BrAPI and any valid cached BrAPI universe are unavailable. Keep
    `DISCOVERY_FALLBACK_PROVIDER=eodhd`.
-3. When the Tavily key is ready, set these two variables on the private
-   `agentic-worker` service only (not the dashboard):
+3. When the Tavily key is ready, set these two variables on both the private
+   `agentic-worker` service and the `portfolio-intelligence` dashboard service:
 
    ```text
    WEB_SEARCH_PROVIDER=tavily
    WEB_SEARCH_API_KEY=<real Tavily key>
    ```
 
+   The worker uses the key for research jobs. The dashboard uses it only in
+   server-side comparable-peer discovery; it is never sent to the browser.
    The IaC definition uses `preserve()` for these manual values, so applying an
    infrastructure plan will not overwrite or expose the key. Do not enter
    `tvly_...` as a placeholder: it is not a usable credential and would make
@@ -134,8 +136,9 @@ The IaC definition supplies the agentic database, bearer key, model settings,
 private callback/API URLs, retry/lease settings and bucket references. The
 manual worker secrets are the project-level shared `OPENAI_API_KEY` and, when
 web research is enabled, the service-level `WEB_SEARCH_API_KEY`. Set
-`WEB_SEARCH_PROVIDER=tavily` alongside that key on `agentic-worker`; neither
-value belongs on the public dashboard service.
+`WEB_SEARCH_PROVIDER=tavily` alongside that key on `agentic-worker`. The same
+two server-only variables must also be set on `portfolio-intelligence` for
+comparable-peer discovery.
 
 The callback URL must reference the dashboard service's domain and port, not
 the worker's own `$PORT`.
