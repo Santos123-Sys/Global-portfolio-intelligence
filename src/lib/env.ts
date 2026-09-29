@@ -33,6 +33,18 @@ const schema = z.object({
   MARKET_DATA_GATEWAY_PLAN_LIMIT_MEMORY_HOURS: z.coerce.number().int().positive().default(24),
   WEB_SEARCH_PROVIDER: z.enum(['none', 'brave', 'tavily']).default('none'),
   WEB_SEARCH_API_KEY: z.string().min(1).optional(),
+  GEMINI_API_KEY: z.string().min(1).optional(),
+  DOCUMENT_STORAGE_PATH: z.string().min(1).default('./storage/documents'),
+  AWS_S3_BUCKET: z.string().min(1).optional(),
+  AWS_ENDPOINT: z.string().url().optional(),
+  AWS_ACCESS_KEY_ID: z.string().min(1).optional(),
+  AWS_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  AWS_REGION: z.string().min(1).default('us-east-1'),
+  NEWS_SCRAPER_DB_PATH: z.string().min(1).optional(),
+  SEC_USER_AGENT: z.string().min(3).optional(),
+  EMBEDDING_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(100),
+  CHUNK_TARGET_SIZE: z.coerce.number().int().min(200).max(1200).default(800),
+  MAX_CONCURRENT_DOWNLOADS: z.coerce.number().int().min(1).max(20).default(5),
   SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must contain at least 32 characters'),
   /** Separate key used only to encrypt TOTP seeds and hash recovery codes. */
   MFA_ENCRYPTION_KEY: z.string().min(32, 'MFA_ENCRYPTION_KEY must contain at least 32 characters').optional(),
@@ -65,6 +77,8 @@ const schema = z.object({
       message: 'AGENTIC_SYSTEM_BASE_URL and AGENTIC_SYSTEM_API_KEY must be configured together',
     });
   }
+  const s3Values = [env.AWS_S3_BUCKET, env.AWS_ACCESS_KEY_ID, env.AWS_SECRET_ACCESS_KEY];
+  if (s3Values.some(Boolean) && !s3Values.every(Boolean)) context.addIssue({ code: z.ZodIssueCode.custom, path: ['AWS_S3_BUCKET'], message: 'AWS_S3_BUCKET, AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must be configured together' });
   if (env.NODE_ENV === 'production' && !env.PUBLIC_APP_URL?.startsWith('https://')) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
@@ -113,6 +127,13 @@ export function getEnv(): Env {
     FINNHUB_API_KEY: optional(process.env.FINNHUB_API_KEY),
     BRAPI_API_KEY: optional(process.env.BRAPI_API_KEY),
     WEB_SEARCH_API_KEY: optional(process.env.WEB_SEARCH_API_KEY),
+    GEMINI_API_KEY: optional(process.env.GEMINI_API_KEY),
+    AWS_S3_BUCKET: optional(process.env.AWS_S3_BUCKET),
+    AWS_ENDPOINT: optional(process.env.AWS_ENDPOINT),
+    AWS_ACCESS_KEY_ID: optional(process.env.AWS_ACCESS_KEY_ID),
+    AWS_SECRET_ACCESS_KEY: optional(process.env.AWS_SECRET_ACCESS_KEY),
+    NEWS_SCRAPER_DB_PATH: optional(process.env.NEWS_SCRAPER_DB_PATH),
+    SEC_USER_AGENT: optional(process.env.SEC_USER_AGENT),
     CRON_SECRET: optional(process.env.CRON_SECRET),
     AGENTIC_SYSTEM_BASE_URL: optional(process.env.AGENTIC_SYSTEM_BASE_URL),
     AGENTIC_SYSTEM_API_KEY: optional(process.env.AGENTIC_SYSTEM_API_KEY),

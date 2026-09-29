@@ -193,7 +193,7 @@ export function Header() {
   const supportNav = SUPPORT_NAV.filter(([href]) => isPlatformAdmin || href !== '/research-history');
   const settingsNav = SETTINGS_NAV.filter(([href]) => isPlatformAdmin || href !== '/agent-settings');
   const reviewActive = REVIEW_NAV.some(([href]) => pathname === href);
-  const supportActive = SUPPORT_NAV.some(([href]) => pathname === href);
+  const supportActive = SUPPORT_NAV.some(([href]) => pathname === href) || pathname === '/admin/document-intelligence';
   const settingsActive = SETTINGS_NAV.some(([href]) => pathname === href);
   const pageMatches = [...WORKFLOW_NAV, ...reviewNav, ...supportNav, ...settingsNav].filter(([href, key]) => `${t(key)} ${href}`.toLocaleLowerCase().includes(pageQuery.toLocaleLowerCase()));
 
@@ -286,6 +286,7 @@ export function Header() {
                     {t(labelKey)}
                   </Link>
                 ))}
+                {isPlatformAdmin ? <Link href="/admin/document-intelligence" className={`nav-link${pathname === '/admin/document-intelligence' ? ' active' : ''}`} aria-current={pathname === '/admin/document-intelligence' ? 'page' : undefined} onClick={() => { setOpenMenu(null); setMobileNavigationOpen(false); }}>Document Intelligence</Link> : null}
               </div>
             )}
           </div>
