@@ -224,12 +224,21 @@ export default function PositionsPage() {
     return 'Awaiting review';
   }
 
+  const stats = useMemo(() => ({
+    positions: rows.length,
+    portfolios: portfolioNames.length,
+    aiReviewed: rows.filter((row) => row.aiScore != null).length,
+    breaches: rows.filter((row) => (row.thesisBreakers?.length ?? 0) > 0).length,
+  }), [portfolioNames.length, rows]);
+
   if (error) {
     return (
       <main>
         <PortfolioWorkspaceNav />
-        <h1>Positions</h1>
-        <div className="card">
+        <section className="dashboard-hero animate-fade-in">
+          <h1 className="text-glow">Positions</h1>
+        </section>
+        <div className="card glow-card">
           <p className="note">
             Connection failed: Unable to reach backend.
             <br />
@@ -245,16 +254,24 @@ export default function PositionsPage() {
   return (
     <main>
       <PortfolioWorkspaceNav />
-      <h1>Positions</h1>
-      <p className="sub">Every row is a single portfolio&apos;s holding. Values stay in that portfolio&apos;s native currency.</p>
+      <section className="dashboard-hero animate-fade-in">
+        <h1 className="text-glow">Positions</h1>
+        <p className="hero-lead">Every row is a single portfolio&apos;s holding. Values stay in that portfolio&apos;s native currency.</p>
+        <div className="dashboard-hero-actions" aria-label="Position summary">
+          <div className="stat-chip animate-scale-in delay-100"><span>Positions</span><span className="stat-value">{stats.positions}</span></div>
+          <div className="stat-chip animate-scale-in delay-200"><span>Portfolios</span><span className="stat-value">{stats.portfolios}</span></div>
+          <div className="stat-chip animate-scale-in delay-300"><span>AI reviewed</span><span className="stat-value">{stats.aiReviewed}</span></div>
+          <div className="stat-chip animate-scale-in delay-400"><span>Thesis breaches</span><span className="stat-value">{stats.breaches}</span></div>
+        </div>
+      </section>
       <p><Link className="text-link" href="/securities">Open the portfolio security directory →</Link></p>
 
       <IbkrPortfolioPanel />
 
-      <section className="card" id="add-position">
+      <section className="card glow-card" id="add-position">
         <div className="section-heading">
           <div><h2>Record a holding</h2><p className="note">Use this only after an investment decision, or to record an existing holding.</p></div>
-          <button className="action-button" type="button" onClick={() => setAddingPosition((open) => !open)}>{addingPosition ? 'Close' : 'Add a position'}</button>
+          <button className="action-button button-hover" type="button" onClick={() => setAddingPosition((open) => !open)}>{addingPosition ? 'Close' : 'Add a position'}</button>
         </div>
         {addingPosition && <form className="setup-form" onSubmit={(event) => void addPosition(event)}>
           <label>Portfolio<select name="portfolioId" required>{portfolios.map((portfolio) => <option key={portfolio.id} value={portfolio.id}>{portfolio.name} ({portfolio.baseCurrency})</option>)}</select></label>
@@ -295,14 +312,14 @@ export default function PositionsPage() {
         </select>
       </div>
 
-      <section className="research-pipeline card" aria-label="Latest market research">
+      <section className="research-pipeline card glow-card" aria-label="Latest market research">
         <div className="research-pipeline-heading">
           <div>
             <p className="analysis-eyebrow">Market research</p>
             <h2>Latest research candidates</h2>
             <p className="note">Candidates are opportunities for review, not portfolio holdings. A position appears below only after you record an investment decision and quantity.</p>
           </div>
-          <Link className="action-button inline-action" href="/ai-stock-discovery">Review candidates</Link>
+          <Link className="action-button inline-action button-hover" href="/ai-stock-discovery">Review candidates</Link>
         </div>
         {!research.latestRun ? (
           <p className="note">No completed market-research run yet. Start discovery to populate this review queue.</p>
@@ -327,7 +344,7 @@ export default function PositionsPage() {
       {loading ? (
         <p className="note">Fetching...</p>
       ) : sorted.length === 0 ? (
-        <div className="card">
+        <div className="card glow-card">
           {rows.length === 0 ? (
             <>
               <p className="note">No positions have been recorded. Approving a research candidate does not add a holding automatically.</p>

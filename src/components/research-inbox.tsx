@@ -67,8 +67,15 @@ export function ResearchInbox() {
   }, [byId, filter, query, rows]);
 
   return <main>
-    <h1>Research &amp; Analysis Inbox</h1>
-    <p className="sub">Review analyzed candidates, new research, changed conclusions and thesis breakers. Candidate decisions remain in Discovery.</p>
+    <section className="dashboard-hero animate-fade-in">
+      <h1 className="text-glow">Research &amp; Analysis Inbox</h1>
+      <p className="hero-lead">Review analyzed candidates, new research, changed conclusions and thesis breakers. Candidate decisions remain in Discovery.</p>
+      <div className="dashboard-hero-actions" aria-label="Research summary">
+        <div className="stat-chip animate-scale-in delay-100"><span>Analyses</span><span className="stat-value">{rows.length}</span></div>
+        <div className="stat-chip animate-scale-in delay-200"><span>Visible</span><span className="stat-value">{visible.length}</span></div>
+        <div className="stat-chip animate-scale-in delay-300"><span>Thesis violations</span><span className="stat-value">{rows.filter((row) => (row.thesisBreakers?.length ?? 0) > 0).length}</span></div>
+      </div>
+    </section>
     <div className="filter-bar" role="group" aria-label="Filter research">
       {filters.map((item) => <button key={item.id} type="button" className={`portfolio-tab${filter === item.id ? ' active' : ''}`} aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{item.label}</button>)}
     </div>
@@ -81,7 +88,7 @@ export function ResearchInbox() {
       : <div className="grid research-inbox-list">{visible.map((row) => {
         const kind = classify(row, byId);
         const badge = kind === 'violated' ? 'THESIS VIOLATION' : kind.toUpperCase();
-        return <article className={`card feed-item ${kind}`} key={row.id}>
+        return <article className={`card glow-card feed-item ${kind}`} key={row.id}>
           <div className="section-heading"><div><p className="analysis-eyebrow">{row.portfolioCandidate ? 'Candidate' : row.portfolioRole}</p><h2>{row.companyName} <span className="cur">{row.ticker}</span></h2></div><span className={`badge ${kind === 'violated' ? 'breach' : kind === 'changed' ? 'watch' : 'ok'}`}>{badge}</span></div>
           <p className="note">Investment score {row.investmentScore}/100 · thesis alignment {row.thesisAlignmentScore}/100 · {new Date(row.analysisTimestamp).toLocaleString()}</p>
           {kind === 'violated' && <p className="caveat"><strong>Thesis breakers:</strong> {(row.thesisBreakers ?? []).join(' · ')}</p>}

@@ -31,8 +31,16 @@ export default async function PortfolioPage() {
 
   return (
     <main>
-      <h1>Portfolio</h1>
-      <p className="sub">Holdings, allocation and position-level state. Values remain in each portfolio's native currency.</p>
+      <section className="dashboard-hero animate-fade-in">
+        <h1 className="text-glow">Portfolio</h1>
+        <p className="hero-lead">Holdings, allocation and position-level state. Values remain in each portfolio&apos;s native currency.</p>
+        <div className="dashboard-hero-actions" aria-label="Portfolio summary">
+          <div className="stat-chip animate-scale-in delay-100"><span>Portfolios</span><span className="stat-value">{new Set(rows.map((row) => row.portfolioId)).size}</span></div>
+          <div className="stat-chip animate-scale-in delay-200"><span>Holdings</span><span className="stat-value">{rows.length}</span></div>
+          <div className="stat-chip animate-scale-in delay-300"><span>Priced</span><span className="stat-value">{rows.filter((row) => row.pricedAt != null).length}</span></div>
+        </div>
+      </section>
+      <div className="card glow-card table-scroll">
       <table>
         <thead><tr><th>Portfolio</th><th>Security</th><th>Country</th><th>Sector</th><th className="num">Quantity</th><th className="num">Avg Cost</th><th className="num">Market Value</th><th className="num">Weight</th></tr></thead>
         <tbody>{rows.map((r) => (
@@ -48,7 +56,8 @@ export default async function PortfolioPage() {
           </tr>
         ))}</tbody>
       </table>
-      {rows.length === 0 && <div className="card"><p className="note">No positions stored.</p></div>}
+      </div>
+      {rows.length === 0 && <div className="card glow-card"><p className="note">No positions stored.</p></div>}
     </main>
   );
 }
