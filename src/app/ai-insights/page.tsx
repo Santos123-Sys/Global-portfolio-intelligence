@@ -35,12 +35,19 @@ export default async function AIInsightsPage() {
 
   return (
     <main>
-      <h1>AI Insights</h1>
-      <p className="sub">AI interpretations are stored separately from deterministic KPI records and must expose their grounding.</p>
-      {rows.length === 0 ? <div className="card"><p className="note">No AI insights stored.</p></div> : (
+      <section className="dashboard-hero animate-fade-in">
+        <h1 className="text-glow">AI Insights</h1>
+        <p className="hero-lead">AI interpretations are stored separately from deterministic KPI records and must expose their grounding.</p>
+        <div className="dashboard-hero-actions" aria-label="Insight summary">
+          <div className="stat-chip animate-scale-in delay-100"><span>Insights</span><span className="stat-value">{rows.length}</span></div>
+          <div className="stat-chip animate-scale-in delay-200"><span>Thesis versions</span><span className="stat-value">{new Set(rows.map((row) => row.thesisVersion)).size}</span></div>
+          <div className="stat-chip animate-scale-in delay-300"><span>Grounded</span><span className="stat-value">{rows.filter((row) => (row.groundedIn?.length ?? 0) > 0).length}</span></div>
+        </div>
+      </section>
+      {rows.length === 0 ? <div className="card glow-card"><p className="note">No AI insights stored.</p></div> : (
         <div className="grid">
           {rows.map((r) => (
-            <article className="card" key={r.id}>
+            <article className="card glow-card" key={r.id}>
               <h2>{r.companyName} · {r.ticker}</h2>
               <p className="note">Thesis v{r.thesisVersion} · {r.role} · Score {r.score}/100 · Confidence {(r.confidence * 100).toFixed(0)}%</p>
               <p>{r.summary}</p>
