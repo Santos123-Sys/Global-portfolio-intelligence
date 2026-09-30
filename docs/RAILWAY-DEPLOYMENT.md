@@ -117,6 +117,14 @@ security keys already contain different random values of at least 32
 characters. `CRON_SECRET` remains optional and is configured only if the refresh
 cron is enabled.
 
+## Google Cloud Translation
+
+Set `GOOGLE_TRANSLATE_API_KEY` only on the `portfolio-intelligence` dashboard
+service. Enable the Google Cloud Translation API, restrict the key to that API,
+and configure billing and quotas in Google Cloud. The browser calls an
+authenticated dashboard route; the key never reaches it. Visible workspace text
+is sent to Google for translation, including research narrative on screen.
+
 The browser never calls `agentic-api`. Only dashboard route handlers use its
 private URL.
 
