@@ -3,6 +3,7 @@ export default {
   schema: [
     './src/lib/db/schema.ts',
     './src/lib/db/workflow-schema.ts',
+    './src/lib/db/agent-schema.ts',
   ],
   out: './drizzle',
   dialect: 'postgresql',
