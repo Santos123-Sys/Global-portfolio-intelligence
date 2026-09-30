@@ -1269,6 +1269,14 @@ button.nav-link:hover, button.nav-link[aria-expanded="true"] { background: var(-
 .thesis-file-label input::file-selector-button { padding: 0.65rem 1rem; margin-right: 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); cursor: pointer; font: inherit; }
 .thesis-review-panel { scroll-margin-top: 150px; }
 .thesis-review-panel:focus { outline: 2px solid var(--accent); outline-offset: 3px; }
+.portfolio-strategy-page { display: grid; gap: 1rem; }
+.portfolio-strategy-page > .thesis-process { margin: 0; }
+.strategy-entry-card, .strategy-review-card { display: grid; gap: 1rem; }
+.strategy-entry-card { border-top: 2px solid var(--accent); }
+.strategy-review-card > .thesis-review-fields { display: grid; gap: 1rem; }
+.strategy-review-card .thesis-review-fields > details,
+.strategy-review-card .thesis-review-fields .thesis-mandate > details { border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 1rem; background: color-mix(in srgb, var(--panel) 78%, transparent); }
+.strategy-review-card .thesis-review-fields summary { cursor: pointer; font-weight: 600; }
 .thesis-alternatives > summary, .thesis-questionnaire > summary { font-weight: 600; }
 .thesis-alternatives > section { padding-top: 1rem; }
 .thesis-questionnaire { margin-top: 1rem; }

@@ -21,29 +21,31 @@ vi.mock('../src/lib/db', () => ({ db: { transaction: mocks.transaction } }));
 import { POST } from '../src/app/api/thesis/route';
 const activeId = '11111111-1111-4111-8111-111111111111';
 const createdId = '22222222-2222-4222-8222-222222222222';
-const body = () => ({
-  baseVersionId: activeId,
-  startDiscovery: false,
-  criteriaJson: {
-    version: 2,
-    portfolios: [
-      {
-        role: 'swiss_quality',
-        currency: 'CHF',
-        objective: 'Durable growth',
-        inclusionCriteria: [],
-        exclusionCriteria: [],
-        policy: {
-          ...emptyThesisPolicy(),
-          universe: {
-            ...emptyThesisPolicy().universe,
-            listingMarkets: ['XSWX'],
-          },
+const criteria = () => ({
+  version: 2,
+  portfolios: [
+    {
+      role: 'swiss_quality',
+      currency: 'CHF',
+      objective: 'Durable growth',
+      inclusionCriteria: [],
+      exclusionCriteria: [],
+      policy: {
+        ...emptyThesisPolicy(),
+        universe: {
+          ...emptyThesisPolicy().universe,
+          listingMarkets: ['XSWX'],
         },
       },
-    ],
-    globalConstraints: [],
-  },
+    },
+  ],
+  globalConstraints: [],
+});
+const body = () => ({
+  externalExtractionId: 'source-extraction',
+  baseVersionId: activeId,
+  startDiscovery: false,
+  criteriaJson: criteria(),
 });
 function query(rows: unknown[]) {
   const p = Promise.resolve(rows);
@@ -55,7 +57,11 @@ function query(rows: unknown[]) {
   });
 }
 beforeEach(() => {
-  mocks.rows = [[{ versionNumber: 1 }], [{ id: activeId }], []];
+  mocks.rows = [
+    [{ versionNumber: 1 }],
+    [{ id: activeId }],
+    [{ id: 'source-row', externalExtractionId: 'source-extraction', status: 'completed', confirmedAt: null, requestedVersion: 2, resultJson: { criteria: criteria(), extractionConfidence: 0.9, ambiguousPoints: [], unmappedContent: [] } }],
+  ];
   mocks.writes = [];
   mocks.start.mockReset();
   mocks.transaction.mockReset();
@@ -90,6 +96,12 @@ const submit = (value: unknown) =>
     }),
   );
 describe('thesis approval boundary', () => {
+  it('requires a completed system extraction as the source for every canonical version', async () => {
+    const input = body();
+    delete (input as Partial<typeof input>).externalExtractionId;
+    expect((await submit(input)).status).toBe(400);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
   it('rejects a stale active version before writing or starting Discovery', async () => {
     const input = body();
     input.baseVersionId = createdId;
