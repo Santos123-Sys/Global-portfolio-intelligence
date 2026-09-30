@@ -32,16 +32,15 @@ test('mandate review blocks conflicts and records corrections before confirmatio
   });
   await page.goto('/investment-thesis');
   await page.getByRole('button', { name: 'Review', exact: true }).click();
-  const confirm = page.getByRole('button', { name: /Confirm thesis version 1/ });
+  const confirm = page.getByRole('button', { name: 'Approve strategy and start research' });
   await expect(confirm).toBeDisabled();
-  await page.getByText('Source prose and legacy criteria', {exact:true}).click();
+  await page.getByText('Additional extracted criteria', {exact:true}).click();
   await page.getByLabel('Exclusion criteria — one per line').fill('High leverage');
   await page.getByRole('textbox', { name: 'Investment objective', exact: true }).fill('Long-term capital growth');
   await expect(confirm).toBeDisabled();
-  await page.getByLabel('Review decision').fill('Interpreted long term as five years; removed the contradictory exclusion.');
+  await page.getByLabel('Review note (required)').fill('Interpreted long term as five years; removed the contradictory exclusion.');
   await expect(confirm).toBeEnabled();
   await confirm.click();
-  await expect(page.getByText(/The thesis was confirmed, but market research did not start/)).toBeVisible();
+  await expect(page.getByText(/The strategy was approved, but market research did not start/)).toBeVisible();
   expect(confirmed).toBe(true);
 });
-

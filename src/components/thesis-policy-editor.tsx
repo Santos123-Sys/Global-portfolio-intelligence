@@ -47,7 +47,7 @@ export function ThesisPolicyEditor({
     });
   return (
     <div className="setup-form">
-      <details open>
+      <details>
         <summary>Mandate and portfolio rules</summary>
         <div className="setup-form-row">
           {(
@@ -100,7 +100,7 @@ export function ThesisPolicyEditor({
           is a separate research setting.
         </p>
       </details>
-      <details open>
+      <details>
         <summary>Eligible universe</summary>
         <p className="note">
           Each populated field is a hard restriction. Alternatives within a
@@ -157,7 +157,7 @@ export function ThesisPolicyEditor({
           exactly, ignoring case.
         </p>
       </details>
-      <details open>
+      <details>
         <summary>Selection, macro, risk and valuation rules</summary>
         <p className="note">
           Hard = eligibility requirement. Preference = ranking consideration.

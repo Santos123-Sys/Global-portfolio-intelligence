@@ -30,16 +30,16 @@ for (const width of [390, 1440]) {
       return route.fulfill({ json: { extractions: submitted ? [extraction] : [] } });
     });
     await page.goto('/investment-thesis');
-    await expect(page.getByRole('heading', { name: 'Your approved thesis' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Approved portfolio strategy' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Continue to Discovery' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Create structured thesis' })).not.toBeVisible();
     await expect(page.getByRole('heading', { name: 'Version 1', exact: true })).not.toBeVisible();
     await page.screenshot({ path: `/tmp/guided-thesis-${width}.png`, fullPage: true });
-    await page.getByLabel('Choose thesis document').setInputFiles({ name: 'updated-thesis.txt', mimeType: 'text/plain', buffer: Buffer.from('Long-term Brazilian growth. B3 primary listing.') });
-    await expect(page.getByRole('heading', { name: 'Review and approve thesis' })).toBeVisible();
+    await page.getByLabel('Choose strategy document').setInputFiles({ name: 'updated-thesis.txt', mimeType: 'text/plain', buffer: Buffer.from('Long-term Brazilian growth. B3 primary listing.') });
+    await expect(page.getByRole('heading', { name: 'Review portfolio strategy' })).toBeVisible();
     await expect(page.locator('#thesis-review')).toBeFocused();
-    await expect(page.getByLabel('Reporting currency for mandate 1')).toHaveValue('BRL');
-    await expect(page.getByRole('button', { name: /Confirm thesis version 3/ })).toBeDisabled(); // prose still requires human acknowledgment
+    await expect(page.getByLabel('Base currency for mandate 1')).toHaveValue('BRL');
+    await expect(page.getByRole('button', { name: 'Approve strategy and start research' })).toBeDisabled(); // prose still requires human acknowledgment
     expect(approvals).toBe(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });

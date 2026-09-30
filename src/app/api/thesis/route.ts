@@ -19,8 +19,7 @@ import { portfoliosRequiredByThesis, ThesisPortfolioConfigurationError } from '@
 export const runtime = 'nodejs';
 
 const thesisMutationSchema = z.object({
-  externalExtractionId: z.string().min(1).optional(),
-  rawDocument: z.string().min(1).max(100_000).optional(),
+  externalExtractionId: z.string().min(1),
   criteriaJson: ThesisCriteria,
   reviewNotes: z.string().trim().max(4000).optional(),
   baseVersionId: z.string().uuid().nullable().optional(),
@@ -110,7 +109,6 @@ export async function POST(req: Request) {
         ownerId: session.auth.userId,
         versionNumber: nextVersion,
         criteriaJson,
-        rawDocument: parsed.data.rawDocument,
       }).returning();
       const existingPortfolios = await tx.select({ portfolioType: portfolios.portfolioType })
         .from(portfolios)
@@ -127,7 +125,7 @@ export async function POST(req: Request) {
       await tx.insert(thesisMutationAudit).values({
         thesisVersionId: created.id,
         ownerId: session.auth.userId,
-        action: extractionId ? 'confirmed_external_extraction' : 'confirmed_manual_criteria',
+        action: 'confirmed_external_extraction',
         actor: session.auth.email,
         metadata: {
           supersededVersionId: active?.id ?? null,
@@ -135,7 +133,7 @@ export async function POST(req: Request) {
           reviewWarnings: review.warnings,
           originalExtraction: sourceReview,
           confirmedCriteria: criteriaJson,
-          externalExtractionId: parsed.data.externalExtractionId ?? null,
+          externalExtractionId: parsed.data.externalExtractionId,
         },
       });
       if (extractionId) {
@@ -190,4 +188,3 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: 'Unable to exclude thesis version' }, { status: 500 });
   }
 }
-

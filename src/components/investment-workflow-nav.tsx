@@ -5,10 +5,10 @@ import { usePathname } from 'next/navigation';
 import { useLanguage } from '@/lib/i18n';
 
 const labels = {
-  en: ['Investment workflow', 'Thesis', 'Discover & review', 'Analysis & valuation', 'Portfolio & risk'],
-  pt: ['Fluxo de investimento', 'Tese', 'Descobrir e revisar', 'Análise e valuation', 'Portfólio e risco'],
-  es: ['Proceso de inversión', 'Tesis', 'Descubrir y revisar', 'Análisis y valoración', 'Cartera y riesgo'],
-  de: ['Anlageprozess', 'Anlagethese', 'Entdecken und prüfen', 'Analyse und Bewertung', 'Portfolio und Risiko'],
+  en: ['Investment workflow', 'Portfolio strategy', 'Discover & review', 'Analysis & valuation', 'Portfolio & risk'],
+  pt: ['Fluxo de investimento', 'Estratégia de portfólio', 'Descobrir e revisar', 'Análise e valuation', 'Portfólio e risco'],
+  es: ['Proceso de inversión', 'Estrategia de cartera', 'Descubrir y revisar', 'Análisis y valoración', 'Cartera y riesgo'],
+  de: ['Anlageprozess', 'Portfoliostrategie', 'Entdecken und prüfen', 'Analyse und Bewertung', 'Portfolio und Risiko'],
 };
 
 const steps = [
