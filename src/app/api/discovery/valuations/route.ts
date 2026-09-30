@@ -19,6 +19,7 @@ import { selectFilingSnapshot } from '@/lib/financial-filing-snapshot';
 import { deriveFcff, FCFF_INPUTS } from '@/lib/quant/fcff';
 import { valuationReviewSchema, type ValuationReview } from '@/lib/valuation-review';
 import { readBoundedJson } from '@/lib/request-body';
+import { lifeCyclePolicy } from '@/lib/company-life-cycle';
 
 export const runtime = 'nodejs';
 
@@ -184,6 +185,13 @@ export async function POST(req: Request) {
   const readiness = automaticReadiness(data, review);
   if (!readiness.ready) return NextResponse.json({ error: readiness.message, readiness }, { status: 409 });
   if (!review?.market) return NextResponse.json({ error: 'Market review required' }, { status: 409 });
+  const lifeCycle = lifeCyclePolicy(review.lifeCycle.stage);
+  if (!lifeCycle.standardFcffDcfAllowed) {
+    return NextResponse.json({
+      error: `A standard perpetual FCFF DCF is not permitted for the reviewed ${lifeCycle.label} stage. ${lifeCycle.terminalValueGuidance}`,
+      lifeCycle,
+    }, { status: 409 });
+  }
   if (review.market.capital.cashFlowBasis !== 'nominal') return NextResponse.json({ error: 'This filing-based FCFF model requires nominal inputs. Real cash flows require a separately reviewed normalization.' }, { status: 409 });
   try {
     const capital = computeCostOfCapital(review.market.capital);
@@ -210,7 +218,7 @@ export async function POST(req: Request) {
       dataAsOf: data.dataAsOf!,
       sourceReferences: references,
     }])) as Parameters<typeof threeCaseDiscountedCashFlow>[0];
-    const result = { market: { plan: buildMarketPlan(review.market.context, data.profiles), capital, validation: readiness.marketIssues }, ...threeCaseDiscountedCashFlow(assumptions), fcffDerivation: readiness.fcffDerivation, review: review ?? null };
+    const result = { market: { plan: buildMarketPlan(review.market.context, data.profiles), capital, validation: readiness.marketIssues }, lifeCycle, ...threeCaseDiscountedCashFlow(assumptions), fcffDerivation: readiness.fcffDerivation, review: review ?? null };
     const [scenario] = await db.insert(valuationScenarios).values({
       ownerId: session.auth.userId,
       candidateId: data.candidate.id,
