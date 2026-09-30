@@ -1,0 +1,1 @@
+'use client'; export default function Error({error,reset}:{error:Error;reset:()=>void}){return <main><section className="card glow-card"><h1>Unable to load dashboard</h1><p>{error.message}</p><button className="action-button" onClick={reset}>Try again</button></section></main>}
