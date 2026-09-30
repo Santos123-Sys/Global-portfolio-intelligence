@@ -132,6 +132,15 @@ export async function renderDcfReportPdf(input: DcfReportInput): Promise<Buffer>
         document.text(clean(review.sourceUrl));
         document.moveDown();
         document.text(clean(review.rationale));
+        document.moveDown();
+        document.font('Helvetica-Bold').text(`Reviewed business life cycle: ${review.lifeCycle.stage.replaceAll('_', ' ')}`);
+        document.font('Helvetica').text(clean(review.lifeCycle.rationale));
+        document.moveDown();
+        for (const [scenarioName, scenario] of Object.entries(review.scenarios)) {
+          document.font('Helvetica-Bold').text(`${scenarioName.replaceAll('_', ' ')} assumptions`);
+          document.font('Helvetica').text(clean(scenario.rationale));
+          document.moveDown(0.5);
+        }
       }
     }
     document.end();

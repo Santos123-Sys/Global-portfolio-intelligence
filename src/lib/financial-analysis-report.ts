@@ -1,4 +1,5 @@
 import { isSupportedFiscalDate } from './financial-evidence';
+import { assessCompanyLifeCycle, type LifeCycleAssessment } from './company-life-cycle';
 
 export interface FinancialObservation {
   metricName: string; valueNumeric: string | null; observationDate: string | null;
@@ -15,6 +16,7 @@ export interface FinancialAnalysisReport {
   companyName: string; ticker: string; exchange: string; currency: string;
   periods: AnnualFinancialRow[]; generatedAt: string; status: 'data_available' | 'partial_data' | 'evidence_required';
   limitations: string[];
+  lifeCycle: LifeCycleAssessment;
 }
 const REQUIRED = ['revenue', 'operating_income', 'net_income', 'operating_cash_flow', 'capital_expenditure'] as const;
 const METRICS = new Set([...REQUIRED, 'free_cash_flow', 'total_debt', 'cash_and_equivalents', 'total_equity', 'shares_outstanding', 'gross_profit']);
@@ -72,6 +74,7 @@ export function buildFinancialAnalysisReport(input: {
   if (periods.some((period) => period.gaps.length)) limitations.push('Missing or conflicting filing metrics are shown as gaps; no value has been estimated.');
   if (periods.length < 2) limitations.push('Year-over-year analysis requires at least two consecutive annual periods.');
   if (periods.some(period => period.comparisonNote)) limitations.push('Some growth comparisons were withheld because fiscal-date spacing is inconsistent with adjacent annual periods.');
+  const lifeCycle = assessCompanyLifeCycle(periods);
   return { companyName: input.companyName, ticker: input.ticker, exchange: input.exchange, currency: input.currency,
-    periods, generatedAt: (input.now ?? new Date()).toISOString(), status: periods.some(period => Object.keys(period.metrics).length) ? periods.some(period => period.gaps.length) ? 'partial_data' : 'data_available' : 'evidence_required', limitations };
+    periods, generatedAt: (input.now ?? new Date()).toISOString(), status: periods.some(period => Object.keys(period.metrics).length) ? periods.some(period => period.gaps.length) ? 'partial_data' : 'data_available' : 'evidence_required', limitations, lifeCycle };
 }
