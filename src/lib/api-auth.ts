@@ -15,6 +15,7 @@ export async function authenticateRequest(req: Request): Promise<AuthenticationR
     const pathname = new URL(req.url).pathname;
     const businessMutation = !['GET', 'HEAD', 'OPTIONS'].includes(req.method)
       && !pathname.startsWith('/api/auth/')
+      && pathname !== '/api/translation'
       && pathname !== '/api/accounts';
     if (businessMutation && !accountCanEdit(auth.role)) {
       return { ok: false, response: NextResponse.json({ error: 'This account is read-only' }, { status: 403 }) };
