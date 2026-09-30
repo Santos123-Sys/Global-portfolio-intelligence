@@ -23,9 +23,15 @@ const nextConfig: NextConfig = {
   typedRoutes: true,
   output: 'standalone',
   poweredByHeader: false,
+  // Use the installed TypeScript compiler API; retain type checking without a detached CLI process.
+  experimental: { useTypeScriptCli: false },
   async headers() {
     return [
       { source: '/:path*', headers: browserSecurityHeaders },
+      {source:'/loading/:path*',headers:[
+        {key:'X-Frame-Options',value:'SAMEORIGIN'},
+        {key:'Content-Security-Policy',value:"default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'"},
+      ]},
       {
         source: '/api/:path*',
         headers: [{ key: 'Content-Security-Policy', value: "default-src 'none'; frame-ancestors 'none'" }],

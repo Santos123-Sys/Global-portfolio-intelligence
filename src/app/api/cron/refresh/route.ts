@@ -47,6 +47,7 @@ export async function GET(req: Request) {
               securityId: s.id,
               priceDate: bar.date,
               close: String(bar.close),
+              volume: bar.volume!=null ? String(bar.volume) : null,
               currency: bar.currency,
               source: provider.name,
             })
@@ -92,4 +93,3 @@ export async function GET(req: Request) {
   }
   return NextResponse.json({ ok: true, ...outcome.result });
 }
-

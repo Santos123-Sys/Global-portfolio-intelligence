@@ -10,6 +10,13 @@ export interface InvestorRelationsFundamentals {
 }
 
 const XBRL_METRICS: Record<string, string> = {
+  'us-gaap:Assets': 'total_assets',
+  'us-gaap:AssetsCurrent': 'current_assets',
+  'us-gaap:LiabilitiesCurrent': 'current_liabilities',
+  'us-gaap:LongTermDebtCurrent': 'current_debt',
+  'ifrs-full:Assets': 'total_assets',
+  'ifrs-full:CurrentAssets': 'current_assets',
+  'ifrs-full:CurrentLiabilities': 'current_liabilities',
   'us-gaap:DepreciationDepletionAndAmortization': 'depreciation_and_amortization',
   'us-gaap:InterestExpense': 'interest_expense',
   'ifrs-full:DepreciationAndAmortisationExpense': 'depreciation_and_amortization',
