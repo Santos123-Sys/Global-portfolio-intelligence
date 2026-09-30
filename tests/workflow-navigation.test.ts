@@ -21,8 +21,9 @@ describe('discovery-first workflow', () => {
     expect(header).toContain("['/how-it-works', 'nav.howItWorks']");
     expect(header).toContain("['/research', 'nav.analysis']");
     expect(header).toContain("['/governance', 'nav.investmentControl']");
-    expect(header).toContain("['/research-history', 'nav.adminActivity']");
-    expect(header).toContain("['/agentic-system', 'nav.existingHoldingsAnalysis']");
+    expect(header).toContain("['/research-operations', 'nav.researchOperations']");
+    expect(header).not.toContain("['/research-history', 'nav.adminActivity']");
+    expect(header).not.toContain("['/agentic-system', 'nav.existingHoldingsAnalysis']");
     expect(header).not.toContain("['/decisions', 'nav.decisionLog']");
     expect(header).not.toContain("['/candidates', 'nav.candidateRecords']");
     expect(header).not.toContain("['/securities', 'nav.securities']");
@@ -31,8 +32,7 @@ describe('discovery-first workflow', () => {
     expect(i18n).toContain("'nav.investmentReview': 'Investment Review'");
     expect(i18n).toContain("'nav.researchInbox': 'Research & Analysis Inbox'");
     expect(i18n).toContain("'nav.investmentControl': 'Investment Control'");
-    expect(i18n).toContain("'nav.adminActivity': 'Admin Activity'");
-    expect(i18n).toContain("'nav.existingHoldingsAnalysis': 'Existing-Holdings Analysis'");
+    expect(i18n).toContain("'nav.researchOperations': 'Research Operations'");
     expect(i18n).toContain("'nav.settings': 'Settings'");
     expect(i18n).toContain("'nav.thesis': '1. Thesis'");
     expect(i18n).toContain("'nav.discover': '2. Discover'");
