@@ -24,7 +24,7 @@ export function DcfAssumptionReview({ facts, currency, period, marketContext, pr
       lifeCycle: { stage: values.life_cycle_stage, rationale: values.life_cycle_rationale },
       fcff: { method: values.method, taxRate: number('tax', 100), workingCapitalInvestment: number('wc'), interestIncludedInCfo: interest },
       scenarios: Object.fromEntries(['worst_case', 'base_case', 'optimistic_case'].map(name => [name, {
-        annualGrowthRate: number(`${name}_growth`, 100), discountRate: number(`${name}_wacc`, 100), terminalGrowthRate: number(`${name}_terminal`, 100),
+        annualGrowthRate: number(`${name}_growth`, 100), discountRate: number(`${name}_wacc`, 100), terminalGrowthRate: number(`${name}_terminal`, 100), rationale: values[`${name}_rationale`],
       }])),
     });
   }
@@ -79,12 +79,12 @@ export function DcfAssumptionReview({ facts, currency, period, marketContext, pr
     <p role="status">{derived.status === 'ready' ? `Computed FCFF: ${currency} ${derived.value?.toLocaleString()}` : `FCFF needs: ${derived.missingFields.join(', ')}`}</p>
     <details><summary>Calculation inputs and limitations</summary><dl>{Object.entries(derived.components).map(([name, value]) => <div key={name}><dt>{name.replaceAll('_', ' ')}</dt><dd>{value.toLocaleString()}</dd></div>)}</dl><ul>{derived.caveats.map(caveat => <li key={caveat}>{caveat}</li>)}</ul></details>
     <div className="dcf-review-grid">{['worst_case', 'base_case', 'optimistic_case'].map(name => <fieldset key={name}><legend>{name.replaceAll('_', ' ')}</legend>
-      {input(`${name}_growth`, 'Annual FCFF growth (%)')}{input(`${name}_wacc`, 'WACC (%)')}{input(`${name}_terminal`, 'Terminal growth (%)')}
+      {input(`${name}_growth`, 'Annual FCFF growth (%)')}{input(`${name}_wacc`, 'WACC (%)')}{input(`${name}_terminal`, 'Terminal growth (%)')}<label>Why these assumptions?<textarea value={fields[`${name}_rationale`] ?? ''} placeholder="Explain the growth path, risk/WACC, terminal economics, and evidence used." onChange={event => update({ ...fields, [`${name}_rationale`]: event.target.value })} /></label>
     </fieldset>)}</div>
     <p className="note">Use a WACC consistent with the currency and cash-flow risk. WACC must be greater than 0% and at most 50%, and exceed terminal growth (−5% to 5%). Annual growth supports −50% to 50%. Review the implied scenario ordering before saving.</p>
     <div className="dcf-review-grid">{input('date', 'Assumptions reviewed as of', 'date')}{input('source', 'Source / assumptions memo URL', 'url')}</div>
     <label>Rationale and sources for rates and accounting adjustments<textarea value={fields.rationale ?? ''} onChange={event => update({ ...fields, rationale: event.target.value })} /></label>
     <label><input type="checkbox" checked={confirmed} onChange={event => update(fields, event.target.checked)} />I reviewed the source, financial period, units, tax and forecast assumptions.</label>
-    <p className="note" role="status">{parsed.success && market ? 'Review complete. The server will validate financial inputs and scenario ordering.' : 'Complete the life-cycle stage and rationale, all nine scenario rates, review date, source URL, valuation rationale (20+ characters), and confirmation.'}</p>
+    <p className="note" role="status">{parsed.success && market ? 'Review complete. The server will validate financial inputs and scenario ordering.' : 'Complete the life-cycle stage and rationale, all nine scenario rates, an explanation for each scenario, review date, source URL, valuation rationale (20+ characters), and confirmation.'}</p>
   </details>;
 }
