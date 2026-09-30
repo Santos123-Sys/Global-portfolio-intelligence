@@ -142,6 +142,8 @@ test('thesis-matched discovery remains reviewable through approval and report ac
   await page.getByLabel('Inputs as of', { exact: true }).fill(new Date().toISOString().slice(0, 10));
   await page.getByLabel('Filings / assumptions memo URL', { exact: true }).fill('https://example.test/assumptions');
   await expect(page.getByText('Computed base WACC: 10.0000%')).toBeVisible();
+  await page.getByLabel('Life-cycle stage').selectOption('maturity');
+  await page.getByLabel('Why this stage applies').fill('Established operations, moderate growth and positive operating income support a mature going-concern classification.');
   await page.getByLabel('FCFF method').selectOption('ebit');
   await page.getByLabel('Non-cash working-capital investment — optional').fill('20');
   for (const name of ['worst case', 'base case', 'optimistic case']) {
@@ -150,6 +152,7 @@ test('thesis-matched discovery remains reviewable through approval and report ac
     if (name !== 'base case') await group.getByLabel('WACC (%)').fill('10');
     else await expect(group.getByLabel('WACC (%)')).toHaveAttribute('readonly', '');
     await group.getByLabel('Terminal growth (%)').fill('2');
+    await group.getByLabel('Why these assumptions?').fill(`${name} assumptions reflect reviewed growth, risk and stable-state economics.`);
   }
   await page.getByLabel('Assumptions reviewed as of').fill('2026-09-25');
   await page.getByLabel('Source / assumptions memo URL').fill('https://example.test/review');
