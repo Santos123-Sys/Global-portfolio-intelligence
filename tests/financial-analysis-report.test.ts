@@ -5,6 +5,25 @@ import { renderFinancialReportPdf } from '../src/lib/financial-report-pdf';
 const fact = (metricName: string, value: number, observationDate: string, sourceUrl: string, currency = 'BRL'): FinancialObservation => ({
   metricName, valueNumeric: String(value), observationDate, currency, sourceUrl,
   sourceName: sourceUrl, provider: 'investor-relations', status: 'OK', retrievedAt: new Date('2026-09-25'),
+  it('retains at most the latest five annual periods and exposes a review-only life-cycle suggestion', () => {
+    const observations: FinancialObservation[] = [];
+    for (let year = 2019; year <= 2025; year += 1) {
+      const revenue = 100 * (1.12 ** (year - 2019));
+      observations.push(
+        fact('revenue', revenue, `${year}-12-31`, `https://filing.test/${year}`),
+        fact('operating_income', revenue * 0.15, `${year}-12-31`, `https://filing.test/${year}`),
+        fact('net_income', revenue * 0.10, `${year}-12-31`, `https://filing.test/${year}`),
+        fact('operating_cash_flow', revenue * 0.18, `${year}-12-31`, `https://filing.test/${year}`),
+        fact('capital_expenditure', revenue * 0.05, `${year}-12-31`, `https://filing.test/${year}`),
+      );
+    }
+    const report = buildFinancialAnalysisReport(input(observations));
+    expect(report.periods).toHaveLength(5);
+    expect(report.periods[0].periodEnd).toBe('2021-12-31');
+    expect(report.lifeCycle.suggestedStage).toBe('growth');
+    expect(report.lifeCycle.limitations.join(' ')).toContain('not hard empirical facts');
+  });
+
 });
 const input = (observations: FinancialObservation[]) => ({ companyName: 'Empresa Exemplo', ticker: 'EXMP3', exchange: 'BVMF', currency: 'BRL', observations, now: new Date('2026-09-25') });
 
