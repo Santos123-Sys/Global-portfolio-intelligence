@@ -65,6 +65,7 @@ const review = {
   },
   confirmed: true, financialPeriodEnd: fiscalDate, currency: 'CHF', asOf: '2026-09-25', sourceUrl: 'https://issuer.test/assumptions',
   rationale: 'Reviewed annual financials and currency-consistent cost of capital.',
+  lifeCycle: { stage: 'maturity', rationale: 'Revenue growth is moderate, operations are established, and the company is being valued as a mature going concern.' },
   fcff: { method: 'ebit', workingCapitalInvestment: 20, interestIncludedInCfo: false },
   scenarios: Object.fromEntries(['worst_case', 'base_case', 'optimistic_case'].map(name => [name, { annualGrowthRate: .04, discountRate: .1, terminalGrowthRate: .02 }])),
 };
@@ -119,5 +120,15 @@ it('rejects a stale policy snapshot before saving a valuation', async () => {
   const response = await submitReview({ ...review, market: { ...review.market, profileSnapshot: marketProfiles.map(p => ({ ...p, version: 'old' })) } });
   expect(response.status).toBe(409);
   expect((await response.json()).error).toContain('Market policies changed');
+  expect(state.saved).toBeNull();
+});
+
+it('blocks the standard perpetual FCFF DCF for reviewed start-up and decline stages', async () => {
+  derivedFacts();
+  for (const stage of ['start_up', 'decline'] as const) {
+    const response = await submitReview({ ...review, lifeCycle: { stage, rationale: 'Reviewed operating evidence supports this stage and requires a stage-specific valuation treatment.' } });
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toContain('standard perpetual FCFF DCF');
+  }
   expect(state.saved).toBeNull();
 });
