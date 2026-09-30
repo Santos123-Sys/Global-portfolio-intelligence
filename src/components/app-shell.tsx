@@ -7,6 +7,7 @@ import { InvestmentWorkflowNav } from './investment-workflow-nav';
 import { ErrorBoundary } from './error-boundary';
 import { usePathname } from 'next/navigation';
 import { LanguageProvider, useLanguage } from '@/lib/i18n';
+import { GoogleCloudTranslateContent } from './google-cloud-translate-content';
 
 function SkipLink() {
   const { t } = useLanguage();
@@ -28,6 +29,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <InvestmentWorkflowNav />
             <ErrorBoundary>{children}</ErrorBoundary>
           </section>
+          <GoogleCloudTranslateContent />
         </div>
       </PortfolioProvider>
     </LanguageProvider>

@@ -22,8 +22,7 @@ const translations = {
     'nav.investmentReview': 'Investment Review',
     'nav.researchInbox': 'Research & Analysis Inbox',
     'nav.investmentControl': 'Investment Control',
-    'nav.adminActivity': 'Admin Activity',
-    'nav.existingHoldingsAnalysis': 'Existing-Holdings Analysis',
+    'nav.researchOperations': 'Research Operations',
     'nav.settings': 'Settings',
     'nav.agentSettings': 'Agent settings',
     'nav.securities': 'Securities',
@@ -40,6 +39,7 @@ const translations = {
     'actions.signOut': 'Sign out',
     'account.activeClient': 'Active client account',
     'language.label': 'Language',
+    'language.translationUnavailable': 'Automatic translation is unavailable; showing built-in translations.',
     'portfolio.viewing': 'Viewing',
     'portfolio.noneSelected': 'No portfolio selected',
   },
@@ -60,8 +60,7 @@ const translations = {
     'nav.investmentReview': 'Revisão de investimentos',
     'nav.researchInbox': 'Caixa de pesquisa e análise',
     'nav.investmentControl': 'Controles de investimento',
-    'nav.adminActivity': 'Atividade administrativa',
-    'nav.existingHoldingsAnalysis': 'Análise de ativos existentes',
+    'nav.researchOperations': 'Operações de pesquisa',
     'nav.settings': 'Configurações',
     'nav.agentSettings': 'Configurações dos agentes',
     'nav.securities': 'Ativos',
@@ -78,6 +77,7 @@ const translations = {
     'actions.signOut': 'Sair',
     'account.activeClient': 'Conta de cliente ativa',
     'language.label': 'Idioma',
+    'language.translationUnavailable': 'A tradução automática está indisponível; exibindo traduções integradas.',
     'portfolio.viewing': 'Visualizando',
     'portfolio.noneSelected': 'Nenhum portfólio selecionado',
   },
@@ -98,8 +98,7 @@ const translations = {
     'nav.investmentReview': 'Revisión de inversiones',
     'nav.researchInbox': 'Bandeja de investigación y análisis',
     'nav.investmentControl': 'Control de inversiones',
-    'nav.adminActivity': 'Actividad administrativa',
-    'nav.existingHoldingsAnalysis': 'Análisis de posiciones existentes',
+    'nav.researchOperations': 'Operaciones de investigación',
     'nav.settings': 'Configuración',
     'nav.agentSettings': 'Configuración de agentes',
     'nav.securities': 'Valores',
@@ -116,6 +115,7 @@ const translations = {
     'actions.signOut': 'Cerrar sesión',
     'account.activeClient': 'Cuenta de cliente activa',
     'language.label': 'Idioma',
+    'language.translationUnavailable': 'La traducción automática no está disponible; se muestran las traducciones integradas.',
     'portfolio.viewing': 'Viendo',
     'portfolio.noneSelected': 'Ninguna cartera seleccionada',
   },
@@ -136,8 +136,7 @@ const translations = {
     'nav.investmentReview': 'Anlageprüfung',
     'nav.researchInbox': 'Research- und Analyse-Posteingang',
     'nav.investmentControl': 'Anlagekontrolle',
-    'nav.adminActivity': 'Admin-Aktivität',
-    'nav.existingHoldingsAnalysis': 'Analyse bestehender Positionen',
+    'nav.researchOperations': 'Research-Betrieb',
     'nav.settings': 'Einstellungen',
     'nav.agentSettings': 'Agenten-Einstellungen',
     'nav.securities': 'Wertpapiere',
@@ -154,6 +153,7 @@ const translations = {
     'actions.signOut': 'Abmelden',
     'account.activeClient': 'Aktives Kundenkonto',
     'language.label': 'Sprache',
+    'language.translationUnavailable': 'Automatische Übersetzung nicht verfügbar; integrierte Übersetzungen werden angezeigt.',
     'portfolio.viewing': 'Ansicht',
     'portfolio.noneSelected': 'Kein Portfolio ausgewählt',
   },
@@ -164,6 +164,8 @@ export type TranslationKey = keyof typeof translations.en;
 type LanguageContextValue = {
   language: Language;
   setLanguage: (language: Language) => void;
+  translationUnavailable: boolean;
+  setTranslationUnavailable: (unavailable: boolean) => void;
   t: (key: TranslationKey) => string;
 };
 
@@ -176,26 +178,30 @@ function isLanguage(value: string | null): value is Language {
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>('en');
+  const [translationUnavailable, setTranslationUnavailable] = useState(false);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     const browserLanguage = window.navigator.language.slice(0, 2);
     const initial = isLanguage(stored) ? stored : isLanguage(browserLanguage) ? browserLanguage : 'en';
     setLanguageState(initial);
-    document.documentElement.lang = initial;
+    document.documentElement.lang = initial === 'pt' ? 'pt-BR' : initial;
   }, []);
 
   const setLanguage = (next: Language) => {
     setLanguageState(next);
-    document.documentElement.lang = next;
+    setTranslationUnavailable(false);
+    document.documentElement.lang = next === 'pt' ? 'pt-BR' : next;
     window.localStorage.setItem(STORAGE_KEY, next);
   };
 
   const value = useMemo<LanguageContextValue>(() => ({
     language,
     setLanguage,
+    translationUnavailable,
+    setTranslationUnavailable,
     t: (key) => translations[language][key],
-  }), [language]);
+  }), [language, translationUnavailable]);
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }

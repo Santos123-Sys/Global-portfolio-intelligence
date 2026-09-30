@@ -549,7 +549,7 @@ export default function AIStockDiscoveryPage() {
             <h2>{t('latest')}</h2>
             <p className="note">{t('latestDetail')}</p>
           </div>
-          <Link className="secondary-button inline-action" href="/research-history">{t('history')}</Link>
+          <Link className="secondary-button inline-action" href="/research-operations?view=activity">{t('history')}</Link>
         </div>
         {runsLoading ? <p className="note" role="status">{t('loadingRuns')}</p> : runs.length === 0 ? <p className="note">{t('noRuns')}</p> : (
           <div className="latest-run-summary" aria-live="polite">

@@ -93,6 +93,7 @@ export default defineRailway((context) => {
       WEB_SEARCH_PROVIDER: preserve(),
       WEB_SEARCH_API_KEY: preserve(),
       GEMINI_API_KEY: preserve(),
+      GOOGLE_TRANSLATE_API_KEY: preserve(),
       DOCUMENT_STORAGE_PATH: '/app/storage/documents',
       AWS_S3_BUCKET: ref(agenticArtifacts, 'BUCKET'),
       AWS_ENDPOINT: ref(agenticArtifacts, 'ENDPOINT'),

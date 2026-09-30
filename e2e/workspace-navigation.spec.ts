@@ -25,7 +25,9 @@ for (const width of [390, 1440]) {
     await expect(page.getByRole('link', { name: 'Investment Control' })).toBeVisible();
     await page.getByRole('button', { name: 'Investment Review' }).click();
     await page.getByRole('button', { name: 'More' }).click();
-    await expect(page.getByRole('link', { name: 'Existing-Holdings Analysis' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Research Operations' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Research Operations' })).toHaveAttribute('href', '/research-operations');
+    await expect(page.getByRole('link', { name: 'Existing-Holdings Analysis' })).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'Admin Activity' })).toHaveCount(0);
     await page.getByRole('button', { name: 'More' }).click();
     await page.getByRole('button', { name: 'Find a page' }).click();
