@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const securityDetail = readFileSync('src/app/security/[ticker]/page.tsx', 'utf8');
+const securityDetail = [
+  readFileSync('src/app/security/[ticker]/page.tsx', 'utf8'),
+  readFileSync('src/components/dashboard/company-dashboard.tsx', 'utf8'),
+].join('\n');
 const candidateRoute = readFileSync('src/app/api/candidates/route.ts', 'utf8');
 
 describe('analysis explainability UX', () => {
@@ -9,7 +12,7 @@ describe('analysis explainability UX', () => {
     expect(securityDetail).toContain('Thin data');
     expect(securityDetail).toContain('Thesis-fit gate active');
     expect(securityDetail).toContain('Information still missing');
-    expect(securityDetail).toContain('evidence-chips');
+    expect(securityDetail).toContain('Evidence & limitations');
   });
 
   it('links one immutable PDF snapshot to the selected live analysis version', () => {
