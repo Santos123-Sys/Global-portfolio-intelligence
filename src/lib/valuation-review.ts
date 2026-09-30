@@ -6,6 +6,7 @@ const scenario = z.object({
   annualGrowthRate: z.number().finite().min(-0.5).max(0.5),
   discountRate: z.number().finite().positive().max(0.5),
   terminalGrowthRate: z.number().finite().min(-0.05).max(0.05),
+  rationale: z.string().trim().min(10).max(1200),
 }).strict().refine(value => value.discountRate > value.terminalGrowthRate, 'WACC must exceed terminal growth');
 export const valuationReviewSchema = z.object({
   market: MarketValuationReview.optional(),
