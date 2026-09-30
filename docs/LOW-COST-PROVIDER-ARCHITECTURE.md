@@ -41,7 +41,10 @@ To make sector/size hard filters for every name, the next provider increment mus
 
 ## Railway configuration
 
-Set `DISCOVERY_*` and `MARKET_DATA_*` on the dashboard service. Set `WEB_SEARCH_*` only on the `agentic-worker` service, which performs web research:
+Set `DISCOVERY_*`, `MARKET_DATA_*`, and `WEB_SEARCH_*` on the dashboard
+service. Set the same `WEB_SEARCH_*` values on `agentic-worker`, which performs
+research jobs. The dashboard uses its server-only copy only for comparable-peer
+discovery:
 
 ```env
 DISCOVERY_PROVIDER=finnhub
@@ -49,6 +52,10 @@ FINNHUB_API_KEY=<Finnhub API key>
 DISCOVERY_FALLBACK_PROVIDER=eodhd
 DISCOVERY_UNIVERSE_CACHE_HOURS=168
 
+# The dashboard service only. Automatically primary for B3/BVMF discovery.
+BRAPI_API_KEY=<BrAPI API key>
+
+# Set on both the dashboard and agentic-worker services.
 WEB_SEARCH_PROVIDER=tavily
 WEB_SEARCH_API_KEY=<Tavily API key>
 

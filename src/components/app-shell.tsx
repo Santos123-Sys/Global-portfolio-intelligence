@@ -19,6 +19,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     <LanguageProvider>
       <PortfolioProvider>
         <div className="app-shell">
+          <div className="ambient-light" aria-hidden="true" />
+          <div className="ambient-light ambient-light-secondary" aria-hidden="true" />
           <SkipLink />
           <Header />
           <section className="content" id="workspace-content" tabIndex={-1}>

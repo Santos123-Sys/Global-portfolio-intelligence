@@ -484,12 +484,14 @@ export default function AIStockDiscoveryPage() {
 
   return (
     <main>
-      <h1>{t('title')}</h1>
-      <p className="sub">{t('intro')}</p>
+      <section className="dashboard-hero animate-fade-in">
+        <h1 className="text-glow">{t('title')}</h1>
+        <p className="hero-lead">{t('intro')}</p>
+      </section>
 
       {error && <p className="login-error workflow-error" role="alert">{error}</p>}
 
-      <section className="card workflow-stage">
+      <section className="card glow-card workflow-stage">
         <div>
           <h2>{t('start')}</h2>
           <p className="note">{t('startDetail')}</p>
@@ -525,7 +527,7 @@ export default function AIStockDiscoveryPage() {
         </div>
       </section>}
 
-      <section className="card">
+      <section className="card glow-card">
         <div className="section-heading">
           <div>
             <h2>{t('latest')}</h2>
@@ -599,7 +601,7 @@ export default function AIStockDiscoveryPage() {
             const journal = journalFor(candidate);
             const invalidFields = invalidJournalFields(journal);
             const fieldLabels = journalFieldLabels(t);
-            return <article className="card candidate-card" key={candidate.id}>
+            return <article className="card glow-card candidate-card" key={candidate.id}>
               <div className="candidate-heading">
                 <div>
                   <h3>{candidate.companyName} <span className="note">{candidate.ticker} · {candidate.exchange}</span></h3>

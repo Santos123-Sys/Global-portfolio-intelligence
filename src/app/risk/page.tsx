@@ -15,7 +15,7 @@ import { usePortfolioBreadcrumb } from '@/lib/portfolio-context';
 
 function GlobalCaveat() {
   return (
-    <div className="card" style={{ borderColor: 'var(--warn)', marginBottom: '2rem' }}>
+    <div className="card glow-card" style={{ borderColor: 'var(--warn)', marginBottom: '2rem' }}>
       <p className="caveat" style={{ marginTop: 0 }}>
         Parametric VaR may rely on a return distribution and correlations that do not hold in stress.
         Historical VaR is limited by its lookback period. Neither method guarantees a maximum loss,
@@ -90,8 +90,10 @@ export default function RiskDetailPage() {
     return (
       <main>
         <PortfolioWorkspaceNav />
-        <h1>Portfolio risk</h1>
-        <div className="card">
+        <section className="dashboard-hero animate-fade-in">
+          <h1 className="text-glow">Portfolio risk</h1>
+        </section>
+        <div className="card glow-card">
           <p className="note">
             Connection failed: Unable to reach backend.
             <br />
@@ -107,8 +109,15 @@ export default function RiskDetailPage() {
   return (
     <main>
       <PortfolioWorkspaceNav />
-      <h1>Portfolio risk</h1>
-      <p className="sub">Portfolio-level risk for recorded holdings. Candidate risk is reviewed inside the discovery workflow before a holding is added.</p>
+      <section className="dashboard-hero animate-fade-in">
+        <h1 className="text-glow">Portfolio risk</h1>
+        <p className="hero-lead">Portfolio-level risk for recorded holdings. Candidate risk is reviewed inside the discovery workflow before a holding is added.</p>
+        <div className="dashboard-hero-actions" aria-label="Risk summary">
+          <div className="stat-chip animate-scale-in delay-100"><span>Portfolio</span><span className="stat-value">{portfolios.find((portfolio) => portfolio.id === selectedId)?.name ?? '—'}</span></div>
+          <div className="stat-chip animate-scale-in delay-200"><span>Holdings</span><span className="stat-value">{holdingCount ?? '—'}</span></div>
+          <div className="stat-chip animate-scale-in delay-300"><span>Risk measures</span><span className="stat-value">{metrics.length}</span></div>
+        </div>
+      </section>
 
       <GlobalCaveat />
 
@@ -117,9 +126,9 @@ export default function RiskDetailPage() {
       {loading ? (
         <p className="note">Fetching...</p>
       ) : !selectedId ? (
-        <div className="card"><h2>Create a portfolio to begin</h2><Link className="action-button inline-action" href="/portfolio-setup">Set up portfolio</Link></div>
+        <div className="card glow-card"><h2>Create a portfolio to begin</h2><Link className="action-button inline-action button-hover" href="/portfolio-setup">Set up portfolio</Link></div>
       ) : holdingCount === 0 || metrics.length === 0 ? (
-        <div className="card">
+        <div className="card glow-card">
           <h2>{holdingCount === 0 ? 'Add a holding to assess risk' : 'Waiting for risk history'}</h2>
           <p className="note">{holdingCount === 0 ? 'This portfolio has no recorded holdings. Add one first; risk estimates need sufficient market-price history.' : `${holdingCount ?? 0} holdings are recorded, but no risk estimates have been computed yet. Metrics appear after a price refresh has sufficient history.`}</p>
           <Link className="action-button inline-action" href={holdingCount === 0 ? '/portfolio-setup' : '/positions'}>{holdingCount === 0 ? 'Add a holding' : 'Review positions'}</Link>
@@ -129,7 +138,7 @@ export default function RiskDetailPage() {
         <p className="note">{holdingCount} recorded holdings · {metrics.length} computed measures. Each measure has its own as-of date, method and caveats; open it to inspect the evidence.</p>
         <div className="grid">
           {metrics.map((m) => (
-            <div className="card" key={m.metricName}>
+            <div className="card glow-card" key={m.metricName}>
               <MetricDrill metric={m} />
             </div>
           ))}

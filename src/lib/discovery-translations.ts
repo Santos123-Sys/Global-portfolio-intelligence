@@ -8,7 +8,7 @@ const en = {
   thesisDetail: 'Confirmation creates the portfolio destinations in your thesis. Discovery requires a configured equity market.',
   thesisLink: 'Investment thesis',
   providers: 'Configure live research providers.',
-  providersDetail: 'Discovery requires Finnhub and its API key; web research uses Tavily or Brave. EODHD provides price history after approval.',
+  providersDetail: 'B3 discovery uses BrAPI when its key is configured. Other markets use the configured discovery provider; EODHD remains the fallback and supplies price history after approval.',
   sequence: 'Research finds candidates. You review them. Only approved candidates receive deeper analysis.',
   start: '1. Start market research',
   startDetail: 'Research selects a bounded company universe and returns a shortlist. It never adds a holding to your portfolio.',
@@ -40,7 +40,7 @@ const translations: Record<Language, Record<Key, string>> = {
   pt: {
     title: 'Descoberta de ações pela tese', intro: 'Tese confirmada → universo de mercado → lista de candidatos → revisão humana → pesquisa da empresa e risco de preço.',
     before: 'Antes de começar', thesis: 'Confirme sua tese.', thesisDetail: 'A confirmação cria os portfólios previstos na tese. A descoberta requer um mercado de ações configurado.', thesisLink: 'Tese de investimento',
-    providers: 'Configure os provedores de pesquisa.', providersDetail: 'A descoberta requer Finnhub e sua chave de API; a pesquisa na web usa Tavily ou Brave. A EODHD fornece o histórico de preços após a aprovação.',
+    providers: 'Configure os provedores de pesquisa.', providersDetail: 'A descoberta na B3 usa a BrAPI quando a chave está configurada. Outros mercados usam o provedor configurado; a EODHD permanece como contingência e fornece histórico de preços após a aprovação.',
     sequence: 'A pesquisa encontra candidatos. Você os avalia. Somente os aprovados recebem uma análise aprofundada.', start: '1. Iniciar pesquisa de mercado', startDetail: 'A pesquisa seleciona um universo limitado de empresas e retorna uma lista. Nenhuma posição é adicionada ao portfólio.',
     limit: 'Máximo de candidatos por portfólio', limitDetail: 'O limite é aplicado separadamente a cada portfólio elegível.', checking: 'Verificando requisitos…', check: 'Verificar requisitos', starting: 'Iniciando pesquisa…', find: 'Encontrar ações alinhadas à tese',
     ready: 'A descoberta está pronta', blocked: 'A descoberta requer atenção', checked: 'Verificado em', provider: 'Provedor', readyBadge: 'Pronto para iniciar', blockedBadge: 'Bloqueado',
@@ -61,7 +61,7 @@ const translations: Record<Language, Record<Key, string>> = {
   es: {
     title: 'Descubrimiento de acciones según la tesis', intro: 'Tesis confirmada → universo de mercado → lista de candidatos → revisión humana → investigación de la empresa y riesgo de precio.',
     before: 'Antes de empezar', thesis: 'Confirma tu tesis.', thesisDetail: 'La confirmación crea las carteras previstas en la tesis. El descubrimiento requiere un mercado de acciones configurado.', thesisLink: 'Tesis de inversión',
-    providers: 'Configura los proveedores de investigación.', providersDetail: 'El descubrimiento requiere Finnhub y su clave API; la búsqueda web utiliza Tavily o Brave. EODHD proporciona el historial de precios tras la aprobación.',
+    providers: 'Configura los proveedores de investigación.', providersDetail: 'El descubrimiento de B3 usa BrAPI cuando su clave está configurada. Otros mercados usan el proveedor configurado; EODHD sigue siendo la alternativa y proporciona el historial de precios tras la aprobación.',
     sequence: 'La investigación encuentra candidatos. Tú los revisas. Solo los aprobados reciben un análisis más profundo.', start: '1. Iniciar investigación de mercado', startDetail: 'La investigación selecciona un universo limitado de empresas y genera una lista. No añade posiciones a la cartera.',
     limit: 'Máximo de candidatos por cartera', limitDetail: 'El límite se aplica por separado a cada cartera elegible.', checking: 'Comprobando requisitos…', check: 'Comprobar requisitos', starting: 'Iniciando investigación…', find: 'Buscar acciones afines a la tesis',
     ready: 'El descubrimiento está listo', blocked: 'El descubrimiento necesita atención', checked: 'Comprobado', provider: 'Proveedor', readyBadge: 'Listo para iniciar', blockedBadge: 'Bloqueado',
@@ -82,7 +82,7 @@ const translations: Record<Language, Record<Key, string>> = {
   de: {
     title: 'Aktienrecherche nach Anlagethese', intro: 'Bestätigte These → Marktuniversum → Kandidatenliste → menschliche Prüfung → Unternehmensanalyse und Kursrisiko.',
     before: 'Vor dem Start', thesis: 'Anlagethese bestätigen.', thesisDetail: 'Die Bestätigung erstellt die in der These vorgesehenen Portfolios. Für die Suche muss ein Aktienmarkt eingerichtet sein.', thesisLink: 'Anlagethese',
-    providers: 'Rechercheanbieter einrichten.', providersDetail: 'Für die Aktiensuche werden Finnhub und ein API-Schlüssel benötigt; die Webrecherche nutzt Tavily oder Brave. EODHD liefert nach der Freigabe Kursdaten.',
+    providers: 'Rechercheanbieter einrichten.', providersDetail: 'Für die B3-Entdeckung wird BrAPI verwendet, wenn der Schlüssel konfiguriert ist. Andere Märkte verwenden den konfigurierten Anbieter; EODHD bleibt die Ausweichlösung und liefert nach der Freigabe die Kurshistorie.',
     sequence: 'Die Recherche findet Kandidaten. Sie prüfen diese. Nur freigegebene Kandidaten werden vertieft analysiert.', start: '1. Marktrecherche starten', startDetail: 'Die Recherche wählt eine begrenzte Anzahl von Unternehmen aus und erstellt eine Kandidatenliste. Es werden keine Positionen angelegt.',
     limit: 'Maximale Kandidaten je Portfolio', limitDetail: 'Die Grenze gilt für jedes geeignete Portfolio separat.', checking: 'Voraussetzungen werden geprüft…', check: 'Voraussetzungen prüfen', starting: 'Recherche wird gestartet…', find: 'Aktien passend zur These suchen',
     ready: 'Suche ist bereit', blocked: 'Suche erfordert Ihre Aufmerksamkeit', checked: 'Geprüft am', provider: 'Anbieter', readyBadge: 'Startbereit', blockedBadge: 'Blockiert',

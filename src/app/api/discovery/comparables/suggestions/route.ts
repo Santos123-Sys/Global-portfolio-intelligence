@@ -6,6 +6,7 @@ import { authenticateRequest } from '@/lib/api-auth';
 import { suggestComparablePeers } from '@/lib/comparable-research';
 import { db } from '@/lib/db';
 import { discoveryCandidates } from '@/lib/db/workflow-schema';
+import { getEnv } from '@/lib/env';
 import { readBoundedJson } from '@/lib/request-body';
 
 export const runtime = 'nodejs';
@@ -23,6 +24,12 @@ export async function POST(req: Request) {
     eq(discoveryCandidates.id, parsed.data.candidateId), eq(discoveryCandidates.ownerId, session.auth.userId)
   )).limit(1);
   if (!candidate?.analysisId) return NextResponse.json({ error: 'Complete the approved security analysis before suggesting peers' }, { status: 409 });
+  const env = getEnv();
+  if (env.WEB_SEARCH_PROVIDER === 'none') {
+    return NextResponse.json({
+      error: 'Peer discovery is not configured. Set WEB_SEARCH_PROVIDER=tavily and WEB_SEARCH_API_KEY on the portfolio-intelligence dashboard service, then redeploy.',
+    }, { status: 503 });
+  }
   try {
     const result = await suggestComparablePeers({ companyName: candidate.companyName, ticker: candidate.ticker, exchange: candidate.exchange, currency: candidate.currency, sector: candidate.sector });
     return NextResponse.json(result);

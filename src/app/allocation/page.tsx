@@ -49,7 +49,7 @@ function groupBy(rows: Array<PositionRow & { effectiveWeight: number }>, keyFn: 
 
 function DonutSection({ title, groups }: { title: string; groups: GroupRow[] }) {
   return (
-    <div className="chart-card">
+    <div className="chart-card glow-card">
       <h2>{title}</h2>
       {groups.length === 0 ? (
         <p className="note">No positions to allocate.</p>
@@ -166,8 +166,10 @@ export default function AllocationPage() {
     return (
       <main>
         <PortfolioWorkspaceNav />
-        <h1>Allocation</h1>
-        <div className="card">
+        <section className="dashboard-hero animate-fade-in">
+          <h1 className="text-glow">Allocation</h1>
+        </section>
+        <div className="card glow-card">
           <p className="note">
             Connection failed: Unable to reach backend.
             <br />
@@ -183,8 +185,16 @@ export default function AllocationPage() {
   return (
     <main>
       <PortfolioWorkspaceNav />
-      <h1>Allocation</h1>
-      <p className="sub">See the holdings, exposures and concentration of one portfolio at a time.</p>
+      <section className="dashboard-hero animate-fade-in">
+        <h1 className="text-glow">Allocation</h1>
+        <p className="hero-lead">See the holdings, exposures and concentration of one portfolio at a time.</p>
+        <div className="dashboard-hero-actions" aria-label="Allocation summary">
+          <div className="stat-chip animate-scale-in delay-100"><span>Portfolio</span><span className="stat-value">{selectedPortfolio?.name ?? '—'}</span></div>
+          <div className="stat-chip animate-scale-in delay-200"><span>Holdings</span><span className="stat-value">{positions.length}</span></div>
+          <div className="stat-chip animate-scale-in delay-300"><span>Weight source</span><span className="stat-value">{exposure.source ?? '—'}</span></div>
+          <div className="stat-chip animate-scale-in delay-400"><span>Dated prices</span><span className="stat-value">{positions.length ? `${priced}/${positions.length}` : '—'}</span></div>
+        </div>
+      </section>
       <p><Link className="text-link" href="/example-portfolio">Explore a populated example portfolio</Link></p>
 
       <PortfolioSelector portfolios={portfolios} selectedId={selectedId} onSelect={setSelectedId} />
@@ -192,9 +202,9 @@ export default function AllocationPage() {
       {loading ? (
         <p className="note">Fetching...</p>
       ) : !selectedPortfolio ? (
-        <div className="card"><h2>Create a portfolio to begin</h2><Link className="action-button inline-action" href="/portfolio-setup">Set up portfolio</Link></div>
+        <div className="card glow-card"><h2>Create a portfolio to begin</h2><Link className="action-button inline-action button-hover" href="/portfolio-setup">Set up portfolio</Link></div>
       ) : positions.length === 0 ? (
-        <div className="card">
+        <div className="card glow-card">
           <h2>No holdings in {selectedPortfolio.name} yet</h2>
           <p className="note">Add a holding to see its sector, country, currency and concentration here.</p>
           <Link className="action-button inline-action" href="/portfolio-setup">Add a holding</Link>
@@ -202,9 +212,9 @@ export default function AllocationPage() {
       ) : (
         <>
         <section className="allocation-summary" aria-label="Allocation coverage">
-          <div className="card"><span className="note">Holdings</span><strong>{positions.length}</strong></div>
-          <div className="card"><span className="note">Weight source</span><strong>{exposure.source ?? 'Unavailable'}</strong></div>
-          <div className="card"><span className="note">Dated prices</span><strong>{priced}/{positions.length}</strong></div>
+          <div className="card glow-card"><span className="note">Holdings</span><strong>{positions.length}</strong></div>
+          <div className="card glow-card"><span className="note">Weight source</span><strong>{exposure.source ?? 'Unavailable'}</strong></div>
+          <div className="card glow-card"><span className="note">Dated prices</span><strong>{priced}/{positions.length}</strong></div>
         </section>
         {exposure.reason ? <div className="card" role="status"><h2>Allocation needs data</h2><p className="note">{exposure.reason}</p><Link className="action-button inline-action" href="/positions">Review positions</Link></div> : <>
         <p className="note">Weights describe recorded holdings only. Country is the security classification, not underlying revenue exposure. Fund look-through is not recorded. Confirmed targets are shown separately below.</p>
@@ -213,7 +223,7 @@ export default function AllocationPage() {
           <DonutSection title="Country" groups={countryGroups} />
           <DonutSection title="Currency" groups={currencyGroups} />
         </div>
-        <section className="card allocation-holdings"><h2>Largest holdings</h2><p className="note">Top {Math.min(5, largest.length)} account for {(largest.slice(0, 5).reduce((sum, row) => sum + row.effectiveWeight, 0) * 100).toFixed(1)}% of recorded holdings.</p>
+        <section className="card glow-card allocation-holdings"><h2>Largest holdings</h2><p className="note">Top {Math.min(5, largest.length)} account for {(largest.slice(0, 5).reduce((sum, row) => sum + row.effectiveWeight, 0) * 100).toFixed(1)}% of recorded holdings.</p>
           <div className="table-scroll"><table><thead><tr><th>Holding</th><th>Sector</th><th>Country</th><th className="num">Weight</th></tr></thead><tbody>{largest.slice(0, 5).map((row) => <tr key={row.id}><td>{row.companyName} <span className="note">{row.ticker}</span></td><td>{row.sector || 'Unclassified'}</td><td>{row.country || 'Unclassified'}</td><td className="num">{(row.effectiveWeight * 100).toFixed(1)}%</td></tr>)}</tbody></table></div>
         </section>
         </>}

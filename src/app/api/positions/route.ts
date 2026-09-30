@@ -6,6 +6,7 @@ import { authenticateRequest, portfolioIsOwned } from '@/lib/api-auth';
 import { assertSameOrigin } from '@/lib/auth';
 import { holdingCreateSchema } from '@/lib/portfolio-setup';
 import { readBoundedJson } from '@/lib/request-body';
+import { provisionCompanyWorkspace } from '@/lib/document-intelligence/workspace-manager';
 
 export const runtime = 'nodejs';
 
@@ -174,7 +175,11 @@ export async function POST(req: Request) {
         quantity: String(parsed.data.quantity),
         avgCost: String(parsed.data.avgCost),
       }).returning();
-      return { portfolio, security, position };
+      const workspace = await provisionCompanyWorkspace({
+        securityId: security.id, ownerId: session.auth.userId, ticker: security.ticker,
+        exchange: security.exchange, country: security.country,
+      }, tx);
+      return { portfolio, security, position, workspace };
     });
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
