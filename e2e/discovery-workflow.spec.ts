@@ -98,6 +98,7 @@ test('thesis-matched discovery remains reviewable through approval and report ac
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Review latest candidates' }).click();
   await expect(page.getByRole('heading', { name: /Nestle SA/ })).toBeVisible();
+  await page.getByText('Review evidence, decision and analysis', { exact: true }).click();
   await expect(page.getByText('2 grounding fields', { exact: true })).toBeVisible();
   await expect(page.getByText(/not independently verified investment facts/)).toBeVisible();
   await page.getByText('Eligibility and evidence dates', { exact: true }).click();

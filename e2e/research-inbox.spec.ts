@@ -19,7 +19,11 @@ for (const width of [390, 1440]) {
 
     await page.goto('/research');
     await expect(page.getByRole('heading', { name: 'Research & Analysis Inbox' })).toBeVisible();
+    await expect(page.getByRole('article')).toHaveCount(3);
+    await expect(page.getByText('Cedar Prior AG')).not.toBeVisible();
+    await page.getByLabel('Include superseded analysis versions').check();
     await expect(page.getByRole('article')).toHaveCount(4);
+    await page.getByLabel('Include superseded analysis versions').uncheck();
     await page.getByRole('button', { name: 'Candidates' }).click();
     await expect(page.getByRole('article')).toHaveCount(1);
     await expect(page.getByText('Alpine Example AG')).toBeVisible();

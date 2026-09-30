@@ -60,6 +60,7 @@ for (const width of [390, 1440])
       return json({});
     });
     await page.goto('/investment-thesis');
+    await page.getByText('Other ways to create a thesis', { exact: true }).click();
     await page
       .getByRole('button', { name: 'Create structured thesis' })
       .click();

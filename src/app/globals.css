@@ -1080,7 +1080,7 @@ button.nav-link:hover, button.nav-link[aria-expanded="true"] { background: var(-
 .example-steps a { padding: .55rem .8rem; border: 1px solid var(--border); border-radius: .5rem; color: inherit; text-decoration: none; }
 .example-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 1rem; }
 .example-cards > .card { margin: 0; }
-.example-portfolio select { display: block; max-width: 450px; min-height: 42px; margin: .5rem 0 1rem; }
+.example-portfolio select { display: block; width: 100%; max-width: 450px; min-width: 0; min-height: 42px; margin: .5rem 0 1rem; }
 .example-entry { margin: 1.3rem 0; }
 
 /* Glass-green effect layer. Light mode intentionally keeps its existing surfaces. */
@@ -1242,3 +1242,53 @@ button.nav-link:hover, button.nav-link[aria-expanded="true"] { background: var(-
   .dashboard-hero { border-radius: 14px; }
   [data-theme='dark'] .ambient-light { width: 13rem; height: 13rem; }
 }
+
+/* Guided investment workflow: shared hierarchy in both existing themes. */
+.investment-workflow-nav { max-width: 1200px; margin: 1rem auto 0; padding: 0 1.5rem; }
+.investment-workflow-nav ol { list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem; padding: 0; margin: 0; }
+.investment-workflow-nav li { min-width: 0; }
+.investment-workflow-nav a { display: flex; gap: 0.65rem; align-items: center; min-height: 52px; padding: 0.7rem; border: 1px solid var(--border); border-radius: 12px; color: var(--muted); background: var(--panel); font-size: 0.8rem; }
+.investment-workflow-nav a[aria-current='step'] { color: var(--text); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); font-weight: 600; }
+.workflow-step-number, .thesis-process li > span { display: inline-grid; place-items: center; flex-shrink: 0; width: 1.7rem; height: 1.7rem; border-radius: 50%; background: var(--bg); border: 1px solid var(--border); }
+.investment-workflow-nav a[aria-current='step'] .workflow-step-number { background: var(--accent); color: var(--panel); border-color: var(--accent); }
+.investment-workflow-nav a:focus-visible, .thesis-file-label:focus-within, .candidate-detail-panel > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.workflow-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin: 1rem 0; }
+.workflow-next-action { border-left: 3px solid var(--accent); }
+.workflow-next-action > p { margin: 0.4rem 0; }
+.thesis-process { display: flex; list-style: none; gap: 1.25rem; flex-wrap: wrap; padding: 0; margin: 1.5rem 0; color: var(--muted); font-size: 0.82rem; }
+.thesis-process li { display: flex; align-items: center; gap: 0.5rem; }
+.thesis-process li[aria-current='step'] { color: var(--accent); font-weight: 600; }
+.thesis-active { border-color: var(--accent); }
+.thesis-destination-list { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
+.thesis-destination-list article { padding: 0.75rem 1rem; border-radius: 10px; background: var(--bg); }
+.thesis-destination-list .badge { margin-left: 0.75rem; }
+.thesis-destination-list p { margin-bottom: 0; font-size: 0.9rem; }
+.thesis-upload { background: color-mix(in srgb, var(--accent) 5%, var(--panel)); }
+.thesis-file-label { display: grid; gap: 0.75rem; padding: 1.25rem; border: 1px dashed var(--accent); border-radius: 10px; cursor: pointer; }
+.thesis-file-label input { max-width: 100%; width: 100%; color: var(--text); background: transparent; border: 0; padding: 0; }
+.thesis-file-label input::file-selector-button { padding: 0.65rem 1rem; margin-right: 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); cursor: pointer; font: inherit; }
+.thesis-review-panel { scroll-margin-top: 150px; }
+.thesis-review-panel:focus { outline: 2px solid var(--accent); outline-offset: 3px; }
+.thesis-alternatives > summary, .thesis-questionnaire > summary { font-weight: 600; }
+.thesis-alternatives > section { padding-top: 1rem; }
+.thesis-questionnaire { margin-top: 1rem; }
+.thesis-extraction-status .badge { margin-right: 1rem; }
+.workflow-filter-bar { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+.workflow-filter-bar label { display: grid; gap: 0.4rem; color: var(--muted); font-size: 0.8rem; min-width: 0; }
+.workflow-filter-bar input, .workflow-filter-bar select { width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem; background: var(--panel); color: var(--text); font: inherit; }
+.candidate-scan-summary { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; font-size: 0.8rem; color: var(--muted); }
+.candidate-detail-panel > summary { color: var(--accent); font-weight: 600; padding: 0.65rem 0; cursor: pointer; }
+.candidate-detail-panel[open] > summary { margin-bottom: 1rem; border-bottom: 1px solid var(--border); }
+.research-history-toggle { display: flex; gap: 0.6rem; align-items: center; margin: 1rem 0; color: var(--muted); font-size: 0.85rem; }
+.research-history-toggle input { width: auto; }
+@media (max-width: 640px) {
+  .investment-workflow-nav { padding: 0 1rem; }
+  .investment-workflow-nav ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .investment-workflow-nav a { font-size: 0.74rem; padding: 0.55rem; }
+  .workflow-filter-bar { grid-template-columns: 1fr; gap: 0.75rem; }
+  .thesis-process { display: grid; gap: 0.65rem; }
+  .workflow-actions > .action-button, .workflow-actions > .secondary-button { width: 100%; text-align: center; }
+  .thesis-review-panel { scroll-margin-top: 120px; }
+}
+.company-intelligence-dashboard .quick-actions-bar { position: static; transform: none; max-width: none; width: 100%; flex-wrap: wrap; align-items: center; margin-top: 1.5rem; }
+.company-export-options { padding: 0.65rem; font-size: 0.85rem; }

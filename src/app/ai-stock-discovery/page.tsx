@@ -3,12 +3,15 @@
 import type { DiscoveryEvidenceScorecard } from '@/lib/discovery-evidence';
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import type { DiscoveryCandidate as ContractCandidate, MarketBrief, MarketDiscoveryOutput } from '@portfolio-intelligence/agentic-contract';
 import { MarketAnalysisReview } from '@/components/market-analysis-review';
 import type { MarketAnalysis } from '@portfolio-intelligence/agentic-contract';
 import { DiscoveryScreeningReview, DiscoveryCandidateContext } from '@/components/discovery-screening-review';
 import { useCallback, useEffect, useState } from 'react';
-import { ValuationWorkbench } from '@/components/valuation-workbench';
+const ValuationWorkbench = dynamic(() => import('@/components/valuation-workbench').then(module => module.ValuationWorkbench), {
+  loading: () => <p className="note" role="status">Loading valuation tools…</p>,
+});
 import { ResearchWorkspace } from '@/components/research-workspace';
 import { useLanguage } from '@/lib/i18n';
 import { discoveryDate, discoveryText } from '@/lib/discovery-translations';
@@ -252,6 +255,11 @@ export default function AIStockDiscoveryPage() {
   const t = (key: Parameters<typeof discoveryText>[1]) => discoveryText(language, key);
   const date = (value: string) => discoveryDate(language, value);
   const [runs, setRuns] = useState<DiscoveryRun[]>([]);
+  const [runsLoading, setRunsLoading] = useState(true);
+  const [expandedCandidateId, setExpandedCandidateId] = useState<string | null>(null);
+  const [candidateQuery, setCandidateQuery] = useState('');
+  const [candidatePortfolio, setCandidatePortfolio] = useState('all');
+  const [candidateFilter, setCandidateFilter] = useState<'all' | 'pending' | 'approved'>('all');
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [candidateListLoading, setCandidateListLoading] = useState(false);
@@ -268,7 +276,7 @@ export default function AIStockDiscoveryPage() {
     const runResponse = await fetch('/api/discovery/runs', { signal });
     const runBody = await runResponse.json().catch(() => ({})) as { runs?: DiscoveryRun[]; error?: string };
     if (!runResponse.ok) throw new Error(runBody.error ?? `Discovery runs failed (${runResponse.status})`);
-    if (!signal?.aborted) setRuns(runBody.runs ?? []);
+    if (!signal?.aborted) { setRuns(runBody.runs ?? []); setRunsLoading(false); }
   }, []);
 
   const loadCandidates = useCallback(async (runId: string, signal?: AbortSignal) => {
@@ -281,7 +289,7 @@ export default function AIStockDiscoveryPage() {
   useEffect(() => {
     const controller = new AbortController();
     void loadRuns(controller.signal).catch((cause) => {
-      if (!controller.signal.aborted) setError((cause as Error).message);
+      if (!controller.signal.aborted) { setError((cause as Error).message); setRunsLoading(false); }
     });
     return () => controller.abort();
   }, [loadRuns]);
@@ -476,10 +484,17 @@ export default function AIStockDiscoveryPage() {
     setError(null);
     setCandidateErrors({});
     setValuationCandidateId(null);
+    setExpandedCandidateId(null); setCandidateQuery(''); setCandidatePortfolio('all'); setCandidateFilter('all');
     setSelectedRunId((current) => current === runId ? null : runId);
   }
 
   const latestRun = runs[0] ?? null;
+  const discoveryRunning = runs.some(run => ['dispatching', 'queued', 'running'].includes(run.status));
+  const visibleCandidates = candidates.filter(candidate =>
+    (candidatePortfolio === 'all' || candidate.portfolioName === candidatePortfolio) &&
+    (candidateFilter === 'all' || (candidateFilter === 'pending' ? ['pending', 'watchlist'].includes(candidate.decision) : candidate.decision === 'approved')) &&
+    `${candidate.companyName} ${candidate.ticker}`.toLocaleLowerCase().includes(candidateQuery.trim().toLocaleLowerCase())
+  );
   const selectedRun = runs.find((run) => run.id === selectedRunId) ?? null;
 
   return (
@@ -489,22 +504,23 @@ export default function AIStockDiscoveryPage() {
         <p className="hero-lead">{t('intro')}</p>
       </section>
 
-      {error && <p className="login-error workflow-error" role="alert">{error}</p>}
+      {error && <div className="login-error workflow-error" role="alert"><p>{error}</p><button className="secondary-button" type="button" onClick={() => void loadRuns().then(() => setError(null)).catch(cause => setError(cause.message))}>Retry loading</button></div>}
+      <aside className="workflow-next-action card" aria-live="polite"><strong>{t('nextAction')}</strong><p>{runsLoading ? t('loadingRuns') : discoveryRunning ? t('researchInProgress') : latestRun?.status === 'completed' && latestRun.candidateCount > 0 ? t('nextReview') : t('nextSearch')}</p><Link className="text-link" href="/investment-thesis">{t('thesisLink')}</Link></aside>
 
       <section className="card glow-card workflow-stage">
         <div>
           <h2>{t('start')}</h2>
           <p className="note">{t('startDetail')}</p>
         </div>
-        <label className="compact-field">{t('limit')}
+        <details className="discovery-search-options"><summary>{t('searchOptions')}</summary><label className="compact-field">{t('limit')}
           <input type="number" min="1" max="7" value={candidateLimit} onChange={(event) => { setCandidateLimit(event.target.value); setPreflight(null); }} />
           <span>{t('limitDetail')}</span>
-        </label>
+        </label></details>
         <div className="discovery-actions">
           <button className="secondary-button" type="button" onClick={() => void checkDiscoveryReadiness()} disabled={busy !== null || preflightBusy}>
             {preflightBusy ? t('checking') : t('check')}
           </button>
-          <button className="action-button" type="button" onClick={() => void startDiscovery()} disabled={busy !== null || preflightBusy}>
+          <button className="action-button" type="button" onClick={() => void startDiscovery()} disabled={busy !== null || preflightBusy || runsLoading || discoveryRunning}>
             {busy === 'start' ? t('starting') : t('find')}
           </button>
         </div>
@@ -535,7 +551,7 @@ export default function AIStockDiscoveryPage() {
           </div>
           <Link className="secondary-button inline-action" href="/research-history">{t('history')}</Link>
         </div>
-        {runs.length === 0 ? <p className="note">{t('noRuns')}</p> : (
+        {runsLoading ? <p className="note" role="status">{t('loadingRuns')}</p> : runs.length === 0 ? <p className="note">{t('noRuns')}</p> : (
           <div className="latest-run-summary" aria-live="polite">
             <p>
               <strong>{t('latestRun')}:</strong> {date(latestRun!.requestedAt)} ·{' '}
@@ -593,7 +609,15 @@ export default function AIStockDiscoveryPage() {
         {!selectedRunId ? <div className="card"><p className="note">{t('hidden')}</p></div>
           : candidateListLoading ? <div className="card"><p className="note">{t('loading')}</p></div>
           : candidates.length === 0 ? <div className="card"><p className="note">{t('empty')}</p></div> : (
-          <div className="candidate-list">{candidates.map((candidate) => {
+          <div>
+            <div className="workflow-filter-bar">
+              <label>{t('searchCandidates')}<input type="search" value={candidateQuery} onChange={event => setCandidateQuery(event.target.value)} /></label>
+              <label>{t('portfolioFilter')}<select aria-label={t('portfolioFilter')} value={candidatePortfolio} onChange={event => setCandidatePortfolio(event.target.value)}><option value="all">{t('allPortfolios')}</option>{[...new Set(candidates.map(candidate => candidate.portfolioName))].map(name => <option key={name} value={name}>{name}</option>)}</select></label>
+              <label>{t('reviewStatus')}<select aria-label={t('reviewStatus')} value={candidateFilter} onChange={event => setCandidateFilter(event.target.value as typeof candidateFilter)}><option value="all">{t('allCandidates')}</option><option value="pending">{t('awaitingDecision')}</option><option value="approved">{t('approved')}</option></select></label>
+            </div>
+            <p className="note" role="status">{visibleCandidates.length} / {candidates.length} {t('candidates')}</p>
+            {visibleCandidates.length === 0 && <p className="note">{t('noFilterMatches')}</p>}
+          <div className="candidate-list">{visibleCandidates.map((candidate) => {
             const discovery = candidate.discoveryJson;
             const canDecide = candidate.decision === 'pending' || candidate.decision === 'watchlist';
             const isWorking = busy === candidate.id;
@@ -611,6 +635,12 @@ export default function AIStockDiscoveryPage() {
                 <div className="candidate-score"><span>Thesis fit</span><span>Review reasons below</span></div>
               </div>
               <p>{discovery.rationale}</p>
+              <div className="candidate-scan-summary"><span className={`badge ${candidate.decision === 'approved' ? 'ok' : 'watch'}`}>{candidate.decision === 'approved' ? t('approved') : candidate.decision === 'watchlist' ? t('watchlist') : t('pending')}</span><span>{discovery.sourceUrls.length} {t('sources')} · {discovery.informationGaps.length} {t('gaps')}</span>{discovery.violatedCriteria.length > 0 && <span className="caveat">{discovery.violatedCriteria.length} {t('conflicts')}</span>}</div>
+              <details className="candidate-detail-panel" open={expandedCandidateId === candidate.id} onToggle={event => {
+                const open = event.currentTarget.open;
+                setExpandedCandidateId(current => open ? candidate.id : current === candidate.id ? null : current);
+              }}>
+              <summary>{t('reviewCompany')}</summary>
               <DiscoveryCandidateContext context={discovery.discoveryContext} />
               {candidate.latestPrice && <p className="note"><strong>{t('close')}:</strong> {formatLatestPrice(candidate.latestPrice)} · {t('asOf')} {candidate.latestPrice.asOf} · {candidate.latestPrice.provider}</p>}
               <section className="evidence-scorecard" aria-label={t('evidence')}>
@@ -792,8 +822,9 @@ export default function AIStockDiscoveryPage() {
                   </>}
                 </div>
               )}
+              </details>
             </article>;
-          })}</div>
+          })}</div></div>
         )}
       </section>
     </main>

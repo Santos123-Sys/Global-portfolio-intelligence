@@ -16,11 +16,11 @@ const WORKFLOW_NAV = [
   ['/how-it-works', 'nav.howItWorks'],
   ['/investment-thesis', 'nav.thesis'],
   ['/ai-stock-discovery', 'nav.discover'],
+  ['/research', 'nav.analysis'],
   ['/positions', 'nav.portfolio'],
 ] as const satisfies ReadonlyArray<readonly [string, TranslationKey]>;
 
 const REVIEW_NAV = [
-  ['/research', 'nav.researchInbox'],
   ['/governance', 'nav.investmentControl'],
 ] as const satisfies ReadonlyArray<readonly [string, TranslationKey]>;
 
@@ -332,7 +332,7 @@ export function Header() {
         </div>
       </div>
 
-      {pathname !== '/' && (
+      {pathname !== '/' && !(['/investment-thesis', '/ai-stock-discovery', '/research'].includes(pathname) || pathname.startsWith('/security/') || pathname.startsWith('/workspace/')) && (
         <div className="breadcrumb">
           {viewing ? (
             <>
