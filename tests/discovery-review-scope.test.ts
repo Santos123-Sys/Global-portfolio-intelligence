@@ -30,7 +30,7 @@ describe('run-scoped candidate review', () => {
 
   it('keeps only the latest run in the active workflow and moves history to its own folder', () => {
     expect(discoveryPage).toContain("t('latest')");
-    expect(discoveryPage).toContain('href="/research-history"');
+    expect(discoveryPage).toContain('href="/research-operations?view=activity"');
     expect(discoveryPage).not.toContain('Show run history');
     expect(discoveryPage).toContain('setSelectedRunId(null)');
   });
