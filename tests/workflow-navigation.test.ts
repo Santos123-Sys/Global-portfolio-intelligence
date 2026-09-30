@@ -19,7 +19,7 @@ describe('discovery-first workflow', () => {
     expect(header).toContain("['/ai-stock-discovery', 'nav.discover']");
     expect(header).toContain("['/positions', 'nav.portfolio']");
     expect(header).toContain("['/how-it-works', 'nav.howItWorks']");
-    expect(header).toContain("['/research', 'nav.researchInbox']");
+    expect(header).toContain("['/research', 'nav.analysis']");
     expect(header).toContain("['/governance', 'nav.investmentControl']");
     expect(header).toContain("['/research-history', 'nav.adminActivity']");
     expect(header).toContain("['/agentic-system', 'nav.existingHoldingsAnalysis']");
@@ -36,7 +36,7 @@ describe('discovery-first workflow', () => {
     expect(i18n).toContain("'nav.settings': 'Settings'");
     expect(i18n).toContain("'nav.thesis': '1. Thesis'");
     expect(i18n).toContain("'nav.discover': '2. Discover'");
-    expect(i18n).toContain("'nav.portfolio': '3. Portfolio'");
+    expect(i18n).toContain("'nav.portfolio': '4. Portfolio'");
     expect(portfolioWorkspaceNav).toContain("['/positions', 'Positions']");
     expect(portfolioWorkspaceNav).toContain("['/allocation', 'Allocation']");
     expect(portfolioWorkspaceNav).toContain("['/risk', 'Risk']");

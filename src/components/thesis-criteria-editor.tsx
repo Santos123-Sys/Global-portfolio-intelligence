@@ -3,7 +3,7 @@
 import { ThesisPolicyEditor } from './thesis-policy-editor';
 import type { ThesisCriteria } from '@portfolio-intelligence/agentic-contract';
 
-export function ThesisCriteriaEditor({ criteria, onChange }: { criteria: ThesisCriteria; onChange: (criteria: ThesisCriteria) => void }) {
+export function ThesisCriteriaEditor({ criteria, onChange, expandPolicy = false }: { criteria: ThesisCriteria; onChange: (criteria: ThesisCriteria) => void; expandPolicy?: boolean }) {
   function update(index: number, patch: Partial<ThesisCriteria['portfolios'][number]>) {
     onChange({ ...criteria, portfolios: criteria.portfolios.map((value, position) => position === index ? { ...value, ...patch } : value) });
   }
@@ -11,11 +11,11 @@ export function ThesisCriteriaEditor({ criteria, onChange }: { criteria: ThesisC
     {criteria.portfolios.map((portfolio, index) => <fieldset key={index} className="thesis-mandate">
       <legend>Mandate {index + 1}</legend>
       <div className="setup-form-row">
-        <label>Discovery destination<select value={portfolio.role} onChange={event => update(index, { role: event.target.value })} aria-label={`Portfolio destination for mandate ${index + 1}`}><option value="swiss_quality">Swiss Quality — SIX</option><option value="brazilian_growth">Brazilian Growth — B3</option>{!['swiss_quality','brazilian_growth'].includes(portfolio.role) && <option value={portfolio.role}>{portfolio.role.replaceAll('_',' ')} — research unavailable</option>}</select></label>
+        <label>Discovery destination<select value={portfolio.role} onChange={event => update(index, { role: event.target.value })} aria-label={`Portfolio destination for mandate ${index + 1}`}><option value="swiss_quality">Swiss Quality — SIX</option><option value="brazilian_growth">Brazilian Growth — B3</option>{!['swiss_quality','brazilian_growth'].includes(portfolio.role) && <option value={portfolio.role}>{portfolio.role === 'new_mandate' ? 'Choose a market' : `${portfolio.role.replaceAll('_',' ')} — research unavailable`}</option>}</select></label>
         <label>Reporting currency<input value={portfolio.currency} onChange={event => update(index, { currency: event.target.value })} aria-label={`Reporting currency for mandate ${index + 1}`} /></label>
       </div>
       <label>Investment objective<textarea value={portfolio.objective} onChange={event => update(index, { objective: event.target.value })} /></label>
-      <ThesisPolicyEditor policy={portfolio.policy} onChange={policy => update(index, { policy })} />
+      <details open={expandPolicy}><summary>Eligibility and investment rules{portfolio.policy ? ` (${portfolio.policy.rules.length} classified rules)` : ' — structure this mandate'}</summary><ThesisPolicyEditor policy={portfolio.policy} onChange={policy => update(index, { policy })} /></details>
       <details><summary>Source prose and legacy criteria</summary><div className="setup-form-row">
         <label>Inclusion criteria — one per line<textarea value={portfolio.inclusionCriteria.join('\n')} onChange={event => update(index, { inclusionCriteria: event.target.value.split('\n') })} /></label>
         <label>Exclusion criteria — one per line<textarea value={portfolio.exclusionCriteria.join('\n')} onChange={event => update(index, { exclusionCriteria: event.target.value.split('\n') })} /></label>
