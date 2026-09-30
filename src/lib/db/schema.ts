@@ -259,6 +259,7 @@ export const priceHistory = pgTable(
     /** Which connector produced this row — required for auditability. */
     source: text('source').notNull(),
     fetchedAt: timestamp('fetched_at', { withTimezone: true }).defaultNow().notNull(),
+    volume: numeric('volume', { precision: 24, scale: 4 }),
   },
   (t) => ({
     securityDateIdx: uniqueIndex('price_history_security_date_idx').on(

@@ -691,6 +691,7 @@ export async function startApprovedCandidateAnalysis(
     securityId: security.id,
     priceDate: bar.date,
     close: String(bar.close),
+    volume: bar.volume!=null ? String(bar.volume) : null,
     currency: bar.currency,
     source: provider.name,
   }))).onConflictDoNothing();

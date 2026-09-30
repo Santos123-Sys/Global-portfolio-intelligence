@@ -25,6 +25,7 @@ export interface DataProvenance {
 export interface DailyBar {
   date: string; // ISO yyyy-mm-dd
   close: number;
+  volume?: number;
   currency: string;
   provenance?: DataProvenance;
 }

@@ -21,6 +21,10 @@ const pipeline = new OpenAIAgenticPipeline(
 );
 const storage = new ReportStorage(config);
 const workerId = `worker-${randomUUID()}`;
+const financeRuntime=config.FINANCE_DATABASE_URL ? (async()=>{
+  process.env.DATABASE_URL=config.FINANCE_DATABASE_URL;
+  return import('./finance-runtime.js');
+})() : null;
 let stopping = false;
 
 // The healthcheck reads these; the loop is the only writer.
@@ -86,6 +90,11 @@ async function run(): Promise<void> {
     lastPollAt = Date.now();
     state = 'idle';
     if (await deliverNextCallback()) continue;
+    if(financeRuntime) {
+      state='processing';
+      const processed=await (await financeRuntime).processQueuedSessions(()=>{lastPollAt=Date.now();});
+      lastPollAt=Date.now(); state='idle'; jobsProcessed+=processed;
+    }
     const job = await repository.claimNext(workerId, config.AGENTIC_JOB_LEASE_SECONDS);
     if (job) {
       process.stdout.write(`Processing ${job.kind} ${job.externalId}\n`);

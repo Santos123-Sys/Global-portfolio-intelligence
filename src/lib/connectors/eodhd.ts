@@ -405,6 +405,7 @@ export class EodhdProvider implements PriceProvider {
         date,
         close,
         currency: info.currency,
+        volume: finite(row.volume) ?? undefined,
         provenance: {
           provider: this.name,
           sourceName: 'EODHD end-of-day historical data',

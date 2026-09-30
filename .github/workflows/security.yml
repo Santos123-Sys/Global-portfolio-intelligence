@@ -47,6 +47,7 @@ jobs:
           npm audit --audit-level=high
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run build:agentic
       - run: npm test
       - run: npm run build
       - name: Install browser for workflow smoke test

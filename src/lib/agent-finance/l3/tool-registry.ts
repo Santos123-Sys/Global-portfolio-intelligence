@@ -2,7 +2,7 @@ import { messageSchema, type AgentMessage } from '../contracts';
 
 export const TOOL_NAMES = ['fetch_financial_statements', 'fetch_price_history', 'fetch_analyst_estimates',
   'fetch_comprehensive_data', 'query_documents', 'fetch_filings', 'execute_python', 'calculate_wacc',
-  'run_monte_carlo', 'fetch_news', 'fetch_peer_data', 'retrieve_memory', 'store_memory', 'run_dcf', 'deliver_message'] as const;
+  'run_monte_carlo', 'fetch_news', 'fetch_peer_data', 'retrieve_memory', 'store_memory', 'run_dcf', 'deliver_message','verify_claims'] as const;
 export type ToolName = typeof TOOL_NAMES[number];
 type Handler = (input: unknown, message: AgentMessage) => Promise<unknown>;
 

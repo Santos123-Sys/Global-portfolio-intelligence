@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { capitalSchema, driverSchema, simulationSchema } from './l4/financial-model';
 
 export const outputSchema = z.object({
   status: z.enum(['completed', 'insufficient_data', 'blocked']),
@@ -6,6 +7,7 @@ export const outputSchema = z.object({
   reasoningChain: z.array(z.string().min(1)).min(1),
   confidenceScore: z.number().min(0).max(100),
   citations: z.array(z.string().min(1)), limitations: z.array(z.string()),
+  claims: z.array(z.object({ text: z.string().min(1), citations: z.array(z.string()), evidence: z.string().min(1) })).optional(),
 });
 export type AgentOutput = z.infer<typeof outputSchema>;
 export const messageSchema = z.object({
@@ -17,9 +19,14 @@ export type AgentMessage = z.infer<typeof messageSchema>;
 export const analyzeSchema = z.object({
   ticker: z.string().trim().min(1).max(32),
   analysisType: z.enum(['dcf', 'fundamental', 'combined', 'quick']),
+  portfolioId: z.string().uuid().optional(),
+  thesisVersionId: z.string().uuid().optional(),
   userOverrides: z.object({
     timeHorizon: z.number().int().min(5).max(10).optional(),
     discountRate: z.number().positive().max(.5).optional(),
+    capitalInputs: capitalSchema.optional(),
+    drivers: driverSchema.optional(),
+    simulation: simulationSchema.optional(),
     assumptions: z.object({
       annualGrowthRate: z.number().min(-.5).max(.5).optional(),
       terminalGrowthRate: z.number().min(-.05).max(.05).optional(),

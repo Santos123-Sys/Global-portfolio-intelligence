@@ -14,6 +14,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ sessionI
   if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
   const runs = await db.select().from(agentRuns).where(eq(agentRuns.sessionId, session.id));
   const plan = executionPlan(analyzeSchema.parse(session.requestPayload).analysisType);
-  const done = runs.filter(row => row.status !== 'running').map(row => row.agentName);
+  const done = [...new Set(runs.filter(row => row.status !== 'running').map(row => row.agentName))];
   return NextResponse.json({ ...session, sessionId, progress: session.status === 'completed' ? 100 : Math.round(done.length / plan.length * 100), agentsCompleted: done, agentsPending: plan.filter(name => !done.includes(name)), currentAgent: runs.find(row => row.status === 'running')?.agentName ?? null, runs }, { headers: { 'Cache-Control': 'no-store' } });
 }

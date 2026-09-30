@@ -14,7 +14,7 @@
     "dev": "next dev",
     "build": "npm run build:contract && next build",
     "build:contract": "npm run build --workspace @portfolio-intelligence/agentic-contract",
-    "build:agentic": "npm run build:contract && npm run build --workspace @portfolio-intelligence/agentic-service",
+    "build:agentic": "npm run build:contract && npm run build --workspace @portfolio-intelligence/agentic-service && node scripts/build-finance-runtime.mjs",
     "postbuild": "node scripts/prepare-standalone.mjs",
     "start": "next start",
     "start:standalone": "HOSTNAME=0.0.0.0 node .next/standalone/server.js",

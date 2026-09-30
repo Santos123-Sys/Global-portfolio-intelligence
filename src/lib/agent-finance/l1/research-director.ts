@@ -1,27 +1,40 @@
-import { and, eq, lt } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
+import { and, eq, lt, sql,or,isNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { agentAnalysisSessions, agentDebates } from '@/lib/db/agent-schema';
+import { agentAnalysisSessions, agentDebates, agentRuns } from '@/lib/db/agent-schema';
 import { analyzeSchema, dcfAgents, analysisAgents, evidenceOutput, executionPlan } from '../contracts';
-import { loadFoundation } from '../l4/foundation';
+import { loadFoundation,sourceEvidence } from '../l4/foundation';
 import { createLiveRegistry } from '../l3/live-registry';
 import { ExecutionEngine } from '../l3/execution-engine';
 import { dcfAgent } from './dcf-swarm';
 import { analysisAgent } from './analysis-swarm';
+import type { Foundation } from '../l4/foundation';
 
 /** L1: queued PostgreSQL state is authoritative; atomic claim prevents duplicate execution. */
-export async function executeSession(sessionId: string): Promise<void> {
-  const [session] = await db.update(agentAnalysisSessions).set({ status: 'running', updatedAt: new Date() })
+export async function executeSession(sessionId: string,onHeartbeat?:()=>void): Promise<void> {
+  const token=randomUUID();
+  const owned=and(eq(agentAnalysisSessions.id,sessionId),eq(agentAnalysisSessions.leaseOwner,token),eq(agentAnalysisSessions.status,'running'));
+  const [session] = await db.update(agentAnalysisSessions).set({ status: 'running',leaseOwner:token,leaseExpiresAt:new Date(Date.now()+120_000),attempts:sql`${agentAnalysisSessions.attempts}+1`, updatedAt: new Date() })
     .where(and(eq(agentAnalysisSessions.id, sessionId), eq(agentAnalysisSessions.status, 'queued'))).returning();
   if (!session) return;
+  let lost=false;
+  const heartbeat=setInterval(()=>{ void db.update(agentAnalysisSessions).set({leaseExpiresAt:new Date(Date.now()+120_000),updatedAt:new Date()}).where(owned).returning({id:agentAnalysisSessions.id}).then(rows=>{if(!rows.length) lost=true;else onHeartbeat?.();}).catch(()=>{lost=true;}); },30_000);
   try {
     const request = analyzeSchema.parse(session.requestPayload);
-    const foundation = await loadFoundation(session.ownerId, session.securityId);
-    const engine = new ExecutionEngine(session.id, createLiveRegistry(foundation, session.ownerId, session.id));
+    const foundation = session.evidenceSnapshot as Foundation ?? await loadFoundation(session.ownerId, session.securityId, request);
+    if(lost) throw new Error('Session lease lost');
+    await db.update(agentAnalysisSessions).set({evidenceSnapshot:foundation}).where(owned);
+    const engine = new ExecutionEngine(session.id, createLiveRegistry(foundation, session.ownerId, session.id),sourceEvidence(foundation),token);
+    const completed=await db.select().from(agentRuns).where(and(eq(agentRuns.sessionId,sessionId),eq(agentRuns.status,'completed')));
+    for(const run of completed) if(run.outputPayload) engine.outputs[run.agentName]=run.outputPayload as import('../contracts').AgentOutput;
     await engine.phase('research');
     await engine.run('research-director', async () => {
       await engine.tool('research-director', 'fetch_comprehensive_data');
       await engine.tool('research-director', 'fetch_filings');
       await engine.tool('research-director', 'fetch_news');
+      await engine.tool('research-director', 'fetch_analyst_estimates');
+      await engine.tool('research-director', 'fetch_peer_data');
+      await engine.tool('research-director', 'calculate_wacc');
       return evidenceOutput({ plan: executionPlan(request.analysisType), ticker: request.ticker }, ['Collect existing dated financial evidence, NewsAdapter-ingested articles and portfolio-linked documents.'], foundation.sources, [], 60);
     });
     if (request.analysisType === 'dcf' || request.analysisType === 'combined') {
@@ -44,19 +57,22 @@ export async function executeSession(sessionId: string): Promise<void> {
       confidenceScore, reasoningChain: ['Synthesize validated specialist outputs without overwriting conflicting views.', 'Numerical results remain separate from model-written narratives and require human review.'],
       citations: [...new Set(values.flatMap(row => row.citations))], requiresHumanReview: true,
       limitations: [...new Set(values.flatMap(row => row.limitations))],
-      status: values.some(row => row.status !== 'completed') ? 'insufficient_data' : 'completed',
+      status: confidenceScore<60 || values.some(row => row.status !== 'completed') ? 'insufficient_data' : 'completed',
     };
     await engine.tool('research-director', 'store_memory', { agentName: 'research-director', eventContent: finalOutput });
-    await db.update(agentAnalysisSessions).set({ status: 'completed', phase: 'complete', finalOutput, updatedAt: new Date(), completedAt: new Date() }).where(eq(agentAnalysisSessions.id, sessionId));
+    if(lost) throw new Error('Session lease lost');
+    await db.update(agentAnalysisSessions).set({ status: 'completed',leaseOwner:null,leaseExpiresAt:null, phase: 'complete', finalOutput, updatedAt: new Date(), completedAt: new Date() }).where(owned);
   } catch (error) {
-    await db.update(agentAnalysisSessions).set({ status: 'failed', error: error instanceof Error ? error.message : 'Analysis failed', updatedAt: new Date(), completedAt: new Date() }).where(eq(agentAnalysisSessions.id, sessionId));
-  }
+    await db.update(agentAnalysisSessions).set({ status: 'failed',leaseOwner:null,leaseExpiresAt:null, error: error instanceof Error ? error.message : 'Analysis failed', updatedAt: new Date(), completedAt: new Date() }).where(owned);
+  } finally {clearInterval(heartbeat);}
 }
 
-export async function processQueuedSessions(): Promise<number> {
+export async function processQueuedSessions(onHeartbeat?:()=>void): Promise<number> {
   // Never silently leave an interrupted model request "running" indefinitely.
-  await db.update(agentAnalysisSessions).set({ status: 'failed', error: 'Execution interrupted or exceeded the ten-minute session lease; start a new run.', completedAt: new Date() }).where(and(eq(agentAnalysisSessions.status, 'running'), lt(agentAnalysisSessions.updatedAt, new Date(Date.now() - 600_000))));
-  const queued = await db.select({ id: agentAnalysisSessions.id }).from(agentAnalysisSessions).where(eq(agentAnalysisSessions.status, 'queued')).limit(2);
-  for (const row of queued) await executeSession(row.id);
+  const expired=or(isNull(agentAnalysisSessions.leaseExpiresAt),lt(agentAnalysisSessions.leaseExpiresAt,new Date()));
+  await db.update(agentAnalysisSessions).set({status:'failed',error:'Worker interrupted three times; inspect run history before retrying.',leaseOwner:null,leaseExpiresAt:null,completedAt:new Date()}).where(and(eq(agentAnalysisSessions.status,'running'),expired,sql`${agentAnalysisSessions.attempts}>=3`));
+  await db.update(agentAnalysisSessions).set({status:'queued',leaseOwner:null,leaseExpiresAt:null,updatedAt:new Date()}).where(and(eq(agentAnalysisSessions.status,'running'),expired,sql`${agentAnalysisSessions.attempts}<3`));
+  const queued = await db.select({ id: agentAnalysisSessions.id }).from(agentAnalysisSessions).where(eq(agentAnalysisSessions.status, 'queued')).limit(1);
+  for (const row of queued) await executeSession(row.id,onHeartbeat);
   return queued.length;
 }

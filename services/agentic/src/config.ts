@@ -19,6 +19,7 @@ const apiSchema = commonSchema.extend({
 });
 
 const workerSchema = commonSchema.extend({
+  FINANCE_DATABASE_URL:z.string().url().optional(),
   OPENAI_API_KEY: z.string().min(1),
   OPENAI_MODEL: z.string().min(1).default('gpt-6-sol'),
   OPENAI_REASONING_EFFORT: reasoningEffort.default('medium'),
