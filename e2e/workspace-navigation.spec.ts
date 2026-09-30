@@ -17,8 +17,11 @@ for (const width of [390, 1440]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: `/tmp/workspace-${width}.png`, fullPage: true, animations: 'disabled' });
     if (width < 640) await page.getByRole('button', { name: 'Menu', exact: true }).click();
+    const analysisLink = page.locator('header').getByRole('link', { name: '3. Analysis', exact: true });
+    await expect(analysisLink).toBeVisible();
+    await expect(analysisLink).toHaveAttribute('href', '/research');
+    await expect(page.locator('header a[href="/research"]')).toHaveCount(1);
     await page.getByRole('button', { name: 'Investment Review' }).click();
-    await expect(page.getByRole('link', { name: 'Research & Analysis Inbox' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Investment Control' })).toBeVisible();
     await page.getByRole('button', { name: 'Investment Review' }).click();
     await page.getByRole('button', { name: 'More' }).click();
@@ -32,5 +35,11 @@ for (const width of [390, 1440]) {
     await expect(page.getByRole('status')).toContainText('No matching pages');
     await page.keyboard.press('Escape');
     await expect(page.locator('#page-finder')).not.toBeVisible();
+    if (width < 640) await page.getByRole('button', { name: 'Menu', exact: true }).click();
+    await analysisLink.focus();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/\/research$/);
+    await expect(page.getByRole('heading', { name: 'Research & Analysis Inbox' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Investment workflow' }).getByRole('link', { name: 'Analysis & valuation' })).toHaveAttribute('aria-current', 'step');
   });
 }
