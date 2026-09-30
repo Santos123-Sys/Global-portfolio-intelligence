@@ -67,7 +67,7 @@ const review = {
   rationale: 'Reviewed annual financials and currency-consistent cost of capital.',
   lifeCycle: { stage: 'maturity', rationale: 'Revenue growth is moderate, operations are established, and the company is being valued as a mature going concern.' },
   fcff: { method: 'ebit', workingCapitalInvestment: 20, interestIncludedInCfo: false },
-  scenarios: Object.fromEntries(['worst_case', 'base_case', 'optimistic_case'].map(name => [name, { annualGrowthRate: .04, discountRate: .1, terminalGrowthRate: .02 }])),
+  scenarios: Object.fromEntries(['worst_case', 'base_case', 'optimistic_case'].map(name => [name, { annualGrowthRate: .04, discountRate: .1, terminalGrowthRate: .02, rationale: `${name} assumptions are tied to reviewed growth, risk and stable-state economics.` }])),
 };
 function derivedFacts() {
   const template = state.facts[0];
