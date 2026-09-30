@@ -4,6 +4,7 @@ import { MarketAssumptionsReview } from './market-assumptions-review';
 import type { MarketContext, MarketProfile, MarketValuationReview } from '@portfolio-intelligence/agentic-contract';
 import { deriveFcff } from '@/lib/quant/fcff';
 import { valuationReviewSchema, type ValuationReview } from '@/lib/valuation-review';
+import { lifeCyclePolicy, type CompanyLifeCycleStage } from '@/lib/company-life-cycle';
 
 export function DcfAssumptionReview({ facts, currency, period, marketContext, profiles, onChange }: {
   marketContext: MarketContext; profiles?: MarketProfile[];
@@ -20,6 +21,7 @@ export function DcfAssumptionReview({ facts, currency, period, marketContext, pr
       market: marketInput ?? undefined,
       confirmed: accepted, financialPeriodEnd: period, currency,
       asOf: values.date, sourceUrl: values.source, rationale: values.rationale,
+      lifeCycle: { stage: values.life_cycle_stage, rationale: values.life_cycle_rationale },
       fcff: { method: values.method, taxRate: number('tax', 100), workingCapitalInvestment: number('wc'), interestIncludedInCfo: interest },
       scenarios: Object.fromEntries(['worst_case', 'base_case', 'optimistic_case'].map(name => [name, {
         annualGrowthRate: number(`${name}_growth`, 100), discountRate: number(`${name}_wacc`, 100), terminalGrowthRate: number(`${name}_terminal`, 100),
@@ -48,7 +50,27 @@ export function DcfAssumptionReview({ facts, currency, period, marketContext, pr
       const checked = review(next, confirmed, interestIncluded, value);
       onChange(checked.success && value ? checked.data : null);
     }} />
-    <label>FCFF method<select value={fields.method} onChange={event => update({ ...fields, method: event.target.value })}>
+    <fieldset>
+      <legend>Business life-cycle review</legend>
+      <p className="note">Confirm the operating stage before setting forecast assumptions. The stage is a reviewed valuation input; it is not inferred automatically from age or size.</p>
+      <label>Life-cycle stage<select value={fields.life_cycle_stage ?? ''} onChange={event => update({ ...fields, life_cycle_stage: event.target.value })}>
+        <option value="">Select stage</option>
+        <option value="start_up">Start-up</option>
+        <option value="growth">Growth</option>
+        <option value="maturity">Maturity</option>
+        <option value="diversification">Diversification</option>
+        <option value="decline">Decline</option>
+      </select></label>
+      {fields.life_cycle_stage && (() => {
+        const policy = lifeCyclePolicy(fields.life_cycle_stage as CompanyLifeCycleStage);
+        return <div className="caveat"><strong>{policy.label} valuation implications</strong>
+          <ul>{policy.valuationFocus.map(item => <li key={item}>{item}</li>)}</ul>
+          <p>{policy.terminalValueGuidance}</p><p>{policy.transitionGuidance}</p>
+        </div>;
+      })()}
+      <label>Why this stage applies<textarea value={fields.life_cycle_rationale ?? ''} placeholder="Cite operating, financial, strategic and industry evidence. Do not classify from company age alone." onChange={event => update({ ...fields, life_cycle_rationale: event.target.value })} /></label>
+    </fieldset>
+        <label>FCFF method<select value={fields.method} onChange={event => update({ ...fields, method: event.target.value })}>
       <option value="auto">Automatic supported method</option><option value="ebit">EBIT / operating profit</option><option value="cfo">Operating cash flow (CFO)</option>
     </select></label>
     <div className="dcf-review-grid">{input('tax', 'Tax rate override (%) — optional')}{input('wc', 'Non-cash working-capital investment — optional')}</div>
@@ -63,6 +85,6 @@ export function DcfAssumptionReview({ facts, currency, period, marketContext, pr
     <div className="dcf-review-grid">{input('date', 'Assumptions reviewed as of', 'date')}{input('source', 'Source / assumptions memo URL', 'url')}</div>
     <label>Rationale and sources for rates and accounting adjustments<textarea value={fields.rationale ?? ''} onChange={event => update({ ...fields, rationale: event.target.value })} /></label>
     <label><input type="checkbox" checked={confirmed} onChange={event => update(fields, event.target.checked)} />I reviewed the source, financial period, units, tax and forecast assumptions.</label>
-    <p className="note" role="status">{parsed.success && market ? 'Review complete. The server will validate financial inputs and scenario ordering.' : 'Complete all nine scenario rates, review date, source URL, rationale (20+ characters), and confirmation.'}</p>
+    <p className="note" role="status">{parsed.success && market ? 'Review complete. The server will validate financial inputs and scenario ordering.' : 'Complete the life-cycle stage and rationale, all nine scenario rates, review date, source URL, valuation rationale (20+ characters), and confirmation.'}</p>
   </details>;
 }
