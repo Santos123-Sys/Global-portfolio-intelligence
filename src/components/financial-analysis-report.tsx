@@ -38,6 +38,14 @@ export function FinancialAnalysisReport({ candidateId, reloadToken }: { candidat
     {loading ? <p className="note" role="status">Loading financial evidence…</p> : error ? <p className="caveat" role="alert">{error}</p> : report && <>
       <p className="note">{report.companyName} · {report.ticker} · {report.currency} · {report.periods.length} annual periods · report generated {new Date(report.generatedAt).toLocaleDateString()}</p>
       <p className="note">Figures use retained financial evidence; margins and growth are calculated. Valuation scenarios are separate estimates. Evidence status: {report.status === 'partial_data' ? 'Partial - review missing or conflicting metrics' : report.status === 'evidence_required' ? 'Evidence required' : 'Required metrics present'}.</p>
+      <section className="life-cycle-assessment">
+        <h5>Business life-cycle assessment</h5>
+        <p className="note">{report.lifeCycle.suggestedStage ? `Provisional financial-pattern suggestion: ${report.lifeCycle.suggestedStage.replaceAll('_', ' ')} · confidence ${report.lifeCycle.confidence}.` : 'No provisional stage can be supported from the retained annual financial pattern.'}</p>
+        <p>{report.lifeCycle.rationale}</p>
+        {report.lifeCycle.evidence.length > 0 && <ul>{report.lifeCycle.evidence.map(item => <li key={item}>{item}</li>)}</ul>}
+        {report.lifeCycle.limitations.map(item => <p className="caveat" key={item}>{item}</p>)}
+        <p className="note">This is a review aid, not an automatic valuation input. Confirm the stage using operating, strategic and industry evidence before generating a DCF.</p>
+      </section>
       {report.periods.length >= 2 && <div className="financial-chart" role="img" aria-label="Historical revenue, operating income, and free cash flow by annual period">
         <ResponsiveContainer width="100%" height={280}><LineChart data={series} margin={{ top: 12, right: 16, bottom: 8, left: 16 }}>
           <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="year" /><YAxis tickFormatter={(value: number) => new Intl.NumberFormat('en-US', { notation: 'compact' }).format(value)} />
