@@ -8,15 +8,14 @@ import type { RunBriefing } from '@/lib/agent-finance/l3/session-control';
 import type { SessionAction } from '@/lib/agent-finance/l3/session-control';
 import { useLanguage } from '@/lib/i18n';
 import { executionPlan } from '@/lib/agent-finance/contracts';
-import { AgentActivityInspectorPanel } from './agent-activity-inspector';
-import type { AgentActivityInspector } from '@/lib/agent-finance/activity-inspector';
 
 interface Session {
-  id: string; status: string; phase: string; progress: number; error?: string | null;
+  id: string; ticker?:string; status: string; phase: string; progress: number; error?: string | null;
   agentsCompleted?: string[]; agentsPending?: string[];
   portfolioLinked?:boolean;
+  liveStatus?:{phase:string;currentAgent:string|null;latestActivity:string|null;updatedAt:string;progress:number}|null;
   events?:RunEvent[];briefing?:RunBriefing;
-  currentAgent?:string|null;inspector?:AgentActivityInspector;
+  currentAgent?:string|null;
   partialOutputs?:Record<string,AgentOutput>;
   finalOutput?: { status?:string; outputs: Record<string, AgentOutput>; confidenceScore: number; limitations: string[];valueScorecard?:{status:string;total:number|null;coverage?:number} } | null;
 }
@@ -48,7 +47,7 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
       const body = await response.json(); if (!response.ok) throw new Error(body.error ?? 'Unable to load history');
       if (!cancelled) { setHistory(body.sessions); setScopes(body.scopes ?? []); if(body.scopes?.length===1) setScope(body.scopes[0].portfolioId); }
       if(body.sessions[0] && !cancelled) {
-        const detail=await fetch(`/api/agents/sessions/${body.sessions[0].id}`,{signal:controller.signal});
+        const detail=await fetch(`/api/agents/sessions/${body.sessions[0].id}?view=company`,{signal:controller.signal});
         if(!detail.ok)throw new Error('Unable to load the retained research run');
         const saved=await detail.json();if(!cancelled)setSession(saved);
       }
@@ -61,7 +60,7 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
     const controller=new AbortController(); let timer:ReturnType<typeof setTimeout>;
     async function poll() {
       try {
-        const response = await fetch(`/api/agents/sessions/${sessionId}`,{signal:controller.signal}); const body = await response.json();
+        const response = await fetch(`/api/agents/sessions/${sessionId}?view=company`,{signal:controller.signal}); const body = await response.json();
         if (!response.ok) throw new Error(body.error ?? 'Unable to load session');
         if (!cancelled) { setSession(current=>current?.id===sessionId ? body : current); setError(''); }
       } catch (e) { if (!cancelled) setError(e instanceof Error ? e.message : 'Polling failed'); }
@@ -94,7 +93,7 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
       const response=await fetch(`/api/agents/sessions/${sessionId}/control`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,confirmed:true})});
       const body=await response.json();if(!response.ok) throw new Error(body.error ?? 'Unable to change run state');
       setSession(current=>current?.id===sessionId ? {...current,status:body.status} : current);
-      const updated=await fetch(`/api/agents/sessions/${sessionId}`); if(!updated.ok) throw new Error('Control succeeded, but the updated timeline could not be loaded. Refresh this page.');
+      const updated=await fetch(`/api/agents/sessions/${sessionId}?view=company`); if(!updated.ok) throw new Error('Control succeeded, but the updated status could not be loaded. Refresh this page.');
       const detail=await updated.json();setSession(current=>current?.id===sessionId ? detail : current);
     } catch(error) {setError(error instanceof Error ? error.message : 'Run control failed');} finally {setBusy(false);}
   }
@@ -158,8 +157,7 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
       <div className="workflow-actions"><button type="button" className="secondary-button" disabled={busy} onClick={()=>setPlanPreview(false)}>Back to edit scope</button><button type="button" className="action-button" disabled={busy || active} onClick={()=>void start()}>{busy?'Starting…':'Confirm plan and start research'}</button></div>
     </section>}
     {error && <p role="alert" className="error-text">{error}</p>}
-    {session && <AgentRunStatus status={session.status} progress={session.progress} events={session.events} briefing={session.briefing} busy={busy} viewer={viewer} onControl={action=>void control(action)}/>}
-    {session?.inspector && <AgentActivityInspectorPanel inspector={session.inspector} events={session.events}/>}
+    {session && <AgentRunStatus status={session.status} progress={session.progress} events={session.events} liveStatus={session.liveStatus} briefing={session.briefing} busy={busy} viewer={viewer} onControl={action=>void control(action)}/>}
     {session?.status==='awaiting_approval' && pendingFinancials && <section className="card glass-panel"><StatementAnalysisSummary output={pendingFinancials}/><h3>Review retained financial inputs</h3><p>Check these annual statement dates, actual period lengths and source categories against the linked filings. This confirms retained inputs; it does not fill gaps or authorize investment decisions.</p>{!viewer && <form onSubmit={event=>{event.preventDefault();void reviewFinancialInputs();}}><div className="form-grid">{pendingPeriods.map(period=><fieldset key={period.date}><legend>{period.date}</legend><label>Actual annual period length (days)<input type="number" required min="330" max="380" value={financialPeriods[period.date]?.days ?? ''} onChange={event=>setFinancialPeriods(current=>({...current,[period.date]:{days:event.target.value,sourceQuality:current[period.date]?.sourceQuality ?? 'unknown'}}))}/></label><label>Reviewed source category<select value={financialPeriods[period.date]?.sourceQuality ?? 'unknown'} onChange={event=>setFinancialPeriods(current=>({...current,[period.date]:{days:current[period.date]?.days ?? '',sourceQuality:event.target.value}}))}><option value="unknown">Unknown / not verified</option><option value="primary">Primary issuer / regulatory filing</option><option value="official_api">Official API</option><option value="licensed_data">Licensed data provider</option><option value="secondary">Secondary source</option></select></label></fieldset>)}</div><details><summary>Retained source references</summary><ul>{pendingFinancials.citations.map(source=><li key={source}>{/^https?:\/\//.test(source)?<a href={source} target="_blank" rel="noreferrer">{source}</a>:source}</li>)}</ul></details><button className="action-button" type="submit" disabled={busy}>Confirm reviewed inputs and continue research</button><p className="note">Secondary or unknown provenance continues to withhold automatic totals. Approval is never inferred from elapsed time.</p></form>}</section>}
     {session?.status === 'failed' && <p role="alert">{session.error ?? 'Analysis failed. Inspect the timeline and retry after correcting the missing inputs.'}</p>}
     {outputs && <>
@@ -181,6 +179,6 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
         <h4>Sources</h4><ul>{output.citations.map((source, i) => <li key={i}>{/^https?:\/\//.test(source) ? <a href={source} target="_blank" rel="noreferrer">{source}</a> : source}</li>)}</ul>
       </details>)}
     </>}
-    {history.length > 0 && <details><summary>Model history</summary>{history.map(row => <button className="portfolio-tab" key={row.id} disabled={active} onClick={async () => { const response = await fetch(`/api/agents/sessions/${row.id}`); if (response.ok) setSession(await response.json()); }}>{row.id.slice(0, 8)} · {row.status}</button>)}</details>}
+    {history.length > 0 && <details><summary>Model history</summary>{history.map(row => <button className="portfolio-tab" key={row.id} disabled={active} onClick={async () => { const response = await fetch(`/api/agents/sessions/${row.id}?view=company`); if (response.ok) setSession(await response.json()); }}>{row.ticker ?? row.id.slice(0, 8)} · {row.status}</button>)}</details>}
   </section>;
 }

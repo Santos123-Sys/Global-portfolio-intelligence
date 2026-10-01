@@ -63,9 +63,9 @@ All mutation routes enforce authentication/write permission, same-origin checks,
 
 ## Agent Activity Inspector
 
-The company analysis dashboard exposes an owner-scoped inspection view for active and completed runs. It shows the active agents and their governed tasks, start/elapsed time, registered tool lifecycle, sanitized failures, validation retries, handoffs, reviewable artifacts, source references, data-quality state and the model/configuration identifier used for each step. Completed sessions retain an expandable audit trail.
+Company Analysis shows a concise live status: phase, current agent, progress, and the latest meaningful update, alongside the return briefing. Detailed session inspection is in the administrator-only Research Operations activity view. The inspector shows governed tasks, start/elapsed time, registered tool lifecycle, sanitized failures, validation retries, handoffs, reviewable artifacts, source references, data-quality state and model/configuration identifiers, with an expandable audit trail.
 
-Observability is deliberately bounded. The API removes frozen evidence and configuration snapshots, lease identifiers, raw run inputs, private prompts and protected policies. It returns public audit summaries, source identifiers and sanitized technical metadata; credentials, signed query strings, raw tool payloads and private chain-of-thought are never exposed. Watching a run never changes its authority boundary or permits automatic acceptance, weighting or trading.
+Regular company-session reads remain owner-scoped. The explicit platform-admin operations view can inspect sessions across accounts. Observability remains bounded in both paths: raw run inputs, prompts, protected policies, frozen evidence/configuration snapshots, lease identifiers, credentials, signed query strings, raw tool payloads and private chain-of-thought are not exposed. Admin visibility does not change the authority boundary or permit automatic acceptance, weighting or trading.
 
 ## Deployment order
 

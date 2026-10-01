@@ -4,7 +4,7 @@ import type { AgentOutput } from '@/lib/agent-finance/contracts';
 import type { RunBriefing } from '@/lib/agent-finance/l3/session-control';
 
 export interface RunEvent {id:string;eventType:string;summary:string;detail?:string|null;occurredAt:string;agent?:string|null;authority:string;consequence:string}
-export function AgentRunStatus({status,progress,events=[],briefing,busy,viewer,onControl}:{status:string;progress:number;events?:RunEvent[];briefing?:RunBriefing;busy:boolean;viewer:boolean;onControl:(action:SessionAction)=>void}) {
+export function AgentRunStatus({status,progress,events=[],liveStatus,briefing,busy,viewer,onControl}:{status:string;progress:number;events?:RunEvent[];liveStatus?:{phase:string;currentAgent:string|null;latestActivity:string|null;updatedAt:string;progress:number}|null;briefing?:RunBriefing;busy:boolean;viewer:boolean;onControl:(action:SessionAction)=>void}) {
   const working=['queued','running'].includes(status);
   return <section className="glass-panel card" aria-label="Research progress and control">
     <h3>Research status: {status.replaceAll('_',' ')}</h3>
@@ -27,9 +27,7 @@ export function AgentRunStatus({status,progress,events=[],briefing,busy,viewer,o
       <h5>Your next action</h5><p>{briefing.nextAction}</p>
       <p className="note">This briefing summarizes validated outputs; it is not private chain-of-thought, an investment guarantee, or authorization to trade or alter portfolio weights.</p>
     </section>}
-    <h4>Meaningful activity</h4>
-    {!events.length ? <p className="note">Waiting for the first research event.</p> : <ol aria-label="Research activity timeline">{events.slice(-12).map(event=><li key={event.id}><strong>{event.summary}</strong>{event.detail && <p className="note">{event.detail}</p>}<small>{event.authority.replaceAll('_',' ')} · {event.consequence} consequence</small></li>)}</ol>}
-    {events.length>12 && <details><summary>Earlier activity ({events.length-12})</summary><ol>{events.slice(0,-12).map(event=><li key={event.id}>{event.summary}</li>)}</ol></details>}
+    {working && <div className="glass-panel card" aria-label="Current research step"><h4>Current step</h4><p>{liveStatus?.currentAgent ? `${liveStatus.currentAgent} · ${liveStatus.phase}` : `Preparing ${liveStatus?.phase ?? 'research'}`}</p><p className="note">{liveStatus?.latestActivity ?? events.at(-1)?.summary ?? 'The worker has not recorded its first update yet.'}</p></div>}
   </section>;
 }
 
