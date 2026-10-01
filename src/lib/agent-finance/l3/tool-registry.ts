@@ -36,6 +36,7 @@ export class ToolRegistry {
     this.calls.set(request.from,count);
     if(count>(config?.runtimePolicy.maxToolCalls ?? 100)) throw new Error('tool_budget_exceeded');
     const tool = this.tools.get(name); if (!tool) throw new Error(`Tool unavailable: ${name}`);
+    await this.policy?.trace({agentName:request.from,toolName:name,configurationHash:config?.configurationHash ?? null,status:'started',latencyMs:0,errorCode:null});
     this.messages.push(request);
     const value = await tool(request.payload, request);
     const result = JSON.parse(JSON.stringify(value ?? null)) as unknown;
