@@ -404,7 +404,7 @@ function ExampleStageData({
       {error && <div role="alert"><p>{error}</p><button type="button" className="action-button" onClick={onRetry}>Retry sample calculation</button></div>}
       {result && <>
         <label htmlFor="example-allocation-method">Allocation method</label>
-        <select id="example-allocation-method" value={method} onChange={event => onMethodChange(event.target.value)}>
+        <select id="example-allocation-method" aria-label="Allocation method" value={method} onChange={event => onMethodChange(event.target.value)}>
           {Object.keys(result.recommendation.ranking).map(name => <option key={name} value={name}>{methodLabel[name] ?? name}{name === result.recommendation.recommended_method ? ' · sample recommendation' : ''}</option>)}
         </select>
         <p className="note">{result.data_range.rows} synthetic trading days · cap {pct(Number(result.inputs.per_asset_max))} · {result.engine_version}</p>
