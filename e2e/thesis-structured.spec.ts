@@ -42,8 +42,13 @@ for (const width of [390, 1440]) {
     await expect(page.getByText('Other ways to create a thesis')).not.toBeVisible();
     await expect(page.getByText(/Every portfolio destination needs/)).not.toBeVisible();
 
+    const extractionResponse = page.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/integrations/agentic/thesis-extractions'
+      && response.request().method() === 'POST',
+    );
     await page.getByLabel('Choose strategy document').setInputFiles({ name: 'strategy.txt', mimeType: 'text/plain', buffer: Buffer.from('Long-term Brazilian growth strategy; B3 primary listings.') });
-    await expect(page.getByRole('heading', { name: 'Review portfolio strategy' })).toBeVisible();
+    expect((await extractionResponse).ok()).toBe(true);
+    await expect(page.getByRole('heading', { name: 'Review portfolio strategy' })).toBeVisible({ timeout: 15000 });
     await expect(page.getByLabel('Base currency for mandate 1')).toHaveValue('BRL');
     const note = page.getByLabel('Review note (required)');
     if (await note.isVisible()) await note.fill('Reviewed the generated policy and confirmed the intended B3 market coverage.');
