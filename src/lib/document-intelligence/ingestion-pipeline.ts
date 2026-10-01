@@ -11,6 +11,7 @@ import { embedDocumentChunks } from './embedding-batcher';
 import { EMBEDDING_MODEL } from './gemini-embedding';
 import { getDocumentStorage } from './document-storage';
 import { createDocumentAlert } from './alerts/document-alerts';
+import { classifyMonitoredEvents, publishMonitoredEventAlerts } from './alerts/event-monitoring';
 import type { DiscoveredDocument } from './types';
 
 const storageKey = (ownerId: string, securityId: string, documentId: string, filename: string) => `${ownerId}/${securityId}/${documentId}/${filename.replace(/[^A-Za-z0-9._-]/g, '_').slice(-160)}`;
@@ -38,7 +39,7 @@ export async function ingestDocument(workspace: typeof companyWorkspaces.$inferS
     const parsed = await parseDocument(downloaded.bytes, downloaded.contentType, downloaded.filename);
     const contentHash = computeContentHash(parsed.text);
     const duplicate = await findDuplicate(workspace.ownerId, workspace.securityId, contentHash, discovered.externalId, record.id);
-    if (duplicate && duplicate.id !== record.id) { await db.update(intelligenceDocuments).set({ contentHash, processingStatus: 'duplicate', processedAt: new Date() }).where(and(eq(intelligenceDocuments.id, record.id), eq(intelligenceDocuments.ownerId, workspace.ownerId), eq(intelligenceDocuments.securityId, workspace.securityId))); return { indexed: false, chunks: 0, duplicate: true }; }
+    if (duplicate && duplicate.id !== record.id) { await db.update(intelligenceDocuments).set({ contentHash, processingStatus: 'duplicate', processedAt: new Date() }).where(and(eq(intelligenceDocuments.id, record.id), eq(intelligenceDocuments.ownerId, workspace.ownerId), eq(intelligenceDocuments.securityId, workspace.securityId))); return { indexed: false, chunks: 0, duplicate: true, events: [] }; }
     await db.update(intelligenceDocuments).set({ processingStatus: 'chunking' }).where(and(eq(intelligenceDocuments.id, record.id), eq(intelligenceDocuments.ownerId, workspace.ownerId), eq(intelligenceDocuments.securityId, workspace.securityId)));
     const chunks = chunkDocument(parsed.text, getEnv().CHUNK_TARGET_SIZE);
     if (!chunks.length) throw new Error('Document did not produce any valid semantic chunks');
@@ -58,7 +59,7 @@ export async function ingestDocument(workspace: typeof companyWorkspaces.$inferS
       await tx.update(intelligenceDocuments).set({ localPath: key, contentHash, contentText: parsed.text, contentLength: parsed.text.length, pageCount: parsed.pageCount, fileFormat: parsed.format, processingStatus: 'indexed', processingError: null, processedAt: new Date(), amendedDocumentId }).where(and(eq(intelligenceDocuments.id, record.id), eq(intelligenceDocuments.ownerId, workspace.ownerId), eq(intelligenceDocuments.securityId, workspace.securityId)));
       await tx.update(companyWorkspaces).set({ lastIngestedAt: new Date(), documentCount: sql`${companyWorkspaces.documentCount} + 1`, chunkCount: sql`${companyWorkspaces.chunkCount} + ${chunks.length}`, ragEnabled: true, status: 'active' }).where(and(eq(companyWorkspaces.id, workspace.id), eq(companyWorkspaces.ownerId, workspace.ownerId), eq(companyWorkspaces.securityId, workspace.securityId)));
     });
-    return { indexed: true, chunks: chunks.length, duplicate: false };
+    return { indexed: true, chunks: chunks.length, duplicate: false, events: classifyMonitoredEvents({ ...discovered, contentText: parsed.text }) };
   } catch (error) {
     await db.update(intelligenceDocuments).set({ processingStatus: sql`case when ${intelligenceDocuments.retryCount} + 1 >= 3 then 'permanent_failure' else 'failed' end`, processingError: error instanceof Error ? error.message.slice(0, 1000) : 'Unknown ingestion failure', retryCount: sql`${intelligenceDocuments.retryCount} + 1` }).where(and(eq(intelligenceDocuments.id, record.id), eq(intelligenceDocuments.ownerId, workspace.ownerId), eq(intelligenceDocuments.securityId, workspace.securityId)));
     throw error;
@@ -73,7 +74,7 @@ export async function ingestUploadedDocument(
   const parsed = await parseDocument(input.bytes, input.contentType, input.filename);
   const contentHash = computeContentHash(parsed.text);
   const duplicate = await findDuplicate(workspace.ownerId, workspace.securityId, contentHash);
-  if (duplicate) return { indexed: false, duplicate: true, documentId: duplicate.id, chunks: 0 };
+  if (duplicate) return { indexed: false, duplicate: true, documentId: duplicate.id, chunks: 0, events: [] };
   const [record] = await db.insert(intelligenceDocuments).values({
     workspaceId: workspace.id, securityId: workspace.securityId, ownerId: workspace.ownerId,
     folderType: input.folderType, documentType: input.documentType, source: 'manual_upload',
@@ -92,7 +93,10 @@ export async function ingestUploadedDocument(
       await tx.update(intelligenceDocuments).set({ localPath: key, contentText: parsed.text, contentLength: parsed.text.length, pageCount: parsed.pageCount, fileFormat: parsed.format, processingStatus: 'indexed', processedAt: new Date() }).where(and(eq(intelligenceDocuments.id, record.id), eq(intelligenceDocuments.ownerId, workspace.ownerId), eq(intelligenceDocuments.securityId, workspace.securityId)));
       await tx.update(companyWorkspaces).set({ lastIngestedAt: new Date(), documentCount: sql`${companyWorkspaces.documentCount} + 1`, chunkCount: sql`${companyWorkspaces.chunkCount} + ${chunks.length}`, ragEnabled: true }).where(and(eq(companyWorkspaces.id, workspace.id), eq(companyWorkspaces.ownerId, workspace.ownerId), eq(companyWorkspaces.securityId, workspace.securityId)));
     });
-    return { indexed: true, duplicate: false, documentId: record.id, chunks: chunks.length };
+    const evidence = { folderType: input.folderType, documentType: input.documentType, title: input.title, contentText: parsed.text, source: 'manual_upload' };
+    const events = classifyMonitoredEvents(evidence);
+    await publishMonitoredEventAlerts({ ownerId: workspace.ownerId, securityId: workspace.securityId, ticker: workspace.ticker, evidence, events });
+    return { indexed: true, duplicate: false, documentId: record.id, chunks: chunks.length, events };
   } catch (error) {
     await getDocumentStorage().delete(key).catch(() => undefined);
     await db.update(intelligenceDocuments).set({ processingStatus: 'failed', processingError: error instanceof Error ? error.message.slice(0, 1000) : 'Upload ingestion failed', retryCount: 1 }).where(and(eq(intelligenceDocuments.id, record.id), eq(intelligenceDocuments.ownerId, workspace.ownerId), eq(intelligenceDocuments.securityId, workspace.securityId)));
@@ -115,7 +119,7 @@ export async function runIngestionJob(jobId: string, ownerId: string, securityId
     const workers = Array.from({ length: Math.min(getEnv().MAX_CONCURRENT_DOWNLOADS, documents.length) }, async () => {
       while (cursor < documents.length) {
         const document = documents[cursor++];
-        try { const result = await ingestDocument(workspace, document, typeof document.metadata?.retryDocumentId === 'string' ? document.metadata.retryDocumentId : undefined); if (result.indexed) { ingested++; chunks += result.chunks; if (document.folderType === 'MATERIAL_FACT') await createDocumentAlert({ ownerId, securityId, headline: `${workspace.ticker}: new material disclosure`, detail: document.title, severity: 'watch' }); } }
+        try { const result = await ingestDocument(workspace, document, typeof document.metadata?.retryDocumentId === 'string' ? document.metadata.retryDocumentId : undefined); if (result.indexed) { ingested++; chunks += result.chunks; await publishMonitoredEventAlerts({ ownerId, securityId, ticker: workspace.ticker, evidence: document, events: result.events }); if (document.folderType === 'MATERIAL_FACT' && result.events.length === 0) await createDocumentAlert({ ownerId, securityId, headline: `${workspace.ticker}: new material disclosure`, detail: document.title, severity: 'watch' }); } }
         catch (error) { errors.push(`${document.title}: ${error instanceof Error ? error.message : 'failed'}`); }
       }
     });

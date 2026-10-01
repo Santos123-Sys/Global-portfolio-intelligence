@@ -241,6 +241,13 @@ td.num, th.num, .num { font-family: monospace; text-align: right; }
 .governance-versioning { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.7rem; }
 .governance-versioning > div { padding: 0.7rem; border: 1px solid var(--border); border-radius: 7px; }
 .governance-versioning p { margin: 0.45rem 0 0; color: var(--muted); font-size: 0.75rem; }
+.admin-section-nav { display: flex; flex-wrap: wrap; gap: .55rem; margin: 1rem 0; }
+.admin-section-nav a { padding: .55rem .75rem; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); text-decoration: none; }
+.admin-section-nav a:hover, .admin-section-nav a:focus-visible { border-color: var(--accent); color: var(--text); }
+.admin-tool-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; margin-bottom: 1rem; }
+.admin-tool-card { display: block; color: inherit; text-decoration: none; }
+.admin-tool-card h2 { margin-top: 0; }
+.admin-tool-card p { color: var(--muted); min-height: 3.2em; }
 .governance-policy-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.65rem; }
 .governance-policy-grid label { display: grid; gap: 0.3rem; color: var(--muted); font-size: 0.74rem; }
 .governance-policy-grid input { width: 100%; box-sizing: border-box; padding: 0.55rem; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); }
@@ -852,7 +859,7 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .governance-kpis, .governance-policy-grid, .governance-exposures, .governance-versioning {
+  .governance-kpis, .governance-policy-grid, .governance-exposures, .governance-versioning, .admin-tool-grid {
     grid-template-columns: 1fr;
   }
 
