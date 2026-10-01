@@ -117,6 +117,12 @@ describe('authority, interruption and user visibility',()=>{
   it('produces a return briefing that retains partial-success visibility',()=>{
     const result=runBriefing({status:'failed'},[{agentName:'financial-statements',status:'completed'},{agentName:'quality-analyst',status:'failed'}]);
     expect(result.completed).toEqual(['financial-statements']);expect(result.gaps).toEqual(['quality-analyst']);expect(result.requiresHumanReview).toBe(true);
+    expect(result.outcome).toContain('stopped');expect(result.nextAction).toContain('retry');expect(result.reportCanBeAccepted).toBe(false);
+  });
+  it('summarizes completed research without implying approval or hiding key risks',()=>{
+    const result=runBriefing({status:'completed',requestPayload:{portfolioId:'portfolio'},finalOutput:{status:'completed',confidenceScore:72,citations:['filing-a','filing-a','news-b'],limitations:['Peer data unavailable'],outputs:{'judge-agent':{status:'completed',data:{findings:['Margin expansion supported'],keyRisks:['Debt refinancing risk']}}}}},[{agentName:'judge-agent',status:'completed'}]);
+    expect(result).toMatchObject({outcome:'Validated evidence-backed research is ready for your review.',keyFindings:['Margin expansion supported'],keyRisks:['Debt refinancing risk'],limitations:['Peer data unavailable'],confidenceScore:72,sourceCount:2,reportCanBeAccepted:true,requiresHumanReview:true});
+    expect(result.nextAction).toContain('explicitly accept');
   });
   it('rejects misrouted JSON envelopes',async()=>{
     const registry=new ToolRegistry().register('fetch_news',async()=>[]);
@@ -126,6 +132,8 @@ describe('authority, interruption and user visibility',()=>{
     const route=readFileSync('src/app/api/agents/sessions/[sessionId]/control/route.ts','utf8');
     for(const text of ['authenticateRequest(req)','assertSameOrigin(req)','eq(agentAnalysisSessions.ownerId,auth.auth.userId)','analysisScopes','pg_advisory_xact_lock','eq(agentAnalysisSessions.status,session.status)']) expect(route).toContain(text);
     const component=readFileSync('src/components/dashboard/agent-run-status.tsx','utf8');
-    for(const text of ['Pause research','Resume research','Cancel research','Return briefing','Meaningful activity']) expect(component).toContain(text);
+    for(const text of ['Pause research','Resume research','Cancel research','Return briefing','Meaningful activity','Key findings','Risks and opposing evidence','Evidence limitations']) expect(component).toContain(text);
+    const analysis=readFileSync('src/components/dashboard/agent-analysis.tsx','utf8');
+    for(const text of ['Review research plan','Confirm plan and start research','No work started yet','Research language','Standalone research; no thesis-linked acceptance','Optional value scorecard']) expect(analysis).toContain(text);
   });
 });

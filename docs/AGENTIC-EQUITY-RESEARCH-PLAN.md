@@ -79,6 +79,8 @@ Observability is deliberately bounded. The API removes frozen evidence and confi
 8. Delete or replace a linked thesis while a run is paused. Continuation and final acceptance must reject the inactive linkage.
 9. Review and explicitly accept an eligible completed report using the existing acceptance workflow. Confirm previous accepted analysis remains in history.
 
+The start flow now includes a pre-execution plan review showing the requested issuer, analysis type, portfolio/thesis scope, research language, selected assumptions, planned research phases and authority boundary. The completed/partial return briefing summarizes validated findings, opposing risks, confidence as evidence coverage, citations, limitations and the next human action. It does not reveal private chain-of-thought or infer approval.
+
 ## Verification and known boundaries
 
 Regression coverage includes ratio conventions, YTD flow normalization, invalid currencies/periods, sector suppression, lineage, evidence/scorecard gates, profile locale and market conflict, governance authorization, retained predecessor context, in-flight interruption and authenticated control/financial-review routes. Existing dashboard and worker tests are also retained.

@@ -1,10 +1,9 @@
 'use client';
 import type { SessionAction } from '@/lib/agent-finance/l3/session-control';
 import type { AgentOutput } from '@/lib/agent-finance/contracts';
+import type { RunBriefing } from '@/lib/agent-finance/l3/session-control';
 
 export interface RunEvent {id:string;eventType:string;summary:string;detail?:string|null;occurredAt:string;agent?:string|null;authority:string;consequence:string}
-export interface RunBriefing {completed:string[];gaps:string[];nextAction:string;requiresHumanReview:boolean}
-
 export function AgentRunStatus({status,progress,events=[],briefing,busy,viewer,onControl}:{status:string;progress:number;events?:RunEvent[];briefing?:RunBriefing;busy:boolean;viewer:boolean;onControl:(action:SessionAction)=>void}) {
   const working=['queued','running'].includes(status);
   return <section className="glass-panel card" aria-label="Research progress and control">
@@ -18,7 +17,16 @@ export function AgentRunStatus({status,progress,events=[],briefing,busy,viewer,o
       {['queued','running','paused','awaiting_approval'].includes(status) && <button type="button" className="secondary-button" disabled={busy} onClick={()=>onControl('cancel')}>Cancel research</button>}
     </div>}
     {status==='paused' && <p className="caveat">Completed steps are saved. Already-sent provider requests cannot be revoked, but superseded workers cannot publish results or start another step.</p>}
-    {briefing && <div aria-label="Return briefing"><h4>Your next action</h4><p>{briefing.nextAction}</p><p className="note">{briefing.completed.length} validated steps · {briefing.gaps.length} steps need attention.</p>{briefing.gaps.length>0 && <ul>{briefing.gaps.map(agent=><li key={agent}>{agent.replaceAll('-',' ')}</li>)}</ul>}</div>}
+    {briefing && ['completed','failed','cancelled'].includes(status) && <section className="glass-panel card" aria-label="Return briefing">
+      <p className="eyebrow">Research briefing</p><h4>{briefing.outcome}</h4>
+      <p className="note">{briefing.completed.length} completed steps · {briefing.gaps.length} steps need attention · {briefing.sourceCount} cited sources{briefing.confidenceScore!==null?` · evidence confidence ${briefing.confidenceScore}/100`:''}</p>
+      {briefing.keyFindings.length>0 && <><h5>Key findings</h5><ul>{briefing.keyFindings.map((finding,index)=><li key={`finding-${index}`}>{finding}</li>)}</ul></>}
+      {briefing.keyRisks.length>0 && <><h5>Risks and opposing evidence</h5><ul>{briefing.keyRisks.map((risk,index)=><li key={`risk-${index}`}>{risk}</li>)}</ul></>}
+      {briefing.gaps.length>0 && <><h5>Steps requiring attention</h5><ul>{briefing.gaps.map(agent=><li key={agent}>{agent.replaceAll('-',' ')}</li>)}</ul></>}
+      {briefing.limitations.length>0 && <details><summary>Evidence limitations ({briefing.limitations.length})</summary><ul>{briefing.limitations.map((item,index)=><li key={`limit-${index}`}>{item}</li>)}</ul></details>}
+      <h5>Your next action</h5><p>{briefing.nextAction}</p>
+      <p className="note">This briefing summarizes validated outputs; it is not private chain-of-thought, an investment guarantee, or authorization to trade or alter portfolio weights.</p>
+    </section>}
     <h4>Meaningful activity</h4>
     {!events.length ? <p className="note">Waiting for the first research event.</p> : <ol aria-label="Research activity timeline">{events.slice(-12).map(event=><li key={event.id}><strong>{event.summary}</strong>{event.detail && <p className="note">{event.detail}</p>}<small>{event.authority.replaceAll('_',' ')} · {event.consequence} consequence</small></li>)}</ol>}
     {events.length>12 && <details><summary>Earlier activity ({events.length-12})</summary><ol>{events.slice(0,-12).map(event=><li key={event.id}>{event.summary}</li>)}</ol></details>}

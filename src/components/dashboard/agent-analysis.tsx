@@ -3,9 +3,11 @@ import { useEffect, useState } from 'react';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { AgentOutput, AnalyzeRequest } from '@/lib/agent-finance/contracts';
 import {driverSchema,capitalSchema,type Drivers} from '@/lib/agent-finance/l4/financial-model';
-import { AgentRunStatus, StatementAnalysisSummary, type RunEvent, type RunBriefing } from './agent-run-status';
+import { AgentRunStatus, StatementAnalysisSummary, type RunEvent } from './agent-run-status';
+import type { RunBriefing } from '@/lib/agent-finance/l3/session-control';
 import type { SessionAction } from '@/lib/agent-finance/l3/session-control';
 import { useLanguage } from '@/lib/i18n';
+import { executionPlan } from '@/lib/agent-finance/contracts';
 import { AgentActivityInspectorPanel } from './agent-activity-inspector';
 import type { AgentActivityInspector } from '@/lib/agent-finance/activity-inspector';
 
@@ -23,6 +25,7 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
   const {language}=useLanguage();
   const [type, setType] = useState<AnalyzeRequest['analysisType']>('combined');
   const [session, setSession] = useState<Session | null>(null);
+  const [planPreview, setPlanPreview] = useState(false);
   const [history, setHistory] = useState<Session[]>([]);
   const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
   const [growth, setGrowth] = useState(''); const [wacc, setWacc] = useState(''); const [terminal, setTerminal] = useState('');
@@ -40,7 +43,7 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
   const sessionId = session?.id;
   useEffect(() => {
     let cancelled = false;
-    const controller=new AbortController();setSession(null);setHistory([]);setScopes([]);setScope('');
+    const controller=new AbortController();setSession(null);setHistory([]);setScopes([]);setScope('');setPlanPreview(false);
     fetch(`/api/agents/sessions?securityId=${encodeURIComponent(securityId)}`,{signal:controller.signal}).then(async response => {
       const body = await response.json(); if (!response.ok) throw new Error(body.error ?? 'Unable to load history');
       if (!cancelled) { setHistory(body.sessions); setScopes(body.scopes ?? []); if(body.scopes?.length===1) setScope(body.scopes[0].portfolioId); }
@@ -81,6 +84,7 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
       const response = await fetch('/api/agents/analyze', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
       const result = await response.json(); if (!response.ok) throw new Error(result.error ?? 'Unable to start');
       setSession({ id: result.sessionId, status: result.status, phase: 'research', progress: 0 });
+      setPlanPreview(false);
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to start'); } finally { setBusy(false); }
   }
   async function control(action:SessionAction) {
@@ -112,6 +116,14 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
   const monteCarlo=sensitivityData?.monteCarlo as {p5:number;p50:number;p95:number;histogram:Array<{value:number;count:number}>} | null | undefined;
   const projection=outputs?.['projection-builder']?.data.projections as Array<{year:number;incomeStatement:{revenue:number;ebit:number;netIncome:number};balanceSheet:{totalAssets:number;totalLiabilities:number;equity:number;cash:number};cashFlow:{fcff:number};checks:{balanceError:number;cashError:number}}> | undefined;
   const acceptable=session?.finalOutput?.status==='completed' && session.finalOutput.confidenceScore>=60 && !!outputs?.['judge-agent'] && !!session.portfolioLinked;
+  const executionSteps=executionPlan(type);
+  const planPhases=[
+    {title:'Gather and validate evidence',agents:executionSteps.filter(name=>['research-director','financial-statement-analyzer','market-industry-research'].includes(name)),description:'Use retained issuer, regulatory, market and NewsAdapter evidence; calculate deterministic statement-quality checks.'},
+    {title:'Build valuation scenarios',agents:executionSteps.filter(name=>['dcf-orchestrator','assumption-setter','growth-modeler','projection-builder','wacc-calculator','terminal-value','sensitivity-analyst','sanity-checker'].includes(name)),description:'Run the DCF specialists and sensitivity checks included in the selected analysis type.'},
+    {title:'Assess the investment case',agents:executionSteps.filter(name=>['analysis-director','fundamental-analyst','technical-analyst','sentiment-analyst','ratio-analyst','quality-analyst','bull-agent','bear-agent','judge-agent'].includes(name)),description:'Evaluate relevant specialist perspectives and preserve opposing evidence; quick analysis omits the full bull/bear debate.'},
+  ].filter(phase=>phase.agents.length>0);
+  const selectedScope=scopes.find(row=>row.portfolioId===scope);
+  const assumptions=[growth?`Revenue growth override: ${growth}%`:null,wacc?`WACC override: ${wacc}%`:null,terminal?`Terminal growth override: ${terminal}%`:null,simulation?'Reviewed sensitivity simulation enabled':null,editDrivers?'Manual projection-policy overrides enabled':null,editCapital?'Manual CAPM input overrides enabled':null].filter((value):value is string=>Boolean(value));
   async function accept() {
     setBusy(true);setError('');
     try {
@@ -124,14 +136,13 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
   return <section className="card glow-card">
     <h2>Agent Analysis</h2>
     <p className="note">Research Director · DCF Swarm · Analysis Swarm. Evidence-backed research, never automatic trading.</p>
-    <details><summary>Research plan and authority</summary><ol><li>Collect existing filings, provider evidence and NewsAdapter articles.</li><li>Run deterministic financial-statement checks and sector-specific industry research.</li><li>Build reviewed valuation scenarios and specialist interpretations.</li><li>Compare bull and bear cases; independent judge reviews the conclusions.</li><li>You review and explicitly accept the report. No timeout or confidence score can authorize trading or weight changes.</li></ol><p className="note">Value scoring is optional and must be enabled in the approved thesis. Its total is unavailable when financial-data quality or source coverage is insufficient.</p></details>
     {!viewer && <div className="form-grid">
       {scopes.length>0 && <label>Portfolio and active thesis<select value={scope} onChange={e=>setScope(e.target.value)}><option value="">Select portfolio</option>{scopes.map(row=><option key={`${row.portfolioId}:${row.thesisVersionId}`} value={row.portfolioId}>{row.name}</option>)}</select></label>}
       <label>Analysis type<select value={type} onChange={e => setType(e.target.value as AnalyzeRequest['analysisType'])}><option value="combined">Combined research</option><option value="dcf">DCF valuation</option><option value="fundamental">Financial analysis</option><option value="quick">Quick analysis (no debate)</option></select></label>
       <label>Revenue growth override (%)<input type="number" min="-50" max="50" step=".1" value={growth} onChange={e => setGrowth(e.target.value)} placeholder="Otherwise estimates / historical trend" /></label>
       <label>WACC override (%)<input type="number" min=".1" max="50" step=".1" value={wacc} onChange={e => setWacc(e.target.value)} placeholder="Otherwise sourced CAPM" /></label>
       <label>Terminal growth (%)<input type="number" min="-5" max="5" step=".1" value={terminal} onChange={e => setTerminal(e.target.value)} placeholder="Required for DCF" /></label>
-      <button className="action-button" disabled={busy || active} onClick={() => void start()}>{busy ? 'Starting…' : 'Start analysis'}</button>
+      {!planPreview && <button className="action-button" disabled={busy || active} onClick={() => setPlanPreview(true)}>Review research plan</button>}
       <label><input type="checkbox" checked={simulation} onChange={e=>setSimulation(e.target.checked)}/>Review simulation policy</label>
       {simulation && <><p className="note">Independent triangular distributions around base drivers. These are modeling assumptions, not probabilities inferred from market data.</p>{Object.entries(widths).map(([key,value])=><label key={key}>{key} {['growth','margin','wacc'].includes(key) ? 'distribution half-width (percentage points)' : 'scenario probability (%)'}<input type="number" step=".1" min="0" value={value} onChange={e=>setWidths({...widths,[key]:Number(e.target.value)})}/></label>)}</>}
       <label><input type="checkbox" checked={editDrivers} onChange={e=>setEditDrivers(e.target.checked)}/>Review projection policies</label>
@@ -139,6 +150,13 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
       <label><input type="checkbox" checked={editCapital} onChange={e=>setEditCapital(e.target.checked)}/>Review CAPM inputs and sources</label>
       {editCapital && <>{['riskFreeRate','beta','equityRiskPremium','countryRiskPremium','costOfDebt','taxRate','debtWeight'].map(key=><label key={key}>{key} {key==='beta' ? '' : '(%)'}<input type="number" step=".01" value={capitalInputs[key] ?? ''} onChange={e=>setCapitalInputs({...capitalInputs,[key]:e.target.value})}/></label>)}<label>Currency (ISO code)<input value={capitalInputs.currency ?? ''} onChange={e=>setCapitalInputs({...capitalInputs,currency:e.target.value.toUpperCase()})}/></label><label>Source date<input type="date" value={capitalInputs.asOf ?? ''} onChange={e=>setCapitalInputs({...capitalInputs,asOf:e.target.value})}/></label><label>Source URLs (one per line)<textarea value={capitalInputs.sources ?? ''} onChange={e=>setCapitalInputs({...capitalInputs,sources:e.target.value})}/></label></>}
     </div>}
+    {planPreview && !active && <section className="glass-panel card" aria-label="Review research plan"><div className="card-heading"><div><p className="eyebrow">Before research starts</p><h3>Review the proposed plan</h3></div><span className="stat-chip">No work started yet</span></div>
+      <dl className="metric-grid"><div className="metric-card"><dt>Company</dt><dd>{ticker}</dd></div><div className="metric-card"><dt>Analysis</dt><dd>{type==='combined'?'Combined research':type==='dcf'?'DCF valuation':type==='fundamental'?'Financial analysis':'Quick analysis'}</dd></div><div className="metric-card"><dt>Portfolio / thesis</dt><dd>{selectedScope?.name ?? 'Standalone research; no thesis-linked acceptance'}</dd></div><div className="metric-card"><dt>Research language</dt><dd>{language==='pt'?'Portuguese (Brazil)':language.toUpperCase()}</dd></div></dl>
+      <div className="dashboard-card-grid">{planPhases.map(phase=><article className="card" key={phase.title}><h4>{phase.title}</h4><p>{phase.description}</p><p className="note">{phase.agents.map(name=>name.replaceAll('-',' ')).join(' · ')}</p></article>)}</div>
+      <h4>Assumptions and options</h4>{assumptions.length?<ul>{assumptions.map(item=><li key={item}>{item}</li>)}</ul>:<p className="note">No manual assumptions supplied. Missing or unreviewed WACC, growth and valuation inputs will remain explicit limitations; the system will not invent source data.</p>}
+      <ul><li>Optional value scorecard runs only if enabled by the approved thesis and its evidence-quality gates pass.</li><li>Some financial periods may pause for your source and duration review.</li><li>Research can read and calculate; it cannot accept conclusions, change portfolio weights or trade.</li></ul>
+      <div className="workflow-actions"><button type="button" className="secondary-button" disabled={busy} onClick={()=>setPlanPreview(false)}>Back to edit scope</button><button type="button" className="action-button" disabled={busy || active} onClick={()=>void start()}>{busy?'Starting…':'Confirm plan and start research'}</button></div>
+    </section>}
     {error && <p role="alert" className="error-text">{error}</p>}
     {session && <AgentRunStatus status={session.status} progress={session.progress} events={session.events} briefing={session.briefing} busy={busy} viewer={viewer} onControl={action=>void control(action)}/>}
     {session?.inspector && <AgentActivityInspectorPanel inspector={session.inspector} events={session.events}/>}
