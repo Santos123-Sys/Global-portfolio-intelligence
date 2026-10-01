@@ -2,6 +2,8 @@ import { MarketProfile, MarketContext, MarketAnalysis, buildMarketPlan, marketCo
 export * from './market-adaptive.js';
 export * from './market-engines.js';
 import { z } from 'zod';
+import { runtimePolicySchema } from './agent-governance.js';
+export * from './agent-governance.js';
 import { ThesisPolicy } from './thesis-policy.js';
 import { evaluateThesisEligibility } from './thesis-domain.js';
 import { DiscoveryContext, ScreeningAudit, screenDiscoveryUniverse, issuerKey } from './discovery-domain.js';
@@ -64,6 +66,8 @@ export const AgentCustomization = z.object({
   scope: z.string().trim().min(1).max(2_000),
   promptAddendum: z.string().trim().max(4_000),
   enabledTools: z.array(AgentTool).max(4),
+  runtimePolicy: runtimePolicySchema.optional(),
+  configurationHash: z.string().optional(),
 }).strict();
 export type AgentCustomization = z.infer<typeof AgentCustomization>;
 
@@ -131,7 +135,7 @@ export const AnalysisOutput = z.object({
   investmentThesis: z.string().min(1),
   keyCatalysts: z.array(z.string()).min(1),
   keyRisks: z.array(z.string()).min(1),
-  thesisBreakers: z.array(z.string()).min(1),
+  thesisBreakers: z.array(z.string()),
   confidenceScore: z.number().min(0).max(1),
   researchFramework: ResearchFramework,
   groundedIn: z.array(z.string()).min(1),

@@ -7,9 +7,16 @@ export const outputSchema = z.object({
   reasoningChain: z.array(z.string().min(1)).min(1),
   confidenceScore: z.number().min(0).max(100),
   citations: z.array(z.string().min(1)), limitations: z.array(z.string()),
-  claims: z.array(z.object({ text: z.string().min(1), citations: z.array(z.string()), evidence: z.string().min(1) })).optional(),
+  claims: z.array(z.object({ text: z.string().min(1), citations: z.array(z.string()), evidence: z.string().min(1),kind:z.enum(['fact','inference','assumption']).optional(),period:z.string().nullable().optional(),currency:z.string().nullable().optional() })).optional(),
+  runtimeMetadata:z.object({model:z.string(),inputTokens:z.number().nullable(),outputTokens:z.number().nullable(),latencyMs:z.number(),estimatedCost:z.number().nullable()}).optional(),
 });
 export type AgentOutput = z.infer<typeof outputSchema>;
+const narrativeData=z.object({findings:z.array(z.string()),missingInputs:z.array(z.string())}).passthrough();
+const judgeData=narrativeData.extend({investmentScore:z.number().min(0).max(100),thesisAlignmentScore:z.number().min(0).max(100),qualityScore:z.number().min(0).max(100),growthScore:z.number().min(0).max(100),riskScore:z.number().min(0).max(100),portfolioRole:z.string(),keyCatalysts:z.array(z.string()),keyRisks:z.array(z.string()),evidencedThesisBreakers:z.array(z.string()),monitoringTriggers:z.array(z.string()),unresolvedDisagreements:z.array(z.string()),swingFactors:z.array(z.string())});
+export function validateRoleData(id:string,output:AgentOutput):AgentOutput {
+  if(output.status==='completed') (id==='judge-agent' ? judgeData : narrativeData).parse(output.data);
+  return output;
+}
 export const messageSchema = z.object({
   from: z.string().min(1), to: z.string().min(1),
   messageType: z.enum(['request', 'response', 'feedback', 'alert']),

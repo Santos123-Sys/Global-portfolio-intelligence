@@ -1,5 +1,6 @@
 import { pgTable, uuid, text, timestamp, jsonb, numeric, integer, index } from 'drizzle-orm/pg-core';
 import { securities, users } from './schema';
+import { agentConfigurations } from './workflow-schema';
 
 export const agentAnalysisSessions = pgTable('agent_analysis_sessions', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -15,6 +16,7 @@ export const agentAnalysisSessions = pgTable('agent_analysis_sessions', {
   leaseOwner: uuid('lease_owner'),
   leaseExpiresAt: timestamp('lease_expires_at', { withTimezone: true }),
   evidenceSnapshot: jsonb('evidence_snapshot'),
+  configurationSnapshot: jsonb('configuration_snapshot'),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp('completed_at', { withTimezone: true }),
@@ -27,6 +29,7 @@ export const agentRuns = pgTable('agent_runs', {
   sessionId: uuid('session_id').notNull().references(() => agentAnalysisSessions.id, { onDelete: 'cascade' }),
   agentName: text('agent_name').notNull(), agentRole: text('agent_role').notNull(),
   inputPayload: jsonb('input_payload').notNull(), outputPayload: jsonb('output_payload'),
+  configurationHash: text('configuration_hash'),
   reasoningChain: text('reasoning_chain'), confidenceScore: numeric('confidence_score', { precision: 5, scale: 2 }),
   executionTimeMs: integer('execution_time_ms'), status: text('status').notNull().default('running'),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
@@ -49,6 +52,23 @@ export const agentBeliefUpdates = pgTable('agent_belief_updates', {
   performanceDelta: numeric('performance_delta', { precision: 10, scale: 4 }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const agentToolTraces = pgTable('agent_tool_traces', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sessionId: uuid('session_id').notNull().references(() => agentAnalysisSessions.id, { onDelete: 'cascade' }),
+  agentName: text('agent_name').notNull(), toolName: text('tool_name').notNull(),
+  configurationHash: text('configuration_hash'), status: text('status').notNull(),
+  latencyMs: integer('latency_ms').notNull(), errorCode: text('error_code'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [index('agent_tool_traces_session_idx').on(t.sessionId)]);
+
+export const agentEvaluationJobs=pgTable('agent_evaluation_jobs',{
+  id:uuid('id').primaryKey().defaultRandom(),ownerId:uuid('owner_id').notNull().references(()=>users.id,{onDelete:'cascade'}),
+  configurationId:uuid('configuration_id').notNull().references(()=>agentConfigurations.id,{onDelete:'cascade'}),candidate:jsonb('candidate').notNull(),baseline:jsonb('baseline').notNull(),
+  status:text('status').notNull().default('queued'),results:jsonb('results').notNull().default([]),
+  leaseOwner:uuid('lease_owner'),leaseExpiresAt:timestamp('lease_expires_at',{withTimezone:true}),
+  updatedAt:timestamp('updated_at',{withTimezone:true}).notNull().defaultNow(),createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow(),
+},t=>[index('agent_evaluation_queue_idx').on(t.status,t.updatedAt)]);
 
 export const agentDebates = pgTable('agent_debates', {
   id: uuid('id').primaryKey().defaultRandom(), sessionId: uuid('session_id').notNull().references(() => agentAnalysisSessions.id, { onDelete: 'cascade' }),

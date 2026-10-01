@@ -6,8 +6,7 @@ export function validateQuality(output:AgentOutput, sources:Record<string,string
   if(output.citations.some(c=>!(c in sources))) errors.push('Unknown citation');
   if(output.status==='completed' && (!output.citations.length || output.confidenceScore<60)) errors.push('Completed output needs evidence and confidence >=60');
   if(output.claims) {
-    const uncited=output.claims.filter(c=>!c.citations.length).length;
-    if(uncited/output.claims.length>.2) errors.push('More than 20% of claims are uncited');
+    if(output.claims.some(c=>!c.citations.length || c.citations.some(source=>!(source in sources)))) errors.push('Every material claim requires known citations');
     for(const claim of output.claims) {
       const normalize=(s:string)=>s.toLowerCase().replace(/\s+/g,' ').trim();
       if(!claim.citations.some(c=>sources[c] && normalize(sources[c]).includes(normalize(claim.evidence)))) errors.push(`Claim evidence does not match retained sources: ${claim.text.slice(0,120)}`);

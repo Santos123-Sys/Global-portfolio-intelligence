@@ -81,6 +81,9 @@ export const agentConfigurations = pgTable(
     promptAddendum: text('prompt_addendum').notNull().default(''),
     enabledTools: jsonb('enabled_tools').$type<string[]>().notNull(),
     active: boolean('active').notNull().default(true),
+    runtimePolicy: jsonb('runtime_policy').$type<import('@portfolio-intelligence/agentic-contract').RuntimePolicy>(),
+    rolloutState: text('rollout_state').notNull().default('production'),
+    evaluation: jsonb('evaluation'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
