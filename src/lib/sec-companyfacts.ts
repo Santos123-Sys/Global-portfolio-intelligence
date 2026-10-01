@@ -3,6 +3,15 @@ import type { InvestorRelationsFundamentals } from './investor-relations';
 const SEC_ORIGIN = 'https://data.sec.gov';
 const REGISTRY_URL = 'https://www.sec.gov/files/company_tickers.json';
 const METRICS: Record<string, string[]> = {
+  total_assets:['us-gaap:Assets','ifrs-full:Assets'],
+  total_liabilities:['us-gaap:Liabilities','ifrs-full:Liabilities'],
+  current_assets:['us-gaap:AssetsCurrent','ifrs-full:CurrentAssets'],
+  current_liabilities:['us-gaap:LiabilitiesCurrent','ifrs-full:CurrentLiabilities'],
+  accounts_receivable:['us-gaap:AccountsReceivableNetCurrent','ifrs-full:TradeReceivables'],
+  accounts_payable:['us-gaap:AccountsPayableCurrent','ifrs-full:TradePayables'],
+  inventory:['us-gaap:InventoryNet','ifrs-full:Inventories'],
+  goodwill:['us-gaap:Goodwill','ifrs-full:Goodwill'],
+  cost_of_revenue:['us-gaap:CostOfRevenue','us-gaap:CostOfGoodsAndServicesSold','ifrs-full:CostOfSales'],
   revenue: ['us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax', 'us-gaap:Revenues', 'ifrs-full:Revenue'],
   depreciation_and_amortization: ['us-gaap:DepreciationDepletionAndAmortization', 'ifrs-full:DepreciationAndAmortisationExpense'],
   interest_expense: ['us-gaap:InterestExpense', 'ifrs-full:InterestExpense'],

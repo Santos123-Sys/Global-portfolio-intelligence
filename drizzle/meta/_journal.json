@@ -169,6 +169,13 @@
       "when": 1790838287391,
       "tag": "0023_vengeful_wilson_fisk",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790847493276,
+      "tag": "0024_lonely_venom",
+      "breakpoints": true
     }
   ]
 }

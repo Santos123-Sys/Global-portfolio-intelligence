@@ -10,10 +10,20 @@ import {sourceEvidence,type Foundation } from '../l4/foundation';
 import { messageSchema,outputSchema } from '../contracts';
 import {verifyAgentClaims} from '../l2/model-router';
 import { calculateWacc, simulationSchema, sensitivityAnalysis, driverSchema } from '../l4/financial-model';
+import { analyzeFinancialStatements, financialInputFromFoundation, financialStatementInputSchema } from '../l4/financial-statement-analyzer';
+import { buildMarketResearchPacket, calculateValueScorecard } from '../l4/research-modules';
+
 import { agentDefinition } from '@portfolio-intelligence/agentic-contract';
 
 export function createLiveRegistry(data: Foundation, ownerId: string, sessionId: string,configs:Record<string,EffectiveAgentConfig>): ToolRegistry {
   const registry = new ToolRegistry({sessionId,configs,trace:async event=>{await db.insert(agentToolTraces).values({...event,sessionId});}});
+  registry.register('analyze_financial_statements', async () => {
+    const input=financialStatementInputSchema.safeParse(financialInputFromFoundation(data));
+    if(!input.success) return outputSchema.parse({status:'insufficient_data',data:{metrics:[],signals:[]},reasoningChain:['Financial trend analysis requires at least two coherent, attributable fiscal periods.'],citations:data.sources,confidenceScore:0,limitations:['Insufficient normalized financial history.'],dataQuality:{status:'insufficient',completeness:0,issues:['Insufficient financial history'],asOf:data.fiscalDate}});
+    return analyzeFinancialStatements(input.data);
+  });
+  registry.register('research_market_structure', async () => buildMarketResearchPacket(data));
+  registry.register('calculate_value_scorecard', async payload => calculateValueScorecard(payload));
   registry.register('verify_claims',async payload=>{
     const output=outputSchema.parse(payload);
     const evidence=sourceEvidence(data);

@@ -2,7 +2,7 @@ import {beforeEach,describe,expect,it,vi} from 'vitest';
 const state=vi.hoisted(()=>({ownsLease:true,writes:[] as unknown[]}));
 vi.mock('../src/lib/db',()=>({db:{
   insert:()=>({values:(value:unknown)=>({returning:async()=>{state.writes.push(value);return [{id:'00000000-0000-4000-8000-000000000002'}];}})}),
-  update:()=>({set:(value:unknown)=>({where:async()=>{state.writes.push(value);return [];}})}),
+  update:()=>({set:(value:unknown)=>({where:()=>{state.writes.push(value);return {returning:async()=>state.ownsLease?[{id:'owned'}]:[]};}})}),
   select:()=>({from:()=>({where:async()=>state.ownsLease ? [{id:'owned'}] : []})}),
 }}));
 import {ExecutionEngine} from '../src/lib/agent-finance/l3/execution-engine';
@@ -33,5 +33,13 @@ describe('persisted execution and JSON QA feedback',()=>{
     engine.outputs['projection-builder']=evidenceOutput({},['Reconciled'],['source']);
     const handler=vi.fn();await engine.run('projection-builder',handler);expect(handler).not.toHaveBeenCalled();
     state.ownsLease=false;await expect(engine.run('projection-builder',handler)).rejects.toThrow('lease lost');
+  });
+  it('does not retry or publish an in-flight model result after pause or cancellation',async()=>{
+    const engine=new ExecutionEngine('00000000-0000-4000-8000-000000000001',registry(),{source:'Revenue 100'},'00000000-0000-4000-8000-000000000003');
+    const handler=vi.fn(async()=>{state.ownsLease=false;return evidenceOutput({},['Retained source'],['source']);});
+    await expect(engine.run('quality-analyst',handler)).rejects.toThrow('lease lost');
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(state.writes.some(row=>['completed','failed'].includes((row as {status?:string}).status ?? ''))).toBe(false);
+    expect(engine.outputs['quality-analyst']).toBeUndefined();
   });
 });

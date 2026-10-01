@@ -8,7 +8,7 @@ import { ThesisPolicy } from './thesis-policy.js';
 import { evaluateThesisEligibility } from './thesis-domain.js';
 import { DiscoveryContext, ScreeningAudit, screenDiscoveryUniverse, issuerKey } from './discovery-domain.js';
 export { DiscoveryContext, ScreeningAudit, screenDiscoveryUniverse, issuerKey, listingKey, discoveryMarkets } from './discovery-domain.js';
-export { ThesisPolicy, ThesisRule, emptyThesisPolicy } from './thesis-policy.js';
+export { ThesisPolicy, ThesisRule, ValueScorecardPolicy, emptyThesisPolicy } from './thesis-policy.js';
 export { reviewStructuredThesis, thesisDiscoveryPlan, evaluateThesisEligibility, diffThesis } from './thesis-domain.js';
 
 export {

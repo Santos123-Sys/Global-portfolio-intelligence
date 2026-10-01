@@ -10,6 +10,10 @@ import { researchComparablePeer } from '@/lib/comparable-research';
 import type { ComparableResult } from '@/lib/quant/comparables';
 import { technicalIndicators } from './technical';
 import {fetchCapitalInputs} from './capital-source';
+import { thesisResearchPolicy } from './research-modules';
+import { portfolios } from '@/lib/db/schema';
+import { MarketBrief } from '@portfolio-intelligence/agentic-contract';
+import { resolveResearchProfile } from '../research-policy';
 
 /** L4: existing evidence stores and provider-ingested observations; no new scraper or provider bypass. */
 export async function loadFoundation(ownerId: string, securityId: string, request?: AnalyzeRequest) {
@@ -21,8 +25,15 @@ export async function loadFoundation(ownerId: string, securityId: string, reques
   ]);
   const company = companyRows[0]; if (!company) throw new Error('Security no longer exists');
   const [thesis]=request?.thesisVersionId ? await db.select().from(thesisVersions).where(and(eq(thesisVersions.id,request.thesisVersionId),eq(thesisVersions.ownerId,ownerId))).limit(1) : [];
+  const [portfolio]=request?.portfolioId ? await db.select({role:portfolios.portfolioType}).from(portfolios).where(and(eq(portfolios.id,request.portfolioId),eq(portfolios.ownerId,ownerId))).limit(1) : [];
+  const policy: {researchPolicy?:ReturnType<typeof thesisResearchPolicy>}={researchPolicy:thesisResearchPolicy(thesis?.criteriaJson,portfolio?.role ?? null)};
+  const profile=resolveResearchProfile(company,request?.researchProfile,policy.researchPolicy?.locale);
+  const locale:{researchLocale?:'pt-BR'|'en'|'de'|'es'}={researchLocale:profile.locale};
+  const [briefRecord]=await db.select({brief:discoveryCandidates.marketBriefJson}).from(discoveryCandidates).where(and(eq(discoveryCandidates.ownerId,ownerId),eq(discoveryCandidates.securityId,securityId),eq(discoveryCandidates.marketBriefStatus,'completed'),request?.portfolioId ? eq(discoveryCandidates.portfolioId,request.portfolioId) : undefined)).orderBy(desc(discoveryCandidates.updatedAt)).limit(1);
+  const brief=MarketBrief.safeParse(briefRecord?.brief);
+  const marketContext:{marketBrief?:MarketBrief|null}={marketBrief:brief.success ? brief.data : null};
   const holdings=request?.portfolioId ? await db.select({ticker:securities.ticker,weight:positions.weight}).from(positions).innerJoin(securities,eq(securities.id,positions.securityId)).where(eq(positions.portfolioId,request.portfolioId)) : [];
-  const metrics = [...new Set([...FCFF_INPUTS, ...OPENING_FIELDS, 'net_income', 'shares_outstanding', 'ebitda', 'gross_profit', 'current_assets', 'current_liabilities', 'current_debt'])];
+  const metrics = [...new Set([...FCFF_INPUTS, ...OPENING_FIELDS, 'net_income', 'shares_outstanding', 'ebitda', 'gross_profit', 'cost_of_revenue', 'accounts_receivable', 'inventory', 'accounts_payable', 'total_liabilities', 'goodwill', 'current_assets', 'current_liabilities', 'current_debt'])];
   const selected = selectFilingSnapshot(observations, company.currency, metrics);
   const facts = Object.fromEntries([...selected].map(([key, row]) => [key, Number(row.valueNumeric)]));
   if (['current_assets','current_liabilities','current_debt','cash_and_equivalents'].every(key=>Number.isFinite(facts[key]))) facts.non_cash_working_capital = facts.current_assets-facts.cash_and_equivalents-facts.current_liabilities+facts.current_debt;
@@ -63,14 +74,14 @@ export async function loadFoundation(ownerId: string, securityId: string, reques
       dataGaps.push(...forward.gaps);
     } catch { dataGaps.push('Existing comparable research adapter could not retrieve labelled forward estimates.'); }
   }
-  return { company, facts, sources, fiscalDate: [...selected.values()][0]?.observationDate ?? null,
+  return { ...policy, ...locale, ...marketContext, company, facts, sources, fiscalDate: [...selected.values()][0]?.observationDate ?? null,
     history, wacc, terminalGrowth: number('terminal_growth_rate'), peers, estimates, dataGaps, thesisContext:thesis?.criteriaJson ?? null,holdings,
     observations: observations.map(row => ({ metric: row.metricName, value: row.valueNumeric ?? row.valueText, currency: row.currency, date: row.observationDate, source: row.sourceUrl, provider: row.provider })),
     prices: prices.reverse().map(row => ({ date: row.priceDate, close: Number(row.close), currency: row.currency,source:row.source,volume:row.volume!=null ? Number(row.volume) : null })),
     documents: documents.map(row => ({ id: row.id, title: row.title, type: row.folderType, source: row.url ?? `document:${row.id}`, publishedAt: row.publishedDate?.toISOString() ?? null, excerpt: row.contentText?.slice(0, 4000) ?? '' })),
   };
 }
-export type Foundation = Awaited<ReturnType<typeof loadFoundation>>;
+export type Foundation = Awaited<ReturnType<typeof loadFoundation>> & {financialReview?:{reviewedAt:string;periods:Array<{date:string;days:number;sourceQuality:'primary'|'official_api'|'licensed_data'|'secondary'|'unknown'}>}};
 export function sourceEvidence(data:Foundation):Record<string,string> {
   const evidence:Record<string,string>={};
   const add=(source:string,text:string)=>{evidence[source]=(evidence[source] ?? '')+'\n'+text;};
@@ -79,7 +90,12 @@ export function sourceEvidence(data:Foundation):Record<string,string> {
     const rows=data.observations.filter(row=>row.source===source && row.currency===data.company.currency && row.date===data.fiscalDate && row.metric in data.facts && Number(row.value)===data.facts[row.metric]);
     if(rows.length)add(source,JSON.stringify({currency:data.company.currency,fiscalDate:data.fiscalDate,observations:rows}));
   });
+  data.history.forEach(period=>period.sources.forEach(source=>{
+    const rows=data.observations.filter(row=>row.source===source && row.currency===data.company.currency && row.date===period.date && row.metric in period.facts && Number(row.value)===period.facts[row.metric]);
+    if(rows.length)add(source,JSON.stringify({currency:data.company.currency,date:period.date,observations:rows}));
+  }));
   data.documents.forEach(row=>add(row.source,row.excerpt));
+  data.marketBrief?.evidenceRegister.forEach(row=>add(row.url,row.excerpt));
   data.peers.forEach(row=>add(row.sourceUrl,JSON.stringify(row)));
   data.estimates.forEach(row=>add(row.source,JSON.stringify(row)));
   data.wacc?.sources.forEach(source=>add(source,JSON.stringify(data.wacc)));

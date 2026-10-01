@@ -13,7 +13,7 @@ const sessionId='00000000-0000-4000-8000-000000000001';
 const envelope=(from:string,to:string)=>({from,to,messageType:'request' as const,payload:{},timestamp:new Date().toISOString(),sessionId});
 describe('unified agent governance',()=>{
   it('covers legacy, DCF, analysis, orchestration and verification without duplicate IDs',()=>{
-    expect(AGENT_REGISTRY).toHaveLength(23);expect(new Set(AGENT_REGISTRY.map(a=>a.id)).size).toBe(23);
+    expect(AGENT_REGISTRY).toHaveLength(26);expect(new Set(AGENT_REGISTRY.map(a=>a.id)).size).toBe(26);
     expect(AGENT_REGISTRY.filter(a=>a.execution==='legacy')).toHaveLength(4);
     for(const a of AGENT_REGISTRY)expect(()=>validateToolPolicy(a.id,a.tools)).not.toThrow();
   });
