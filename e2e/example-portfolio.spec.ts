@@ -32,7 +32,7 @@ for (const width of [390, 1440]) {
     });
 
     await page.goto('/example-portfolio');
-    await expect(page.getByRole('heading', { name: 'Illustrative Swiss Quality portfolio' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Illustrative Swiss Quality portfolio' })).toBeVisible();
     await expect(page.getByText('Demonstration only: fictional companies and synthetic data.')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Investment thesis' })).toBeVisible();
     await expect(page.locator('.example-viewport-desktop')).toHaveAttribute('data-demo-stage', 'thesis');
