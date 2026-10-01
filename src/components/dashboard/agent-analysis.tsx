@@ -6,12 +6,15 @@ import {driverSchema,capitalSchema,type Drivers} from '@/lib/agent-finance/l4/fi
 import { AgentRunStatus, StatementAnalysisSummary, type RunEvent, type RunBriefing } from './agent-run-status';
 import type { SessionAction } from '@/lib/agent-finance/l3/session-control';
 import { useLanguage } from '@/lib/i18n';
+import { AgentActivityInspectorPanel } from './agent-activity-inspector';
+import type { AgentActivityInspector } from '@/lib/agent-finance/activity-inspector';
 
 interface Session {
   id: string; status: string; phase: string; progress: number; error?: string | null;
   agentsCompleted?: string[]; agentsPending?: string[];
-  requestPayload?:AnalyzeRequest;
+  portfolioLinked?:boolean;
   events?:RunEvent[];briefing?:RunBriefing;
+  currentAgent?:string|null;inspector?:AgentActivityInspector;
   partialOutputs?:Record<string,AgentOutput>;
   finalOutput?: { status?:string; outputs: Record<string, AgentOutput>; confidenceScore: number; limitations: string[];valueScorecard?:{status:string;total:number|null;coverage?:number} } | null;
 }
@@ -108,7 +111,7 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
   const tornado=sensitivityData?.tornado as Array<{driver:string;low:number;high:number}> | undefined;
   const monteCarlo=sensitivityData?.monteCarlo as {p5:number;p50:number;p95:number;histogram:Array<{value:number;count:number}>} | null | undefined;
   const projection=outputs?.['projection-builder']?.data.projections as Array<{year:number;incomeStatement:{revenue:number;ebit:number;netIncome:number};balanceSheet:{totalAssets:number;totalLiabilities:number;equity:number;cash:number};cashFlow:{fcff:number};checks:{balanceError:number;cashError:number}}> | undefined;
-  const acceptable=session?.finalOutput?.status==='completed' && session.finalOutput.confidenceScore>=60 && !!outputs?.['judge-agent'] && !!session.requestPayload?.portfolioId;
+  const acceptable=session?.finalOutput?.status==='completed' && session.finalOutput.confidenceScore>=60 && !!outputs?.['judge-agent'] && !!session.portfolioLinked;
   async function accept() {
     setBusy(true);setError('');
     try {
@@ -138,6 +141,7 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
     </div>}
     {error && <p role="alert" className="error-text">{error}</p>}
     {session && <AgentRunStatus status={session.status} progress={session.progress} events={session.events} briefing={session.briefing} busy={busy} viewer={viewer} onControl={action=>void control(action)}/>}
+    {session?.inspector && <AgentActivityInspectorPanel inspector={session.inspector} events={session.events}/>}
     {session?.status==='awaiting_approval' && pendingFinancials && <section className="card glass-panel"><StatementAnalysisSummary output={pendingFinancials}/><h3>Review retained financial inputs</h3><p>Check these annual statement dates, actual period lengths and source categories against the linked filings. This confirms retained inputs; it does not fill gaps or authorize investment decisions.</p>{!viewer && <form onSubmit={event=>{event.preventDefault();void reviewFinancialInputs();}}><div className="form-grid">{pendingPeriods.map(period=><fieldset key={period.date}><legend>{period.date}</legend><label>Actual annual period length (days)<input type="number" required min="330" max="380" value={financialPeriods[period.date]?.days ?? ''} onChange={event=>setFinancialPeriods(current=>({...current,[period.date]:{days:event.target.value,sourceQuality:current[period.date]?.sourceQuality ?? 'unknown'}}))}/></label><label>Reviewed source category<select value={financialPeriods[period.date]?.sourceQuality ?? 'unknown'} onChange={event=>setFinancialPeriods(current=>({...current,[period.date]:{days:current[period.date]?.days ?? '',sourceQuality:event.target.value}}))}><option value="unknown">Unknown / not verified</option><option value="primary">Primary issuer / regulatory filing</option><option value="official_api">Official API</option><option value="licensed_data">Licensed data provider</option><option value="secondary">Secondary source</option></select></label></fieldset>)}</div><details><summary>Retained source references</summary><ul>{pendingFinancials.citations.map(source=><li key={source}>{/^https?:\/\//.test(source)?<a href={source} target="_blank" rel="noreferrer">{source}</a>:source}</li>)}</ul></details><button className="action-button" type="submit" disabled={busy}>Confirm reviewed inputs and continue research</button><p className="note">Secondary or unknown provenance continues to withhold automatic totals. Approval is never inferred from elapsed time.</p></form>}</section>}
     {session?.status === 'failed' && <p role="alert">{session.error ?? 'Analysis failed. Inspect the timeline and retry after correcting the missing inputs.'}</p>}
     {outputs && <>

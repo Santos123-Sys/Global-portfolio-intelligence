@@ -61,6 +61,12 @@ The request cannot spoof a market that contradicts retained security metadata. L
 
 All mutation routes enforce authentication/write permission, same-origin checks, ownership, allowed state transitions, active-thesis checks on continuation and advisory-lock queue capacity. Compare-and-set updates reject racing controls. Configuration snapshots, tool allowlists/budgets, shadow diagnostics and evaluation controls from the latest main branch remain intact.
 
+## Agent Activity Inspector
+
+The company analysis dashboard exposes an owner-scoped inspection view for active and completed runs. It shows the active agents and their governed tasks, start/elapsed time, registered tool lifecycle, sanitized failures, validation retries, handoffs, reviewable artifacts, source references, data-quality state and the model/configuration identifier used for each step. Completed sessions retain an expandable audit trail.
+
+Observability is deliberately bounded. The API removes frozen evidence and configuration snapshots, lease identifiers, raw run inputs, private prompts and protected policies. It returns public audit summaries, source identifiers and sanitized technical metadata; credentials, signed query strings, raw tool payloads and private chain-of-thought are never exposed. Watching a run never changes its authority boundary or permits automatic acceptance, weighting or trading.
+
 ## Deployment order
 
 1. Review this branch and its generated **`0024_lonely_venom.sql`** migration. Migrations 0022 and 0023 from main are preserved; the earlier local draft migration is not part of the deployment sequence.
@@ -79,4 +85,4 @@ Regression coverage includes ratio conventions, YTD flow normalization, invalid 
 
 Local unit tests and builds do not prove live provider access, deployed migration success or production worker connectivity. Those require the rollout checks above. Browser verification requires an installed browser runtime; absence is a verification limitation, not a passing UI result.
 
-This implementation adapts the four supplied analytical modules into the existing platform. It does not install their standalone report engines or reproduce every page from the Agentic UX reference. Advanced review UX, model-output localization and unfamiliar sector policies still require real-issuer acceptance testing; no numerical accuracy or investment return is guaranteed.
+This implementation adapts the four supplied analytical modules into the existing platform. It does not install their standalone report engines or reproduce every page from the Agentic UX reference. Model-output localization, additional sector policies and real-issuer acceptance testing remain; no numerical accuracy or investment return is guaranteed.

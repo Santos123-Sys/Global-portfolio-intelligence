@@ -69,7 +69,7 @@ export function executionPlan(type: AnalyzeRequest['analysisType']): string[] {
 export const authoritySchema = z.enum(['autonomous', 'notify', 'approval_required', 'human_only']);
 export const consequenceSchema = z.enum(['low', 'medium', 'high', 'critical']);
 export const sessionEventSchema = z.object({
-  eventType: z.enum(['plan_created', 'phase_started', 'tool_started', 'tool_completed', 'finding', 'warning', 'approval_required', 'paused', 'resumed', 'failed', 'completed', 'cancelled']),
+  eventType: z.enum(['plan_created', 'phase_started', 'tool_started', 'tool_completed', 'handoff', 'retry', 'artifact_created', 'data_quality_changed', 'finding', 'warning', 'approval_required', 'paused', 'resumed', 'failed', 'completed', 'cancelled']),
   summary: z.string().min(1).max(500),
   detail: z.string().max(4000).optional(),
   agent: z.string().max(80).optional(),
