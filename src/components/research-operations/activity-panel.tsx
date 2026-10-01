@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import AgentResearchOperations from './agent-research-operations';
 
 interface HistoryItem { title: string; status: string; requestedAt: string; completedAt: string | null; detail: string; }
 interface HistoryFolder { key: string; title: string; description: string; items: HistoryItem[]; }
@@ -19,8 +20,9 @@ export default function ActivityPanel() {
   }, []);
   return <section className="ops-panel">
     <h1>Admin activity</h1>
-    <p className="sub">Run and extraction history for troubleshooting thesis uploads, market discovery and existing-holdings analysis. Technical run IDs are hidden.</p>
+    <p className="sub">Review agent runs, evidence trails and operational history for troubleshooting. Technical traces are shown here; the company page keeps only a concise progress update.</p>
     {error && <p className="login-error" role="alert">{error}</p>}
+    <AgentResearchOperations />
     <div className="history-folders">{folders.map((folder) => <section className="card history-folder" key={folder.key}>
       <h2>{folder.title}</h2><p className="note">{folder.description}</p>
       {folder.items.length === 0 ? <p className="note">No activity recorded yet.</p> : <details><summary>{folder.items.length} recorded item{folder.items.length === 1 ? '' : 's'}</summary>
