@@ -45,7 +45,7 @@ for (const width of [390, 1440]) {
     for (const [label, stage] of [
       ['Discovery', 'discovery'], ['Candidate review', 'candidate-review'], ['Human approval', 'approval'],
     ]) {
-      await page.getByRole('navigation', { name: 'Portfolio walkthrough progress' }).getByRole('link', { name: new RegExp(`^\\d{2} ${label}import { randomBytes, randomUUID } from 'node:crypto';
+      await page.getByRole('navigation', { name: 'Portfolio walkthrough progress' }).locator('a[href="#example-stage-' + stage + '"]').click();
 import { expect, test } from '@playwright/test';
 import { signSessionPayload } from '../src/lib/session-token';
 
