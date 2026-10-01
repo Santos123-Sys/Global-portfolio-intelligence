@@ -21,6 +21,31 @@ route does not use the live CSV adapter, so synthetic history never passes a
 total-return attestation or enters `portfolio_weight_runs`. Selecting a method
 changes only the local preview; no method is confirmed as a user decision.
 
+## Progressive walkthrough
+
+The page presents the workflow as eight deterministic states: investment
+thesis, discovery, candidate review, human approval, financial analysis,
+valuation, portfolio inclusion, and monitoring. Structured step data is the
+source for progress navigation, stage descriptions, status/activity copy, and
+the application preview. An `IntersectionObserver` observes each stage; the
+active stage controls the stable desktop preview without a continuous scroll
+listener. Navigation remains anchor-based, and stage descriptions remain
+server-rendered.
+
+The desktop preview is sticky while the left narrative advances. At mobile
+widths, each stage contains its own compact preview below the explanation. The
+approval control changes only local demonstration state; analysis and valuation
+panels remain gated until that step is previewed. The seeded allocation endpoint
+loads only when the portfolio-inclusion stage becomes active after that local
+approval. Reduced motion removes movement and smooth-scroll effects. A collapsed full-data section
+keeps the detailed financial and DCF tables available without putting every
+result on screen at once.
+
+Displayed agent activity is simulated; no actual agent execution, provider
+lookup, investment approval, live monitoring, or user portfolio change occurs.
+Comparable-company output is marked unavailable because the fixture has no peer
+dataset.
+
 There is no migration and no user-specific seed record. The six fictional
 identifiers cannot enter real portfolio holdings through the sandbox; there is
 no import or promotion action. Visitors reach the real thesis and discovery

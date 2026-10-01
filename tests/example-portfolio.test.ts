@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { examplePortfolio } from '../src/lib/example-portfolio';
+import { portfolioExampleSteps } from '../src/lib/example-portfolio-walkthrough';
 
 const auth = vi.hoisted(() => vi.fn());
 vi.mock('../src/lib/api-auth', () => ({ authenticateRequest: auth }));
@@ -8,6 +9,22 @@ import { GET } from '../src/app/api/example-portfolio/route';
 const request = new Request('http://localhost/api/example-portfolio');
 
 describe('isolated example portfolio', () => {
+  it('defines the complete deterministic workflow as structured UI state', () => {
+    expect(portfolioExampleSteps.map(step => step.stage)).toEqual([
+      'thesis', 'discovery', 'candidate-review', 'approval', 'analysis', 'valuation', 'portfolio', 'monitoring',
+    ]);
+    expect(new Set(portfolioExampleSteps.map(step => step.id)).size).toBe(portfolioExampleSteps.length);
+    for (const step of portfolioExampleSteps) {
+      expect(step.uiState.panel).toBe(step.stage);
+      expect(step.uiState.agent).toBeTruthy();
+      expect(step.uiState.status).toBeTruthy();
+      expect(['queued', 'running', 'awaiting_approval', 'completed', 'insufficient_data', 'blocked']).toContain(step.uiState.status);
+      expect(step.uiState.action).toBeTruthy();
+      expect(step.uiState.inputs).toBeTruthy();
+      expect(step.uiState.result).toBeTruthy();
+    }
+  });
+
   it('uses fictional identifiers and calculates FCFF from the supplied scenario inputs', () => {
     expect(examplePortfolio.assets).toHaveLength(6);
     expect(examplePortfolio.assets.reduce((sum, asset) => sum + asset.startingWeight, 0)).toBeCloseTo(1);
