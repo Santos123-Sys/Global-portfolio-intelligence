@@ -34,11 +34,21 @@ describe('user-safe Agent Activity Inspector',()=>{
   });
   it('keeps raw snapshots, prompts and inputs out of the owner session response',()=>{
     const route=readFileSync('src/app/api/agents/sessions/[sessionId]/route.ts','utf8');
-    expect(route).toContain('evidenceSnapshot,configurationSnapshot,leaseOwner,leaseExpiresAt,requestPayload,...publicSession');
+    expect(route).toContain('evidenceSnapshot,configurationSnapshot,leaseOwner,leaseExpiresAt,requestPayload,ownerId,...publicSession');
     expect(route).toContain('buildAgentActivityInspector');expect(route).toContain('publicRuns');
     expect(route).toContain('sanitizeActivityDetail(event.detail)');
+    expect(route).toContain("companyView=view==='company'");expect(route).toContain('inspector=companyView?null:');expect(route).toContain('liveStatus');
+    const sessionsRoute=readFileSync('src/app/api/agents/sessions/route.ts','utf8');
+    expect(sessionsRoute).toContain('isPlatformAdmin');expect(sessionsRoute).toContain('requestPayload:agentAnalysisSessions.requestPayload');
+    expect(sessionsRoute).toContain('ticker:request.success?request.data.ticker');expect(sessionsRoute).not.toContain('configurationSnapshot:agentAnalysisSessions');
+    expect(sessionsRoute).toContain('operations?undefined:eq(agentAnalysisSessions.ownerId, auth.auth.userId)');
+    expect(route).toContain("view==='operations'");expect(route).toContain('operationsView?undefined:eq(agentAnalysisSessions.ownerId, auth.auth.userId)');
     const component=readFileSync('src/components/dashboard/agent-activity-inspector.tsx','utf8');
     for(const label of ['Live agents','Evidence','Artifacts','Audit trail','Observability and privacy boundary'])expect(component).toContain(label);
+    const analysis=readFileSync('src/components/dashboard/agent-analysis.tsx','utf8');
+    expect(analysis).not.toContain('AgentActivityInspectorPanel');expect(analysis).toContain('view=company');
+    const operations=readFileSync('src/components/research-operations/agent-research-operations.tsx','utf8');
+    expect(operations).toContain('AgentActivityInspectorPanel');expect(operations).toContain('Platform admin');
   });
 });
 
