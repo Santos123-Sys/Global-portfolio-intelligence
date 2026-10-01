@@ -1,4 +1,6 @@
 import PDFDocument from 'pdfkit';
+import type { ThesisCriteria, ThesisPolicy } from '@portfolio-intelligence/agentic-contract';
+import { strategyPdfTitleFromCriteria } from './portfolio-strategy-chat';
 
 export interface GeneratedThesisMandate {
   role: string;
@@ -7,6 +9,7 @@ export interface GeneratedThesisMandate {
   objective: string;
   inclusionCriteria: string[];
   exclusionCriteria: string[];
+  policy?: ThesisPolicy;
 }
 
 export interface GeneratedThesisInput {
@@ -21,68 +24,119 @@ export interface GeneratedThesisInput {
   mandates: GeneratedThesisMandate[];
 }
 
+const GREEN = '#113D30';
+const GREEN_MID = '#2E6B51';
+const PALE = '#EEF5EF';
+const TEXT = '#17231D';
+const MUTED = '#5C6B61';
+
 function safeText(value: string): string {
   return value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').trim();
 }
 
 function bulletList(document: PDFKit.PDFDocument, items: string[], empty: string): void {
   if (!items.length) {
-    document.fillColor('#52606d').text(empty);
+    document.fillColor(MUTED).text(empty, { indent: 10 });
     return;
   }
   for (const item of items) {
-    document.fillColor('#16202a').text(`• ${safeText(item)}`, { indent: 10, paragraphGap: 4 });
+    document.fillColor(TEXT).text(`• ${safeText(item)}`, { indent: 10, paragraphGap: 3, lineGap: 1 });
   }
 }
 
-function section(document: PDFKit.PDFDocument, heading: string, text?: string): void {
-  document.moveDown(0.75).fillColor('#0f3a5b').font('Helvetica-Bold').fontSize(13).text(heading);
-  if (text) document.moveDown(0.25).fillColor('#16202a').font('Helvetica').fontSize(10.5).text(safeText(text), { lineGap: 3 });
+function section(document: PDFKit.PDFDocument, heading: string, value?: string): void {
+  document.moveDown(0.75).fillColor(GREEN).font('Helvetica-Bold').fontSize(12).text(safeText(heading));
+  if (value) document.moveDown(0.2).fillColor(TEXT).font('Helvetica').fontSize(10.5).text(safeText(value), { lineGap: 2 });
 }
 
-/** A static, text-first PDF so it is safe to pass through the same upload validation as a user document. */
+function policyLines(policy?: ThesisPolicy): string[] {
+  if (!policy) return [];
+  const universe = policy.universe;
+  const fields: Array<[string, string[]]> = [
+    ['Listing market', universe.listingMarkets], ['Domicile', universe.domicileCountries],
+    ['Operating geography', universe.operatingCountries], ['Revenue exposure', universe.revenueCountries],
+    ['Security type', universe.securityTypes], ['Required sectors', universe.sectorsIncluded],
+    ['Excluded sectors', universe.sectorsExcluded], ['Required industries', universe.industriesIncluded],
+    ['Excluded industries', universe.industriesExcluded],
+  ];
+  return fields.filter(([, values]) => values.length).map(([name, values]) => `${name}: ${values.join(', ')}`);
+}
+
+function ruleLines(policy?: ThesisPolicy): string[] {
+  return (policy?.rules ?? []).map((rule) => {
+    const effect = rule.kind === 'hard' ? 'Required' : rule.kind === 'preference' ? 'Preference' : 'Context';
+    const metric = rule.metric ? ` — ${rule.metric.field} ${rule.metric.operator === 'gte' ? '≥' : '≤'} ${rule.metric.value} ${rule.metric.unit} (${rule.metric.period})` : '';
+    return `${effect} · ${rule.category}: ${rule.statement}${metric}`;
+  });
+}
+
+/**
+ * Creates a short investor mandate inspired by equity research structure:
+ * thesis summary, universe, selection debate, risks, controls and disclosure.
+ * It intentionally contains no issuer facts, market forecasts or valuations.
+ */
 export async function renderGeneratedThesisPdf(input: GeneratedThesisInput): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const document = new PDFDocument({ size: 'A4', margin: 54, info: { Title: safeText(input.title), Author: 'Portfolio Intelligence' } });
+    const document = new PDFDocument({
+      size: 'A4', margin: 50,
+      info: { Title: safeText(input.title), Author: 'Portfolio Intelligence', Subject: 'Investor-authored portfolio mandate' },
+    });
     const chunks: Buffer[] = [];
     document.on('data', (chunk: Buffer) => chunks.push(chunk));
     document.on('end', () => resolve(Buffer.concat(chunks)));
     document.on('error', reject);
 
-    document.rect(0, 0, document.page.width, document.page.height).fill('#f7f4ed');
-    document.fillColor('#0f3a5b').font('Helvetica-Bold').fontSize(11).text('PORTFOLIO INTELLIGENCE', 54, 70);
-    document.fillColor('#16202a').fontSize(27).text(safeText(input.title), 54, 126, { width: 480, lineGap: 5 });
-    document.fillColor('#52606d').font('Helvetica').fontSize(12).text(`Prepared for ${safeText(input.investorName)}`, 54, 220);
-    document.fillColor('#0f3a5b').rect(54, 274, 145, 3).fill();
-    document.fillColor('#16202a').font('Helvetica').fontSize(11).text('Investment mandate and decision framework', 54, 298);
-    document.fillColor('#52606d').fontSize(9.5).text('This document records the investor’s instructions. It is subject to explicit human review before it is used for market research or portfolio decisions.', 54, 672, { width: 480, lineGap: 3 });
+    document.rect(0, 0, document.page.width, document.page.height).fill('#FBFCFA');
+    document.fillColor(GREEN).font('Helvetica-Bold').fontSize(10).text('PORTFOLIO INTELLIGENCE  /  INVESTMENT MANDATE', 50, 50);
+    document.moveDown(3).fillColor(TEXT).fontSize(26).text(safeText(input.title), { width: 490, lineGap: 4 });
+    document.moveDown(0.4).fillColor(GREEN_MID).font('Helvetica-Bold').fontSize(12).text('Portfolio strategy');
+    document.moveDown(0.7).fillColor(MUTED).font('Helvetica').fontSize(10).text(`Prepared for ${safeText(input.investorName || 'Portfolio owner')}  ·  ${new Date().toISOString().slice(0, 10)}`);
+    document.moveDown(1.4).fillColor(PALE).roundedRect(50, document.y, 495, 128, 12).fill();
+    const summaryY = document.y + 17;
+    document.fillColor(GREEN).font('Helvetica-Bold').fontSize(10).text('STRATEGY AT A GLANCE', 68, summaryY);
+    document.fillColor(TEXT).font('Helvetica').fontSize(10).text(`Market: ${safeText(input.markets.join(' · ')) || 'Not specified'}`, 68, summaryY + 24, { width: 455 });
+    document.text(`Horizon: ${safeText(input.timeHorizon)}     Review: ${safeText(input.reviewCadence)}`, 68, summaryY + 45, { width: 455 });
+    document.text(`Risk posture: ${safeText(input.riskTolerance)}`, 68, summaryY + 66, { width: 455 });
+    document.y = summaryY + 140;
+    section(document, 'Executive summary', input.purpose);
+    section(document, 'Investment thesis', 'This document records the investor’s objectives and decision rules. It is a mandate for subsequent research and human review; it is not a security recommendation.');
+    section(document, 'Portfolio destinations');
+    bulletList(document, input.mandates.map((mandate) => `${mandate.label} (${mandate.currency}) — ${mandate.objective}`), 'No portfolio destination was specified.');
+    document.moveDown(1.4).fillColor(MUTED).fontSize(8.5).text('Strategy intake uses investor-provided information. No external issuer or market facts, forecasts, target prices or valuations are asserted in this document.', { width: 495, lineGap: 2 });
 
     document.addPage();
-    document.fillColor('#0f3a5b').font('Helvetica-Bold').fontSize(18).text('Mandate at a glance');
-    section(document, 'Investment purpose', input.purpose);
-    section(document, 'Time horizon and risk posture');
-    document.fillColor('#16202a').font('Helvetica').fontSize(10.5).text(`Time horizon: ${safeText(input.timeHorizon)}\nRisk posture: ${safeText(input.riskTolerance)}\nReview cadence: ${safeText(input.reviewCadence)}`, { lineGap: 4 });
-    section(document, 'Markets and geographies');
-    bulletList(document, input.markets, 'No market or geography was specified.');
-    section(document, 'Portfolio-wide constraints');
-    bulletList(document, input.globalConstraints, 'No portfolio-wide constraints were specified.');
+    document.fillColor(GREEN).font('Helvetica-Bold').fontSize(18).text('Selection policy and risk framework');
+    document.moveDown(0.25).fillColor(MUTED).font('Helvetica').fontSize(9.5).text('The detailed rules below preserve what you stated. Missing information remains unspecified; research must not treat missing data as proof that a company qualifies.');
 
     for (const mandate of input.mandates) {
-      document.addPage();
-      document.fillColor('#0f3a5b').font('Helvetica-Bold').fontSize(18).text(safeText(mandate.label));
-      document.fillColor('#52606d').font('Helvetica').fontSize(10).text(`Portfolio identifier: ${safeText(mandate.role)}  ·  Native currency: ${safeText(mandate.currency)}`);
-      section(document, 'Objective', mandate.objective);
+      document.moveDown(0.8).fillColor(GREEN).font('Helvetica-Bold').fontSize(13).text(safeText(mandate.label));
+      document.moveDown(0.2).fillColor(MUTED).font('Helvetica').fontSize(9.5).text(`Role: ${safeText(mandate.role)}   ·   Reporting currency: ${safeText(mandate.currency)}`);
+      section(document, 'Mandate objective', mandate.objective);
+      section(document, 'Investment approach and valuation', mandate.policy?.strategy);
+      section(document, 'Eligible universe');
+      bulletList(document, policyLines(mandate.policy), 'No structured geography or security restrictions were specified.');
       section(document, 'What qualifies');
-      bulletList(document, mandate.inclusionCriteria, 'No explicit qualifying criteria were supplied.');
+      bulletList(document, mandate.inclusionCriteria, 'No additional inclusion criteria specified.');
       section(document, 'What disqualifies');
-      bulletList(document, mandate.exclusionCriteria, 'No explicit disqualifying criteria were supplied.');
+      bulletList(document, mandate.exclusionCriteria, 'No additional exclusions specified.');
+      section(document, 'Classified rules');
+      bulletList(document, ruleLines(mandate.policy), 'No additional classified rules specified.');
+      const riskDebates = (mandate.policy?.rules ?? []).filter((rule) => rule.category === 'risk' || rule.category === 'macro');
+      section(document, 'Key risks and monitoring focus');
+      bulletList(document, riskDebates.map((rule) => `${rule.kind === 'hard' ? 'Requirement' : rule.kind === 'preference' ? 'Watch item' : 'Context'}: ${rule.statement}`), 'No specific risk or macro monitor was provided. Research must identify material risks before investment review.');
+      const holdings = [
+        mandate.policy?.targetHoldings ? `Target holdings: ${mandate.policy.targetHoldings}` : '',
+        mandate.policy?.maximumHoldings ? `Maximum holdings: ${mandate.policy.maximumHoldings}` : '',
+        mandate.policy?.benchmark ? `Benchmark: ${mandate.policy.benchmark}` : '',
+      ].filter(Boolean);
+      if (holdings.length) section(document, 'Portfolio construction', holdings.join('\n'));
     }
 
-    document.addPage();
-    document.fillColor('#0f3a5b').font('Helvetica-Bold').fontSize(18).text('Governance and decision protocol');
-    section(document, 'Use of this thesis', 'This thesis guides research and review. It does not authorise a trade or add a security to a portfolio. Every candidate requires evidence-based review and an explicit investment decision.');
-    section(document, 'Review discipline', 'Reassess the thesis at the stated cadence and whenever a material change affects objectives, constraints, time horizon, liquidity needs, or risk capacity. Record amendments as a new thesis version.');
-    document.fillColor('#52606d').font('Helvetica').fontSize(9).text('Generated by Portfolio Intelligence. This document is an investor mandate, not investment advice or a solicitation to transact.', 54, 690, { width: 480, lineGap: 3 });
+    section(document, 'Portfolio-wide constraints');
+    bulletList(document, input.globalConstraints, 'No additional portfolio-wide constraint was specified.');
+    section(document, 'Governance and decision protocol', `Review cadence: ${input.reviewCadence}. Material changes to the objectives, time horizon, risk capacity, liquidity needs or portfolio constraints should be reviewed and recorded as a new version. Every security requires evidence-based human approval before it enters the portfolio.`);
+    section(document, 'Evidence and limitations', 'Qualitative preferences guide analysis unless explicitly defined as hard requirements. Numeric tests are used only where the investor supplied a threshold, unit and period. Source coverage and data quality must be disclosed during research; unavailable evidence does not establish eligibility. Automated market discovery currently covers B3 (BVMF) and SIX (XSWX).');
+    document.moveDown(1).fillColor(MUTED).font('Helvetica').fontSize(8.5).text('Generated by Portfolio Intelligence from the investor’s strategy conversation. This mandate is for research planning and does not constitute investment advice, an offer, or an instruction to transact.', { width: 495, lineGap: 2 });
     document.end();
   });
 }
@@ -90,4 +144,37 @@ export async function renderGeneratedThesisPdf(input: GeneratedThesisInput): Pro
 export function generatedThesisFileName(title: string): string {
   const stem = safeText(title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 80) || 'investment-thesis';
   return `${stem}-investment-thesis.pdf`;
+}
+
+export function thesisCriteriaToPdfInput(criteria: ThesisCriteria, investorName = ''): GeneratedThesisInput {
+  const first = criteria.portfolios[0];
+  const roleNames: Record<string, string> = { swiss_quality: 'Swiss Quality', brazilian_growth: 'Brazilian Growth' };
+  const markets = [...new Set(criteria.portfolios.flatMap((portfolio) => portfolio.policy?.universe.listingMarkets ?? []))];
+  const constraints = [...criteria.globalConstraints];
+  const takeConstraint = (prefix: string) => {
+    const index = constraints.findIndex((value) => value.startsWith(prefix));
+    if (index < 0) return '';
+    return constraints.splice(index, 1)[0]!.slice(prefix.length).trim();
+  };
+  const riskTolerance = takeConstraint('Risk posture:');
+  const reviewCadence = takeConstraint('Review cadence:') || 'As needed';
+  return {
+    title: strategyPdfTitleFromCriteria(criteria),
+    investorName,
+    purpose: criteria.portfolios.map((portfolio) => portfolio.objective).join('\n\n'),
+    timeHorizon: first?.policy?.horizon || 'Not specified',
+    riskTolerance: riskTolerance || 'Not specified',
+    markets: markets.length ? markets : ['Not specified'],
+    globalConstraints: constraints,
+    reviewCadence,
+    mandates: criteria.portfolios.map((portfolio) => ({
+      role: portfolio.role,
+      label: portfolio.policy?.name || roleNames[portfolio.role] || portfolio.role.replaceAll('_', ' '),
+      currency: portfolio.currency,
+      objective: portfolio.objective,
+      inclusionCriteria: portfolio.inclusionCriteria,
+      exclusionCriteria: portfolio.exclusionCriteria,
+      policy: portfolio.policy,
+    })),
+  };
 }
