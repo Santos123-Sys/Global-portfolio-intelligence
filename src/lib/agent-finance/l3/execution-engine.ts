@@ -4,10 +4,11 @@ import { agentAnalysisSessions, agentRuns } from '@/lib/db/agent-schema';
 import { outputSchema, type AgentOutput, type AgentMessage } from '../contracts';
 import { ToolRegistry, type ToolName } from './tool-registry';
 import { validateQuality } from './quality';
+import { selectPrior, type EffectiveAgentConfig } from '@/lib/agent-governance';
 
 export class ExecutionEngine {
   readonly outputs: Record<string, AgentOutput> = {};
-  constructor(readonly sessionId: string, readonly registry: ToolRegistry, readonly sources:Record<string,string>={}, readonly leaseOwner?:string) {}
+  constructor(readonly sessionId: string, readonly registry: ToolRegistry, readonly sources:Record<string,string>={}, readonly leaseOwner?:string,readonly configs:Record<string,EffectiveAgentConfig>={}) {}
   async assertLease() {
     if(!this.leaseOwner) return;
     const [row]=await db.select({id:agentAnalysisSessions.id}).from(agentAnalysisSessions).where(and(eq(agentAnalysisSessions.id,this.sessionId),eq(agentAnalysisSessions.leaseOwner,this.leaseOwner),eq(agentAnalysisSessions.status,'running')));
@@ -24,15 +25,16 @@ export class ExecutionEngine {
     await this.assertLease();
     if(this.outputs[name]?.status==='completed') return this.outputs[name];
     const start = Date.now();
-    const [run] = await db.insert(agentRuns).values({ sessionId: this.sessionId, agentName: name, agentRole: name, inputPayload: this.outputs }).returning({ id: agentRuns.id });
+    const inputs=selectPrior(name,this.outputs);
+    const [run] = await db.insert(agentRuns).values({ sessionId: this.sessionId, agentName: name, agentRole: name, inputPayload: inputs,configurationHash:this.configs[name]?.configurationHash }).returning({ id: agentRuns.id });
     try {
       const incoming = await this.tool('research-director', 'deliver_message', {
-        from: 'research-director', to: name, messageType: 'request', payload: this.outputs,
+        from: 'research-director', to: name, messageType: 'request', payload: inputs,
         timestamp: new Date().toISOString(), sessionId: this.sessionId,
       }) as AgentMessage;
       let output:AgentOutput | undefined;
       let errors:string[]=[];
-      for(let attempt=0;attempt<3;attempt++) {
+      for(let attempt=0;attempt<(this.configs[name]?.runtimePolicy.maxAttempts ?? 3);attempt++) {
         const prior=incoming.payload as Record<string,AgentOutput>;
         const feedback:AgentOutput={status:'blocked',data:{attempt,errors},reasoningChain:['Correct failed QA checks; retain missing evidence as insufficient data.'],confidenceScore:0,citations:[],limitations:errors};
         try {

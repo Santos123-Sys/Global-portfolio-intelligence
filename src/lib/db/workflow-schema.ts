@@ -1,551 +1,548 @@
-import { pgTable, uuid, text, timestamp, numeric, jsonb, index, uniqueIndex, integer, boolean, real, date, vector, type AnyPgColumn } from 'drizzle-orm/pg-core';
-import { accounts, aiAnalyses, portfolios, securities, thesisVersions, users } from './schema';
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éí×M<é:-jZ.¶›­–)Ş³V–×÷'B²uF&ÆRÂWV–BÂFW‡BÂF–ÖW7F×ÂçVÖW&–2Â§6öæ"Â–æFW‚ÂVæ—VT–æFW‚Â–çFVvW"Â&ööÆVâÂ&VÂÂFFRÂfV7F÷"ÂG—Rç•t6öÇVÖâÒg&öÒvG&—§¦ÆRÖ÷&Ò÷rÖ6÷&Rs°¦–×÷'B²66÷VçG2Â”æÇ—6W2Â÷'FföÆ–÷2Â6V7W&—F–W2ÂF†W6—5fW'6–öç2ÂW6W'2Òg&öÒrâ÷66†VÖs° ¢ò¢ ¢¢&÷f–FW"Ö–æFWVæFVçBÂ&WW6&ÆRF—66÷fW'’Væ—fW'6RâF†—2—2æ÷B6÷W&6Rö`¢¢G'WF‚f÷"fÇVF–öã²—BÆWG2FV×÷&&–Ç’Væf–Æ&ÆRF—66÷fW'’’fÆÀ¢¢&6²Fò¶æ÷vâÂFFVBVæ—fW'6R&F†W"F†â7–çF†WF–2FFà¢¢ğ¦W‡÷'B6öç7BF—66÷fW'•Væ—fW'6U6æ6†÷G2ÒuF&ÆR€¢vF—66÷fW'•÷Væ—fW'6U÷6æ6†÷G2rÀ¢°¢–C¢WV–B‚v–Br’ç&–Ö'”¶W’‚’æFVfVÇE&æFöÒ‚’À¢&÷f–FW#¢FW‡B‚w&÷f–FW"r’ææ÷DçVÆÂ‚’À¢W†6†ævS¢FW‡B‚vW†6†ævRr’ææ÷DçVÆÂ‚’À¢&V6÷&G4§6öã¢§6öæ"‚w&V6÷&G5ö§6öâr’ææ÷DçVÆÂ‚’À¢fWF6†VDC¢F–ÖW7F×‚vfWF6†VEöBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’æFVfVÇDæ÷r‚’ææ÷DçVÆÂ‚’À¢W‡—&W4C¢F–ÖW7F×‚vW‡—&W5öBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’ææ÷DçVÆÂ‚’À¢ÒÀ¢‡B’Óâ‡°¢&÷f–FW$W†6†ævT–Gƒ¢Væ—VT–æFW‚‚vF—66÷fW'•÷Væ—fW'6U÷&÷f–FW%öW†6†ævUö–G‚r’æöâ‡Bç&÷f–FW"ÂBæW†6†ævR’À¢W‡—'”–Gƒ¢–æFW‚‚vF—66÷fW'•÷Væ—fW'6UöW‡—'•ö–G‚r’æöâ‡BæW‡—&W4B’À¢Ò¢“° ¢ò¢ ¢¢FöÖ–2W‡FW&æÂÖFFWf–FVæ6RâF†—2F&ÆR—2FVÆ–&W&FVÇ’ÖWG&–2Ö÷&–VçFVB6ğ¢¢F†R7—7FVÒ6â¶VWF†R6÷W&6RU$ÂÂ&WG&–WfÂVW'’Â7FGW2æB&r–Æö@¢¢æW‡BFòWfW'’Ö&¶WB÷"gVæFÖVçFÂfÇVR6öç7VÖVB'’F÷vç7G&VÒÆöv–2à¢¢ğ¦W‡÷'B6öç7BÖ&¶WDFFö'6W'fF–öç2ÒuF&ÆR€¢vÖ&¶WEöFFöö'6W'fF–öç2rÀ¢°¢–C¢WV–B‚v–Br’ç&–Ö'”¶W’‚’æFVfVÇE&æFöÒ‚’À¢6V7W&—G”–C¢WV–B‚w6V7W&—G•ö–Br’ç&VfW&Væ6W2‚‚’Óâ6V7W&—F–W2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢ö'6W'fF–öåG—S¢FW‡B‚vö'6W'fF–öå÷G—Rr’ææ÷DçVÆÂ‚’Âòò&–6RÂgVæFÖVçFÂÂ6V&6…öWf–FVæ6P¢ÖWG&–4æÖS¢FW‡B‚vÖWG&–5öæÖRr’ææ÷DçVÆÂ‚’À¢fÇVTçVÖW&–3¢çVÖW&–2‚wfÇVUöçVÖW&–2rÂ²&V6—6–öã¢#BÂ66ÆS¢Ò’À¢fÇVUFW‡C¢FW‡B‚wfÇVU÷FW‡Br’À¢7W'&Væ7“¢FW‡B‚v7W'&Væ7’r’À¢ö'6W'fF–öäFFS¢FW‡B‚vö'6W'fF–öåöFFRr’À¢&WG&–WfVDC¢F–ÖW7F×‚w&WG&–WfVEöBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’æFVfVÇDæ÷r‚’ææ÷DçVÆÂ‚’À¢&÷f–FW#¢FW‡B‚w&÷f–FW"r’ææ÷DçVÆÂ‚’À¢6÷W&6TæÖS¢FW‡B‚w6÷W&6UöæÖRr’À¢6÷W&6UW&Ã¢FW‡B‚w6÷W&6U÷W&Âr’À¢VW'“¢FW‡B‚wVW'’r’À¢7FGW3¢FW‡B‚w7FGW2r’ææ÷DçVÆÂ‚’Âòòô²ÂDDõTäd”Ä$ÄRÂ%4UõTä4U%D”âÂU%$õ ¢Wf–FVæ6U6æ—WC¢FW‡B‚vWf–FVæ6U÷6æ—WBr’À¢&u–ÆöC¢§6öæ"‚w&u÷–ÆöBr’À¢ÒÀ¢‡B’Óâ‡°¢6V7W&—G”ÖWG&–4–Gƒ¢–æFW‚‚vÖ&¶WEöö'6W'fF–öç5÷6V7W&—G•öÖWG&–5ö–G‚r’æöâ‡Bç6V7W&—G”–BÂBæÖWG&–4æÖRÂBç&WG&–WfVDB’À¢7FGW4–Gƒ¢–æFW‚‚vÖ&¶WEöö'6W'fF–öç5÷7FGW5ö–G‚r’æöâ‡Bç7FGW2ÂBç&WG&–WfVDB’À¢Ò¢“° ¢ò¢¢ÄÄÒÖW‡G&7FVBDbf7G2&VÖ–âV&çF–æVBVçF–ÂF†R÷væW"&Wf–Ww2F†VÒâ¢ğ¦W‡÷'B6öç7Bf–ææ6–ÄFö7VÖVçDG&gG2ÒuF&ÆR‚vf–ææ6–ÅöFö7VÖVçEöG&gG2rÂ°¢–C¢WV–B‚v–Br’ç&–Ö'”¶W’‚’æFVfVÇE&æFöÒ‚’À¢÷væW$–C¢WV–B‚v÷væW%ö–Br’ç&VfW&Væ6W2‚‚’ÓâW6W'2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢6æF–FFT–C¢WV–B‚v6æF–FFUö–Br’ç&VfW&Væ6W2‚‚’ÓâF—66÷fW'”6æF–FFW2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢f–ÆTæÖS¢FW‡B‚vf–ÆUöæÖRr’ææ÷DçVÆÂ‚’À¢Fd&6ScC¢FW‡B‚wFeö&6ScBr’ææ÷DçVÆÂ‚’À¢6†#Sc¢FW‡B‚w6†#Sbr’ææ÷DçVÆÂ‚’À¢W‡G&7F–öä§6öã¢§6öæ"‚vW‡G&7F–öåö§6öâr’ææ÷DçVÆÂ‚’À¢æÇ—6—4§6öã¢§6öæ"‚væÇ—6—5ö§6öâr’ææ÷DçVÆÂ‚’À¢7FGW3¢FW‡B‚w7FGW2r’ææ÷DçVÆÂ‚’æFVfVÇB‚vv—F–æu÷&Wf–Wrr’À¢7&VFVDC¢F–ÖW7F×‚v7&VFVEöBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’æFVfVÇDæ÷r‚’ææ÷DçVÆÂ‚’À¢&÷fVDC¢F–ÖW7F×‚v&÷fVEöBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’À§ÒÂ‡B’Óâ‡²÷væW$6æF–FFT–Gƒ¢–æFW‚‚vf–ææ6–ÅöFö7VÖVçEö÷væW%ö6æF–FFUö–G‚r’æöâ‡Bæ÷væW$–BÂBæ6æF–FFT–BÂBæ7&VFVDB’Ò’“° ¢ò¢¢fW'6–öæVB÷væW"7W7FöÖ—¦F–öâÆ–W&VB&VæVF‚–Ö×WF&ÆRvVçB6fWG’'VÆW2â¢ğ¦W‡÷'B6öç7BvVçD6öæf–wW&F–öç2ÒuF&ÆR€¢vvVçEö6öæf–wW&F–öç2rÀ¢°¢–C¢WV–B‚v–Br’ç&–Ö'”¶W’‚’æFVfVÇE&æFöÒ‚’À¢÷væW$–C¢WV–B‚v÷væW%ö–Br’ç&VfW&Væ6W2‚‚’ÓâW6W'2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢vVçD¶–æC¢FW‡B‚vvVçEö¶–æBr’ææ÷DçVÆÂ‚’À¢fW'6–öäçVÖ&W#¢–çFVvW"‚wfW'6–öåöçVÖ&W"r’ææ÷DçVÆÂ‚’À¢æÖS¢FW‡B‚væÖRr’ææ÷DçVÆÂ‚’À¢66÷S¢FW‡B‚w66÷Rr’ææ÷DçVÆÂ‚’À¢&ö×DFFVæGVÓ¢FW‡B‚w&ö×EöFFVæGVÒr’ææ÷DçVÆÂ‚’æFVfVÇB‚rr’À¢Væ&ÆVEFööÇ3¢§6öæ"‚vVæ&ÆVE÷FööÇ2r’âGG—SÇ7G&–æuµÓâ‚’ææ÷DçVÆÂ‚’À¢7F—fS¢&ööÆVâ‚v7F—fRr’ææ÷DçVÆÂ‚’æFVfVÇB‡G'VR’À¢'VçF–ÖUöÆ–7“¢§6öæ"‚w'VçF–ÖU÷öÆ–7’r’âGG—SÆ–×÷'B‚t÷'FföÆ–òÖ–çFVÆÆ–vVæ6RövVçF–2Ö6öçG&7Br’å'VçF–ÖUöÆ–7“â‚’À¢&öÆÆ÷WE7FFS¢FW‡B‚w&öÆÆ÷WE÷7FFRr’ææ÷DçVÆÂ‚’æFVfVÇB‚w&öGV7F–öâr’À¢WfÇVF–öã¢§6öæ"‚vWfÇVF–öâr’À¢7&VFVDC¢F–ÖW7F×‚v7&VFVEöBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’æFVfVÇDæ÷r‚’ææ÷DçVÆÂ‚’À¢ÒÀ¢‡B’Óâ‡°¢÷væW$¶–æEfW'6–öä–Gƒ¢Væ—VT–æFW‚‚vvVçEö6öæf–w5ö÷væW%ö¶–æE÷fW'6–öåö–G‚r¢æöâ‡Bæ÷væW$–BÂBævVçD¶–æBÂBçfW'6–öäçVÖ&W"’À¢7F—fT–Gƒ¢–æFW‚‚vvVçEö6öæf–w5ö÷væW%ö¶–æEö7F—fUö–G‚r’æöâ‡Bæ÷væW$–BÂBævVçD¶–æBÂBæ7F—fR’À¢Ò¢“° ¢ò¢¢öæR&÷f–FW"Öw&÷VæFVB÷÷'GVæ—G’ÖF—66÷fW'’¦ö"÷fW"6öæf—&ÖVBF†W6—2â¢ğ¦W‡÷'B6öç7BW‡FW&æÄF—66÷fW'•'Vç2ÒuF&ÆR€¢vW‡FW&æÅöF—66÷fW'•÷'Vç2rÀ¢°¢–C¢WV–B‚v–Br’ç&–Ö'”¶W’‚’æFVfVÇE&æFöÒ‚’À¢÷væW$–C¢WV–B‚v÷væW%ö–Br’ç&VfW&Væ6W2‚‚’ÓâW6W'2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢F†W6—5fW'6–öä–C¢WV–B‚wF†W6—5÷fW'6–öåö–Br’ç&VfW&Væ6W2‚‚’ÓâF†W6—5fW'6–öç2æ–B’ææ÷DçVÆÂ‚’À¢W‡FW&æÄF—66÷fW'”–C¢FW‡B‚vW‡FW&æÅöF—66÷fW'•ö–Br’ææ÷DçVÆÂ‚’çVæ—VR‚’À¢7FGW3¢FW‡B‚w7FGW2r’ææ÷DçVÆÂ‚’æFVfVÇB‚wVWVVBr’À¢&÷f–FW#¢FW‡B‚w&÷f–FW"r’ææ÷DçVÆÂ‚’À¢&WVW7D§6öã¢§6öæ"‚w&WVW7Eö§6öâr’ææ÷DçVÆÂ‚’À¢&W7VÇD§6öã¢§6öæ"‚w&W7VÇEö§6öâr’À¢W'&÷$ÖW76vS¢FW‡B‚vW'&÷%öÖW76vRr’À¢&WVW7FVDC¢F–ÖW7F×‚w&WVW7FVEöBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’æFVfVÇDæ÷r‚’ææ÷DçVÆÂ‚’À¢6ö×ÆWFVDC¢F–ÖW7F×‚v6ö×ÆWFVEöBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’À¢ÒÀ¢‡B’Óâ‡²÷væW%7FGW4–Gƒ¢–æFW‚‚vF—66÷fW'•÷'Vç5ö÷væW%÷7FGW5ö–G‚r’æöâ‡Bæ÷væW$–BÂBç7FGW2ÂBç&WVW7FVDB’Ò¢“° ¢ò¢¢6†÷'FÆ—7FVB6V7W&—G’v—F–ærâW‡Æ–6—B‡VÖâFV6—6–öâ&Vf÷&RæÇ—6—2â¢ğ¦W‡÷'B6öç7BF—66÷fW'”6æF–FFW2ÒuF&ÆR€¢vF—66÷fW'•ö6æF–FFW2rÀ¢°¢–C¢WV–B‚v–Br’ç&–Ö'”¶W’‚’æFVfVÇE&æFöÒ‚’À¢÷væW$–C¢WV–B‚v÷væW%ö–Br’ç&VfW&Væ6W2‚‚’ÓâW6W'2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢'Vä–C¢WV–B‚w'Våö–Br’ç&VfW&Væ6W2‚‚’ÓâW‡FW&æÄF—66÷fW'•'Vç2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢÷'FföÆ–ô–C¢WV–B‚w÷'FföÆ–õö–Br’ç&VfW&Væ6W2‚‚’Óâ÷'FföÆ–÷2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢6V7W&—G”–C¢WV–B‚w6V7W&—G•ö–Br’ç&VfW&Væ6W2‚‚’Óâ6V7W&—F–W2æ–BÂ²öäFVÆWFS¢w6WBçVÆÂrÒ’À¢F–6¶W#¢FW‡B‚wF–6¶W"r’ææ÷DçVÆÂ‚’À¢W†6†ævS¢FW‡B‚vW†6†ævRr’ææ÷DçVÆÂ‚’À¢6ö×ç”æÖS¢FW‡B‚v6ö×ç•öæÖRr’ææ÷DçVÆÂ‚’À¢7W'&Væ7“¢FW‡B‚v7W'&Væ7’r’ææ÷DçVÆÂ‚’À¢6÷VçG'“¢FW‡B‚v6÷VçG'’r’À¢6V7F÷#¢FW‡B‚w6V7F÷"r’À¢–æGW7G'“¢FW‡B‚v–æGW7G'’r’À¢6Æ76–f–6F–öå6÷W&6S¢FW‡B‚v6Æ76–f–6F–öå÷6÷W&6Rr’ææ÷DçVÆÂ‚’æFVfVÇB‚wVæ6Æ76–f–VBr’À¢F—66÷fW'”§6öã¢§6öæ"‚vF—66÷fW'•ö§6öâr’ææ÷DçVÆÂ‚’À¢FV6—6–öã¢FW‡B‚vFV6—6–öâr’ææ÷DçVÆÂ‚’æFVfVÇB‚wVæF–ærr’À¢&F–öæÆS¢FW‡B‚vFV6—6–öå÷&F–öæÆRr’À¢FV6—6–öä¦÷W&æÃ¢§6öæ"‚vFV6—6–öåö¦÷W&æÂr’À¢FV6–FVDC¢F–ÖW7F×‚vFV6–FVEöBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’À¢v÷&¶fÆ÷u7FGW3¢FW‡B‚wv÷&¶fÆ÷u÷7FGW2r’ææ÷DçVÆÂ‚’æFVfVÇB‚vv—F–æu÷&Wf–Wrr’À¢W‡FW&æÄÖ&¶WD'&–Vd–C¢FW‡B‚vW‡FW&æÅöÖ&¶WEö'&–Veö–Br’À¢Ö&¶WD'&–Ve7FGW3¢FW‡B‚vÖ&¶WEö'&–Ve÷7FGW2r’ææ÷DçVÆÂ‚’æFVfVÇB‚væ÷E÷7F'FVBr’À¢Ö&¶WD'&–Ve&WVW7D§6öã¢§6öæ"‚vÖ&¶WEö'&–Ve÷&WVW7Eö§6öâr’À¢Ö&¶WD'&–Vd§6öã¢§6öæ"‚vÖ&¶WEö'&–Veö§6öâr’À¢Ö&¶WD'&–VdW'&÷$ÖW76vS¢FW‡B‚vÖ&¶WEö'&–VeöW'&÷%öÖW76vRr’À¢W‡FW&æÄæÇ—6—5'Vä–C¢FW‡B‚vW‡FW&æÅöæÇ—6—5÷'Våö–Br’À¢æÇ—6—4W'&÷$ÖW76vS¢FW‡B‚væÇ—6—5öW'&÷%öÖW76vRr’À¢æÇ—6—4–C¢WV–B‚væÇ—6—5ö–Br’ç&VfW&Væ6W2‚‚’Óâ”æÇ—6W2æ–BÂ²öäFVÆWFS¢w6WBçVÆÂrÒ’À¢7&VFVDC¢F–ÖW7F×‚v7&VFVEöBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’æFVfVÇDæ÷r‚’ææ÷DçVÆÂ‚’À¢WFFVDC¢F–ÖW7F×‚wWFFVEöBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’æFVfVÇDæ÷r‚’ææ÷DçVÆÂ‚’À¢ÒÀ¢‡B’Óâ‡°¢'Vå6V7W&—G”–Gƒ¢Væ—VT–æFW‚‚vF—66÷fW'•ö6æF–FFW5÷'Vå÷6V7W&—G•ö–G‚r¢æöâ‡Bç'Vä–BÂBç÷'FföÆ–ô–BÂBæW†6†ævRÂBçF–6¶W"’À¢÷væW%v÷&¶fÆ÷t–Gƒ¢–æFW‚‚vF—66÷fW'•ö6æF–FFW5ö÷væW%÷v÷&¶fÆ÷uö–G‚r’æöâ‡Bæ÷væW$–BÂBçv÷&¶fÆ÷u7FGW2ÂBæ7&VFVDB’À¢Ò¢“° ¢ò¢¢FWFW&Ö–æ—7F–27FæFÆöæRÖWG&–726Æ7VÆFVBg&öÒ6æF–FFRw2&–6R6W&–W2â¢ğ¦W‡÷'B6öç7B6V7W&—G•&—6µ6æ6†÷G2ÒuF&ÆR€¢w6V7W&—G•÷&—6µ÷6æ6†÷G2rÀ¢°¢–C¢WV–B‚v–Br’ç&–Ö'”¶W’‚’æFVfVÇE&æFöÒ‚’À¢÷væW$–C¢WV–B‚v÷væW%ö–Br’ç&VfW&Væ6W2‚‚’ÓâW6W'2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢6æF–FFT–C¢WV–B‚v6æF–FFUö–Br’ç&VfW&Væ6W2‚‚’ÓâF—66÷fW'”6æF–FFW2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢6V7W&—G”–C¢WV–B‚w6V7W&—G•ö–Br’ç&VfW&Væ6W2‚‚’Óâ6V7W&—F–W2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢ÖWG&–74§6öã¢§6öæ"‚vÖWG&–75ö§6öâr’ææ÷DçVÆÂ‚’À¢&÷f–FW#¢FW‡B‚w&÷f–FW"r’ææ÷DçVÆÂ‚’À¢FF4öc¢F–ÖW7F×‚vFFö5ööbrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’ææ÷DçVÆÂ‚’À¢6ö×WFVDC¢F–ÖW7F×‚v6ö×WFVEöBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’æFVfVÇDæ÷r‚’ææ÷DçVÆÂ‚’À¢ÒÀ¢‡B’Óâ‡²6æF–FFUF–ÖT–Gƒ¢–æFW‚‚w6V7W&—G•÷&—6µö6æF–FFU÷F–ÖUö–G‚r’æöâ‡Bæ6æF–FFT–BÂBæ6ö×WFVDB’Ò¢“° ¢ò¢¢‡VÖâÖ6öæf—&ÖVB77V×F–öç2æBFWFW&Ö–æ—7F–2fÇVF–öâ÷WGWBâ¢ğ¦W‡÷'B6öç7BfÇVF–öå66Væ&–÷2ÒuF&ÆR€¢wfÇVF–öå÷66Væ&–÷2rÀ¢°¢–C¢WV–B‚v–Br’ç&–Ö'”¶W’‚’æFVfVÇE&æFöÒ‚’À¢÷væW$–C¢WV–B‚v÷væW%ö–Br’ç&VfW&Væ6W2‚‚’ÓâW6W'2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢6æF–FFT–C¢WV–B‚v6æF–FFUö–Br’ç&VfW&Væ6W2‚‚’ÓâF—66÷fW'”6æF–FFW2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢æÇ—6—4–C¢WV–B‚væÇ—6—5ö–Br’ç&VfW&Væ6W2‚‚’Óâ”æÇ—6W2æ–BÂ²öäFVÆWFS¢w6WBçVÆÂrÒ’À¢ÖWF†öC¢FW‡B‚vÖWF†öBr’ææ÷DçVÆÂ‚’À¢7FGW3¢FW‡B‚w7FGW2r’ææ÷DçVÆÂ‚’À¢77V×F–öç4§6öã¢§6öæ"‚v77V×F–öç5ö§6öâr’ææ÷DçVÆÂ‚’À¢&W7VÇD§6öã¢§6öæ"‚w&W7VÇEö§6öâr’ææ÷DçVÆÂ‚’À¢6÷W&6U&VfW&Væ6W3¢§6öæ"‚w6÷W&6U÷&VfW&Væ6W2r’âGG—SÇ7G&–æuµÓâ‚’ææ÷DçVÆÂ‚’À¢&÷fVD'“¢FW‡B‚v&÷fVEö'’r’ææ÷DçVÆÂ‚’À¢7&VFVDC¢F–ÖW7F×‚v7&VFVEöBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’æFVfVÇDæ÷r‚’ææ÷DçVÆÂ‚’À¢ÒÀ¢‡B’Óâ‡²6æF–FFT7&VFVD–Gƒ¢–æFW‚‚wfÇVF–öåö6æF–FFUö7&VFVEö–G‚r’æöâ‡Bæ6æF–FFT–BÂBæ7&VFVDB’Ò¢“° ¢ò¢¢‡VÖâÖ–â×F†RÖÆö÷FV6—6–öç2÷fW"’ÖvVæW&FVB6æF–FFRæÇ—6W2â¢ğ¦W‡÷'B6öç7B6æF–FFTFV6—6–öç2ÒuF&ÆR€¢v6æF–FFUöFV6—6–öç2rÀ¢°¢–C¢WV–B‚v–Br’ç&–Ö'”¶W’‚’æFVfVÇE&æFöÒ‚’À¢÷væW$–C¢WV–B‚v÷væW%ö–Br’ç&VfW&Væ6W2‚‚’ÓâW6W'2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢æÇ—6—4–C¢WV–B‚væÇ—6—5ö–Br’ç&VfW&Væ6W2‚‚’Óâ”æÇ—6W2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢FV6—6–öã¢FW‡B‚vFV6—6–öâr’ææ÷DçVÆÂ‚’Âòò66WFVBÂ&V¦V7FVBÂvF6†Æ—7BÂ&VæÇ—6—5÷&WVW7FV@¢&F–öæÆS¢FW‡B‚w&F–öæÆRr’À¢FV6–FVD'“¢FW‡B‚vFV6–FVEö'’r’ææ÷DçVÆÂ‚’À¢FV6–FVDC¢F–ÖW7F×‚vFV6–FVEöBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’æFVfVÇDæ÷r‚’ææ÷DçVÆÂ‚’À¢ÖWFFF¢§6öæ"‚vÖWFFFr’À¢ÒÀ¢‡B’Óâ‡²æÇ—6—4FV6—6–öä–Gƒ¢–æFW‚‚v6æF–FFUöFV6—6–öç5öæÇ—6—5ö–G‚r’æöâ‡BææÇ—6—4–BÂBæFV6–FVDB’Ò¢“° ¢ò¢¢w&—FRÖVF—B&V6÷&Bf÷"F†W6—2×WFF–öç2â¢ğ¦W‡÷'B6öç7BF†W6—4×WFF–öäVF—BÒuF&ÆR€¢wF†W6—5ö×WFF–öåöVF—BrÀ¢°¢–C¢WV–B‚v–Br’ç&–Ö'”¶W’‚’æFVfVÇE&æFöÒ‚’À¢÷væW$–C¢WV–B‚v÷væW%ö–Br’ç&VfW&Væ6W2‚‚’ÓâW6W'2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢F†W6—5fW'6–öä–C¢WV–B‚wF†W6—5÷fW'6–öåö–Br’ç&VfW&Væ6W2‚‚’ÓâF†W6—5fW'6–öç2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢7F–öã¢FW‡B‚v7F–öâr’ææ÷DçVÆÂ‚’À¢7F÷#¢FW‡B‚v7F÷"r’ææ÷DçVÆÂ‚’À¢7&VFVDC¢F–ÖW7F×‚v7&VFVEöBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’æFVfVÇDæ÷r‚’ææ÷DçVÆÂ‚’À¢ÖWFFF¢§6öæ"‚vÖWFFFr’À¢ÒÀ¢‡B’Óâ‡²F†W6—4VF—D–Gƒ¢–æFW‚‚wF†W6—5ö×WFF–öåöVF—E÷F†W6—5ö–G‚r’æöâ‡BçF†W6—5fW'6–öä–BÂBæ7&VFVDB’Ò¢“° ¢ò¢¢VæF–ærÖöFVÂW‡G&7F–öââ—B&V6öÖW26æöæ–6ÂöæÇ’gFW"W‡Æ–6—B‡VÖâ6öæf—&ÖF–öââ¢ğ¦W‡÷'B6öç7BW‡FW&æÅF†W6—4W‡G&7F–öç2ÒuF&ÆR€¢vW‡FW&æÅ÷F†W6—5öW‡G&7F–öç2rÀ¢°¢–C¢WV–B‚v–Br’ç&–Ö'”¶W’‚’æFVfVÇE&æFöÒ‚’À¢÷væW$–C¢WV–B‚v÷væW%ö–Br’ç&VfW&Væ6W2‚‚’ÓâW6W'2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢W‡FW&æÄW‡G&7F–öä–C¢FW‡B‚vW‡FW&æÅöW‡G&7F–öåö–Br’ææ÷DçVÆÂ‚’çVæ—VR‚’À¢7FGW3¢FW‡B‚w7FGW2r’ææ÷DçVÆÂ‚’æFVfVÇB‚wVWVVBr’À¢&WVW7FVEfW'6–öã¢–çFVvW"‚w&WVW7FVE÷fW'6–öâr’ææ÷DçVÆÂ‚’À¢6÷W&6Tf–ÆTæÖS¢FW‡B‚w6÷W&6Uöf–ÆUöæÖRr’ææ÷DçVÆÂ‚’À¢6÷W&6TÖ–ÖUG—S¢FW‡B‚w6÷W&6UöÖ–ÖU÷G—Rr’ææ÷DçVÆÂ‚’À¢&W7VÇD§6öã¢§6öæ"‚w&W7VÇEö§6öâr’À¢W'&÷$ÖW76vS¢FW‡B‚vW'&÷%öÖW76vRr’À¢&WVW7FVDC¢F–ÖW7F×‚w&WVW7FVEöBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’æFVfVÇDæ÷r‚’ææ÷DçVÆÂ‚’À¢6ö×ÆWFVDC¢F–ÖW7F×‚v6ö×ÆWFVEöBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’À¢6öæf—&ÖVDC¢F–ÖW7F×‚v6öæf—&ÖVEöBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’À¢6öæf—&ÖVEF†W6—5fW'6–öä–C¢WV–B‚v6öæf—&ÖVE÷F†W6—5÷fW'6–öåö–Br¢ç&VfW&Væ6W2‚‚’ÓâF†W6—5fW'6–öç2æ–BÂ²öäFVÆWFS¢w6WBçVÆÂrÒ’À¢F—6Ö—76VDC¢F–ÖW7F×‚vF—6Ö—76VEöBrÂ²v—F…F–ÖW¦öæS¢G'VRÒ’À¢F—6Ö—76VD'“¢FW‡B‚vF—6Ö—76VEö'’r’À¢ÒÀ¢‡B’Óâ‡°¢÷væW%7FGW4–Gƒ¢–æFW‚‚vW‡FW&æÅ÷F†W6—5öW‡G&7F–öç5ö÷væW%÷7FGW5ö–G‚r’æöâ‡Bæ÷væW$–BÂBç7FGW2ÂBç&WVW7FVDB’À¢Ò¢“° ¢ò¢¢F6†&ö&B&V6÷&Böb'Vâ÷væVB'’F†RW‡FW&æÂvVçF–27—7FVÒâ¢ğ¦W‡÷'B6öç7BW‡FW&æÄvVçF–5'Vç2ÒuF&ÆR€¢vW‡FW&æÅövVçF–5÷'Vç2rÀ¢°¢–C¢WV–B‚v–Br’ç&–Ö'”¶W’‚’æFVfVÇE&æFöÒ‚’À¢÷væW$–C¢WV–B‚v÷væW%ö–Br’ç&VfW&Væ6W2‚‚’ÓâW6W'2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢ò¢¢–Ö×WF&ÆR66÷VçB&–æF–ærf÷"WF†VçF–6FVBvVçF–26ÆÆ&6·2â¢ğ¢66÷VçD–C¢WV–B‚v66÷VçEö–Br’ç&VfW&Væ6W2‚‚’Óâ66÷VçG2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢W‡FW&æÅ'Vä–C¢FW‡B‚vW‡FW&æÅ÷'Våö–Br’ææ÷DçVÆÂ‚’çVæ—VR‚’À¢7FGW3¢FW‡B‚w7FGW2r’ææ÷DçVÆÂ‚’æFVfVÇB‚wVWVVBr’À¢F†W6—5fW'6–öã¢FW‡B‚wF†W6—5÷fW'6–öâr’À¢Öæ–fW7E66†VÖfW'6–öã¢FW‡B‚vÖæ–fW7E÷66†VÖ÷fW'6–öâr’À¢Öæ–fW7D†6ƒ¢FW‡B‚vÖæ–fW7Eö†6‚r’À¢&WVW7D§6öã¢§6öæ"‚w&WVW7Eö§6öâr’À¢Öæ–fW7D§6öã¢§6öæ"‚vÖæ–fW7Eö§6öâr’À¢&W÷'EFeW&Ã¢FW‡B‚w&W÷'E÷Fe÷W&Âr’À¢&WVW7FVDC¢F–ÖW7F×‚w&WVW7FVEöBr’æFVfVÇDæ÷r‚’ææ÷DçVÆÂ‚’À¢6ö×ÆWFVDC¢F–ÖW7F×‚v6ö×ÆWFVEöBr’À¢–×÷'FVDC¢F–ÖW7F×‚v–×÷'FVEöBr’À¢W'&÷$ÖW76vS¢FW‡B‚vW'&÷%öÖW76vRr’À¢ÒÀ¢‡B’Óâ‡°¢7FGW4–Gƒ¢–æFW‚‚vW‡FW&æÅövVçF–5÷'Vç5÷7FGW5ö–G‚r’æöâ‡Bç7FGW2ÂBç&WVW7FVDB’À¢66÷VçE7FGW4–Gƒ¢–æFW‚‚vW‡FW&æÅövVçF–5÷'Vç5ö66÷VçE÷7FGW5ö–G‚r’æöâ‡Bæ66÷VçD–BÂBç7FGW2ÂBç&WVW7FVDB’À¢†6„–Gƒ¢–æFW‚‚vW‡FW&æÅövVçF–5÷'Vç5öÖæ–fW7Eö†6…ö–G‚r’æöâ‡BæÖæ–fW7D†6‚’À¢Ò¢“° ¢ò¢¢÷'FföÆ–òÖÆWfVÂ7–çF†W6—2–×÷'FVBg&öÒF†RW‡FW&æÂÖæ–fW7Bâ¢ğ¦W‡÷'B6öç7B÷'FföÆ–ôæÇ—6—57–çF†W6W2ÒuF&ÆR€¢w÷'FföÆ–õöæÇ—6—5÷7–çF†W6W2rÀ¢°¢–C¢WV–B‚v–Br’ç&–Ö'”¶W’‚’æFVfVÇE&æFöÒ‚’À¢'Vä–C¢WV–B‚w'Våö–Br’ç&VfW&Væ6W2‚‚’ÓâW‡FW&æÄvVçF–5'Vç2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢÷'FföÆ–ô–C¢WV–B‚w÷'FföÆ–õö–Br’ç&VfW&Væ6W2‚‚’Óâ÷'FföÆ–÷2æ–BÂ²öäFVÆWFS¢v666FRrÒ’ææ÷DçVÆÂ‚’À¢F†W6—5fW'6–öã¢FW‡B‚wF†W6—5÷fW'6–öâr’ææ÷DçVÆÂ‚’À¢7–çF†W6—4§6öã¢§6öæ"‚w7–çF†W6—5ö§6öâr’ææ÷DçVÆÂ‚’À¢7&VFVDC¢F–ÖW7F×‚v7&VFVEöBr’æFVfVÇDæ÷r‚’ææ÷DçVÆÂ‚’À¢ÒÀ¢‡B’Óâ‡°¢'Vå÷'FföÆ–ô–Gƒ¢Væ—VT–æFW‚‚w÷'FföÆ–õ÷7–çF†W6—5÷'Vå÷÷'FföÆ–õö–G‚r’æöâ‡Bç'Vä–BÂBç÷'FföÆ–ô–B’À¢Ò¢“° ¢ò¢¢6ö×ÆWFRW‡FW&æÂ÷WGWB&WF–æVBf÷"VF—BæBf–VÆG2æ÷B&ö¦V7FVB–çFò•öæÇ—6W2â¢ğ¦W‡÷'B6öç7BW‡FW&æÄvVçF–4æÇ—6W2ÒuF&ÆR€¢vW‡FW&æÅövVçF–5öæÇ—6W2rÀ¯:¶‰ËkºwµçJ
+KˆÙXİ\š]RYˆ]ZY
+	ÜÙXİ\š]WÚY	ÊKœ™Y™\™[˜Ù\Ê
 
-/**
- * A provider-independent, reusable discovery universe. This is not a source of
- * truth for valuation; it lets a temporarily unavailable discovery API fall
- * back to a known, dated universe rather than synthetic data.
- */
-export const discoveryUniverseSnapshots = pgTable(
-  'discovery_universe_snapshots',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    provider: text('provider').notNull(),
-    exchange: text('exchange').notNull(),
-    recordsJson: jsonb('records_json').notNull(),
-    fetchedAt: timestamp('fetched_at', { withTimezone: true }).defaultNow().notNull(),
-    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-  },
-  (t) => ({
-    providerExchangeIdx: uniqueIndex('discovery_universe_provider_exchange_idx').on(t.provider, t.exchange),
-    expiryIdx: index('discovery_universe_expiry_idx').on(t.expiresAt),
-  })
-);
+HOˆÙXİ\š]Y\ËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
 
-/**
- * Atomic external-data evidence. This table is deliberately metric-oriented so
- * the system can keep the source URL, retrieval query, status and raw payload
- * next to every market or fundamental value consumed by downstream logic.
- */
-export const marketDataObservations = pgTable(
-  'market_data_observations',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    securityId: uuid('security_id').references(() => securities.id, { onDelete: 'cascade' }).notNull(),
-    observationType: text('observation_type').notNull(), // price | fundamental | search_evidence
-    metricName: text('metric_name').notNull(),
-    valueNumeric: numeric('value_numeric', { precision: 24, scale: 10 }),
-    valueText: text('value_text'),
-    currency: text('currency'),
-    observationDate: text('observation_date'),
-    retrievedAt: timestamp('retrieved_at', { withTimezone: true }).defaultNow().notNull(),
-    provider: text('provider').notNull(),
-    sourceName: text('source_name'),
-    sourceUrl: text('source_url'),
-    query: text('query'),
-    status: text('status').notNull(), // OK | DATA_UNAVAILABLE | PARSE_UNCERTAIN | ERROR
-    evidenceSnippet: text('evidence_snippet'),
-    rawPayload: jsonb('raw_payload'),
-  },
-  (t) => ({
-    securityMetricIdx: index('market_observations_security_metric_idx').on(t.securityId, t.metricName, t.retrievedAt),
-    statusIdx: index('market_observations_status_idx').on(t.status, t.retrievedAt),
-  })
-);
+Kˆ[˜[\Ú\ÒYˆ]ZY
+	Ø[˜[\Ú\×ÚY	ÊKœ™Y™\™[˜Ù\Ê
 
-/** LLM-extracted PDF facts remain quarantined until the owner reviews them. */
-export const financialDocumentDrafts = pgTable('financial_document_drafts', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  candidateId: uuid('candidate_id').references(() => discoveryCandidates.id, { onDelete: 'cascade' }).notNull(),
-  fileName: text('file_name').notNull(),
-  pdfBase64: text('pdf_base64').notNull(),
-  sha256: text('sha256').notNull(),
-  extractionJson: jsonb('extraction_json').notNull(),
-  analysisJson: jsonb('analysis_json').notNull(),
-  status: text('status').notNull().default('awaiting_review'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  approvedAt: timestamp('approved_at', { withTimezone: true }),
-}, (t) => ({ ownerCandidateIdx: index('financial_document_owner_candidate_idx').on(t.ownerId, t.candidateId, t.createdAt) }));
+HOˆZP[˜[\Ù\ËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
 
-/** Versioned owner customization layered beneath immutable agent safety rules. */
-export const agentConfigurations = pgTable(
-  'agent_configurations',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-    agentKind: text('agent_kind').notNull(),
-    versionNumber: integer('version_number').notNull(),
-    name: text('name').notNull(),
-    scope: text('scope').notNull(),
-    promptAddendum: text('prompt_addendum').notNull().default(''),
-    enabledTools: jsonb('enabled_tools').$type<string[]>().notNull(),
-    active: boolean('active').notNull().default(true),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  },
-  (t) => ({
-    ownerKindVersionIdx: uniqueIndex('agent_configs_owner_kind_version_idx')
-      .on(t.ownerId, t.agentKind, t.versionNumber),
-    activeIdx: index('agent_configs_owner_kind_active_idx').on(t.ownerId, t.agentKind, t.active),
-  })
-);
+Kˆİ]]œÛÛˆœÛÛ˜Š	Ûİ]]ÚœÛÛ‰ÊK››İ[
 
-/** One provider-grounded opportunity-discovery job over a confirmed thesis. */
-export const externalDiscoveryRuns = pgTable(
-  'external_discovery_runs',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-    thesisVersionId: uuid('thesis_version_id').references(() => thesisVersions.id).notNull(),
-    externalDiscoveryId: text('external_discovery_id').notNull().unique(),
-    status: text('status').notNull().default('queued'),
-    provider: text('provider').notNull(),
-    requestJson: jsonb('request_json').notNull(),
-    resultJson: jsonb('result_json'),
-    errorMessage: text('error_message'),
-    requestedAt: timestamp('requested_at', { withTimezone: true }).defaultNow().notNull(),
-    completedAt: timestamp('completed_at', { withTimezone: true }),
-  },
-  (t) => ({ ownerStatusIdx: index('discovery_runs_owner_status_idx').on(t.ownerId, t.status, t.requestedAt) })
-);
+KˆÜ™X]Y]ˆ[Y\İ[\
+	ØÜ™X]YØ]	ÊK™Y˜][›İÊ
+K››İ[
 
-/** Shortlisted security awaiting an explicit human decision before analysis. */
-export const discoveryCandidates = pgTable(
-  'discovery_candidates',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-    runId: uuid('run_id').references(() => externalDiscoveryRuns.id, { onDelete: 'cascade' }).notNull(),
-    portfolioId: uuid('portfolio_id').references(() => portfolios.id, { onDelete: 'cascade' }).notNull(),
-    securityId: uuid('security_id').references(() => securities.id, { onDelete: 'set null' }),
-    ticker: text('ticker').notNull(),
-    exchange: text('exchange').notNull(),
-    companyName: text('company_name').notNull(),
-    currency: text('currency').notNull(),
-    country: text('country'),
-    sector: text('sector'),
-    industry: text('industry'),
-    classificationSource: text('classification_source').notNull().default('unclassified'),
-    discoveryJson: jsonb('discovery_json').notNull(),
-    decision: text('decision').notNull().default('pending'),
-    rationale: text('decision_rationale'),
-    decisionJournal: jsonb('decision_journal'),
-    decidedAt: timestamp('decided_at', { withTimezone: true }),
-    workflowStatus: text('workflow_status').notNull().default('awaiting_review'),
-    externalMarketBriefId: text('external_market_brief_id'),
-    marketBriefStatus: text('market_brief_status').notNull().default('not_started'),
-    marketBriefRequestJson: jsonb('market_brief_request_json'),
-    marketBriefJson: jsonb('market_brief_json'),
-    marketBriefErrorMessage: text('market_brief_error_message'),
-    externalAnalysisRunId: text('external_analysis_run_id'),
-    analysisErrorMessage: text('analysis_error_message'),
-    analysisId: uuid('analysis_id').references(() => aiAnalyses.id, { onDelete: 'set null' }),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-  },
-  (t) => ({
-    runSecurityIdx: uniqueIndex('discovery_candidates_run_security_idx')
-      .on(t.runId, t.portfolioId, t.exchange, t.ticker),
-    ownerWorkflowIdx: index('discovery_candidates_owner_workflow_idx').on(t.ownerId, t.workflowStatus, t.createdAt),
-  })
-);
+KˆKˆ
+
+HOˆ
+Âˆ[”ÙXİ\š]RYˆ[š\]YR[™^
+	Ù^\›˜[Ø[˜[\Ú\×Ü[—ÜÜ›Û[×ÜÙXİ\š]WÚY	ÊK›ÛŠœ[’YœÜ›Û[ÒYœÙXİ\š]RY
+KˆJBŠNÂ‚‹ÊŠ‚ˆ
+ˆ]™\H][\Y^\›˜[X\šÙ]Y]HØ[Ú[ˆÜˆÜÙKˆ\È\ÈH™XÛÜ™ˆ
+ˆ][œİÙ\œÈÚH\È^H[š]™\œÙH[œ˜[šÙYˆÜˆšİÈ]XÚÙˆÙ^IÜÈYÙ]ˆ
+ˆ\ÈÜ[ˆÚ]İ]İY\ÜÚ[™È8 %[™]˜XÚÜÈHØ]]Ø^IÜÈİÛˆXÚ\Ú[ÛœÎˆBˆ
+ˆZ[HØ[YÙ]Ûİ[È›İÜÈ\™K[™H™XÙ[[—Û[Z]›İÈ\ÈÚ]ˆ
+ˆ]ÈH]\ˆØ[ÚÚ\H™]ÛÜšÈ›İ[™š\[™XYHÛ›İÛˆÈ˜Z[‚ˆ
+‹Â™^ÜÛÛœİ›İšY\Ø[ÈHÕX›Jˆ	Ü›İšY\—ØØ[ÉËˆÂˆYˆ]ZY
+	ÚY	ÊKœš[X\RÙ^J
+K™Y˜][˜[™ÛJ
+Kˆ›İšY\ˆ^
+	Ü›İšY\‰ÊK››İ[
 
-/** Deterministic standalone metrics calculated from a candidate's price series. */
-export const securityRiskSnapshots = pgTable(
-  'security_risk_snapshots',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-    candidateId: uuid('candidate_id').references(() => discoveryCandidates.id, { onDelete: 'cascade' }).notNull(),
-    securityId: uuid('security_id').references(() => securities.id, { onDelete: 'cascade' }).notNull(),
-    metricsJson: jsonb('metrics_json').notNull(),
-    provider: text('provider').notNull(),
-    dataAsOf: timestamp('data_as_of', { withTimezone: true }).notNull(),
-    computedAt: timestamp('computed_at', { withTimezone: true }).defaultNow().notNull(),
-  },
-  (t) => ({ candidateTimeIdx: index('security_risk_candidate_time_idx').on(t.candidateId, t.computedAt) })
-);
+KˆËÈHİX›H›İ]H[\]K™]™\ˆH[T“ˆ›ÈTHÙ^K›È\‹\Ş[X›ÛˆËÈÙYÛY[ˆÙYH[™Ú[[\]J
+H[ˆÜ˜ËÛX‹ØÛÛ›™XİÜœËÙØ]]Ø^KË‚ˆ[™Ú[ˆ^
+	Ù[™Ú[	ÊK››İ[
 
-/** Human-confirmed assumptions and deterministic valuation output. */
-export const valuationScenarios = pgTable(
-  'valuation_scenarios',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-    candidateId: uuid('candidate_id').references(() => discoveryCandidates.id, { onDelete: 'cascade' }).notNull(),
-    analysisId: uuid('analysis_id').references(() => aiAnalyses.id, { onDelete: 'set null' }),
-    method: text('method').notNull(),
-    status: text('status').notNull(),
-    assumptionsJson: jsonb('assumptions_json').notNull(),
-    resultJson: jsonb('result_json').notNull(),
-    sourceReferences: jsonb('source_references').$type<string[]>().notNull(),
-    approvedBy: text('approved_by').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  },
-  (t) => ({ candidateCreatedIdx: index('valuation_candidate_created_idx').on(t.candidateId, t.createdAt) })
-);
+KˆØ[Y]ˆ[Y\İ[\
+	ØØ[YØ]	ËÈÚ][Y^›Û™NˆYHJK™Y˜][›İÊ
+K››İ[
 
-/** Human-in-the-loop decisions over AI-generated candidate analyses. */
-export const candidateDecisions = pgTable(
-  'candidate_decisions',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-    analysisId: uuid('analysis_id').references(() => aiAnalyses.id, { onDelete: 'cascade' }).notNull(),
-    decision: text('decision').notNull(), // accepted | rejected | watchlist | reanalysis_requested
-    rationale: text('rationale'),
-    decidedBy: text('decided_by').notNull(),
-    decidedAt: timestamp('decided_at', { withTimezone: true }).defaultNow().notNull(),
-    metadata: jsonb('metadata'),
-  },
-  (t) => ({ analysisDecisionIdx: index('candidate_decisions_analysis_idx').on(t.analysisId, t.decidedAt) })
-);
+Kˆİ]ÛÛYNˆ^
+	Ûİ]ÛÛYIÊK››İ[
 
-/** Write-audit record for thesis mutations. */
-export const thesisMutationAudit = pgTable(
-  'thesis_mutation_audit',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-    thesisVersionId: uuid('thesis_version_id').references(() => thesisVersions.id, { onDelete: 'cascade' }).notNull(),
-    action: text('action').notNull(),
-    actor: text('actor').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    metadata: jsonb('metadata'),
-  },
-  (t) => ({ thesisAuditIdx: index('thesis_mutation_audit_thesis_idx').on(t.thesisVersionId, t.createdAt) })
-);
+KËÈÚÈ[—Û[Z]˜]WÛ[Z]Y\œ›Ü‚ˆİ]\Îˆ[YÙ\Š	ÚÜİ]\ÉÊKˆ\˜][Û“\Îˆ[YÙ\Š	Ù\˜][Û—Û\ÉÊK››İ[
 
-/** Pending model extraction. It becomes canonical only after explicit human confirmation. */
-export const externalThesisExtractions = pgTable(
-  'external_thesis_extractions',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-    externalExtractionId: text('external_extraction_id').notNull().unique(),
-    status: text('status').notNull().default('queued'),
-    requestedVersion: integer('requested_version').notNull(),
-    sourceFileName: text('source_file_name').notNull(),
-    sourceMimeType: text('source_mime_type').notNull(),
-    resultJson: jsonb('result_json'),
-    errorMessage: text('error_message'),
-    requestedAt: timestamp('requested_at', { withTimezone: true }).defaultNow().notNull(),
-    completedAt: timestamp('completed_at', { withTimezone: true }),
-    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
-    confirmedThesisVersionId: uuid('confirmed_thesis_version_id')
-      .references(() => thesisVersions.id, { onDelete: 'set null' }),
-    dismissedAt: timestamp('dismissed_at', { withTimezone: true }),
-    dismissedBy: text('dismissed_by'),
-  },
-  (t) => ({
-    ownerStatusIdx: index('external_thesis_extractions_owner_status_idx').on(t.ownerId, t.status, t.requestedAt),
-  })
-);
+KˆKˆ
+
+HOˆ
+Âˆ›İšY\Ø[YYˆ[™^
+	Ü›İšY\—ØØ[×Ü›İšY\—ØØ[YÚY	ÊK›ÛŠœ›İšY\‹˜Ø[Y]
+Kˆ[™Ú[İ]ÛÛYRYˆ[™^
+	Ü›İšY\—ØØ[×Ù[™Ú[Ûİ]ÛÛYWÚY	ÊK›ÛŠœ›İšY\‹™[™Ú[›İ]ÛÛYK˜Ø[Y]
+KˆJBŠNÂ‚‹ÊŠˆ[[]]X›HšXÙKØÛÛ™šYËÜ™\İ[Û˜\ÚİÈš[˜[]Y]Ø[ˆ™HÜš][ˆÛ›HÛ˜ÙHHH[X[‹ˆ
+‹Â™^ÜÛÛœİÜ›Û[ÕÙZYÚ[œÈHÕX›J	ÜÜ›Û[×İÙZYÚÜ[œÉËÂˆYˆ]ZY
+	ÚY	ÊKœš[X\RÙ^J
+K™Y˜][˜[™ÛJ
+KˆİÛ™\’Yˆ]ZY
+	ÛİÛ™\—ÚY	ÊKœ™Y™\™[˜Ù\Ê
 
-/** Dashboard record of a run owned by the external agentic system. */
-export const externalAgenticRuns = pgTable(
-  'external_agentic_runs',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-    /** Immutable account binding for authenticated agentic callbacks. */
-    accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'cascade' }).notNull(),
-    externalRunId: text('external_run_id').notNull().unique(),
-    status: text('status').notNull().default('queued'),
-    thesisVersion: text('thesis_version'),
-    manifestSchemaVersion: text('manifest_schema_version'),
-    manifestHash: text('manifest_hash'),
-    requestJson: jsonb('request_json'),
-    manifestJson: jsonb('manifest_json'),
-    reportPdfUrl: text('report_pdf_url'),
-    requestedAt: timestamp('requested_at').defaultNow().notNull(),
-    completedAt: timestamp('completed_at'),
-    importedAt: timestamp('imported_at'),
-    errorMessage: text('error_message'),
-  },
-  (t) => ({
-    statusIdx: index('external_agentic_runs_status_idx').on(t.status, t.requestedAt),
-    accountStatusIdx: index('external_agentic_runs_account_status_idx').on(t.accountId, t.status, t.requestedAt),
-    hashIdx: index('external_agentic_runs_manifest_hash_idx').on(t.manifestHash),
-  })
-);
+HOˆ\Ù\œËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
 
-/** Portfolio-level synthesis imported from the external manifest. */
-export const portfolioAnalysisSyntheses = pgTable(
-  'portfolio_analysis_syntheses',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    runId: uuid('run_id').references(() => externalAgenticRuns.id, { onDelete: 'cascade' }).notNull(),
-    portfolioId: uuid('portfolio_id').references(() => portfolios.id, { onDelete: 'cascade' }).notNull(),
-    thesisVersion: text('thesis_version').notNull(),
-    synthesisJson: jsonb('synthesis_json').notNull(),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-  },
-  (t) => ({
-    runPortfolioIdx: uniqueIndex('portfolio_synthesis_run_portfolio_idx').on(t.runId, t.portfolioId),
-  })
-);
+KˆÜ›Û[ÒYˆ]ZY
+	ÜÜ›Û[×ÚY	ÊKœ™Y™\™[˜Ù\Ê
 
-/** Complete external output retained for audit and fields not projected into ai_analyses. */
-export const externalAgenticAnalyses = pgTable(
-  'external_agentic_analyses',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    runId: uuid('run_id').references(() => externalAgenticRuns.id, { onDelete: 'cascade' }).notNull(),
-    portfolioId: uuid('portfolio_id').references(() => portfolios.id, { onDelete: 'cascade' }).notNull(),
-    securityId: uuid('security_id').references(() => securities.id, { onDelete: 'cascade' }).notNull(),
-    analysisId: uuid('analysis_id').references(() => aiAnalyses.id, { onDelete: 'cascade' }).notNull(),
-    outputJson: jsonb('output_json').notNull(),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-  },
-  (t) => ({
-    runSecurityIdx: uniqueIndex('external_analysis_run_portfolio_security_idx').on(t.runId, t.portfolioId, t.securityId),
-  })
-);
+HOˆÜ›Û[ÜËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
 
-/**
- * Every attempted external market-data call, win or lose. This is the record
- * that answers "why is my universe unranked" or "how much of today's budget
- * is spent" without guessing â€” and it backs the gateway's own decisions: the
- * daily call budget counts rows here, and a recent plan_limit row is what
- * lets a later call skip a network round trip already known to fail.
- */
-export const providerCalls = pgTable(
-  'provider_calls',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    provider: text('provider').notNull(),
-    // A stable route template, never the full URL: no API key, no per-symbol
-    // segment. See endpointTemplate() in src/lib/connectors/gateway.ts.
-    endpoint: text('endpoint').notNull(),
-    calledAt: timestamp('called_at', { withTimezone: true }).defaultNow().notNull(),
-    outcome: text('outcome').notNull(), // ok | plan_limit | rate_limited | error
-    httpStatus: integer('http_status'),
-    durationMs: integer('duration_ms').notNull(),
-  },
-  (t) => ({
-    providerCalledIdx: index('provider_calls_provider_called_idx').on(t.provider, t.calledAt),
-    endpointOutcomeIdx: index('provider_calls_endpoint_outcome_idx').on(t.provider, t.endpoint, t.outcome, t.calledAt),
-  })
-);
+KˆXİÜ’Yˆ]ZY
+	ØXİÜ—ÚY	ÊKœ™Y™\™[˜Ù\Ê
 
-/** Immutable price/config/result snapshot; final audit can be written only once by a human. */
-export const portfolioWeightRuns = pgTable('portfolio_weight_runs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  portfolioId: uuid('portfolio_id').references(() => portfolios.id, { onDelete: 'cascade' }).notNull(),
-  actorId: uuid('actor_id').references(() => users.id).notNull(),
-  pricesCsv: text('prices_csv').notNull(),
-  priceHash: text('price_hash').notNull(),
-  source: text('source').notNull(),
-  currency: text('currency').notNull(),
-  holdingsHash: text('holdings_hash').notNull(),
-  baseDecisionId: uuid('base_decision_id'),
-  configJson: jsonb('config_json').$type<import('../portfolio-weights').WeightConfig>().notNull(),
-  resultJson: jsonb('result_json').$type<import('../portfolio-weights').WeightResult>().notNull(),
-  finalJson: jsonb('final_json').$type<import('../portfolio-weights').FinalWeights>(),
-  confirmedBy: uuid('confirmed_by').references(() => users.id),
-  acknowledgedWarnings: jsonb('acknowledged_warnings').$type<string[]>(),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
-}, t => ({ portfolioCreatedIdx: index('weight_runs_portfolio_created_idx').on(t.portfolioId, t.createdAt) }));
+HOˆ\Ù\œËšY
+K››İ[
 
-/** Immutable, read-only snapshot retrieved from a connected broker session. */
-export const brokerAccountSnapshots = pgTable('broker_account_snapshots', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  provider: text('provider').notNull(),
-  accountMasked: text('account_masked').notNull(),
-  baseCurrency: text('base_currency').notNull(),
-  cash: numeric('cash', { precision: 24, scale: 8 }).notNull(),
-  netLiquidation: numeric('net_liquidation', { precision: 24, scale: 8 }).notNull(),
-  availableFunds: numeric('available_funds', { precision: 24, scale: 8 }).notNull(),
-  buyingPower: numeric('buying_power', { precision: 24, scale: 8 }).notNull(),
-  informationGaps: jsonb('information_gaps').$type<string[]>().notNull(),
-  capturedAt: timestamp('captured_at', { withTimezone: true }).notNull(),
-  syncedAt: timestamp('synced_at', { withTimezone: true }).defaultNow().notNull(),
-}, t => ({ ownerCapturedIdx: index('broker_snapshot_owner_captured_idx').on(t.ownerId, t.capturedAt) }));
+KˆšXÙ\ĞÜİˆ^
+	ÜšXÙ\×ØÜİ‰ÊK››İ[
 
-export const brokerPositionSnapshots = pgTable('broker_position_snapshots', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  snapshotId: uuid('snapshot_id').references(() => brokerAccountSnapshots.id, { onDelete: 'cascade' }).notNull(),
-  conId: text('con_id').notNull(),
-  symbol: text('symbol').notNull(),
-  exchange: text('exchange').notNull(),
-  currency: text('currency').notNull(),
-  quantity: numeric('quantity', { precision: 24, scale: 8 }).notNull(),
-  avgCost: numeric('avg_cost', { precision: 24, scale: 8 }).notNull(),
-  lastPrice: numeric('last_price', { precision: 24, scale: 8 }).notNull(),
-  costBasis: numeric('cost_basis', { precision: 24, scale: 8 }).notNull(),
-  marketValue: numeric('market_value', { precision: 24, scale: 8 }).notNull(),
-  unrealizedPnl: numeric('unrealized_pnl', { precision: 24, scale: 8 }).notNull(),
-  returnPct: real('return_pct'),
-  firstDetectedFill: text('first_detected_fill'),
-  daysSinceDetectedFill: integer('days_since_detected_fill'),
-  annualizedReturnPct: real('annualized_return_pct'),
-}, t => ({ snapshotValueIdx: index('broker_position_snapshot_value_idx').on(t.snapshotId, t.marketValue) }));
+KˆšXÙR\Úˆ^
+	ÜšXÙWÚ\Ú	ÊK››İ[
 
-/** Preview audit. Results can never represent submitted or filled orders. */
-export const brokerOrderPreviews = pgTable('broker_order_previews', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  snapshotId: uuid('snapshot_id').references(() => brokerAccountSnapshots.id, { onDelete: 'set null' }),
-  provider: text('provider').notNull(),
-  requestJson: jsonb('request_json').notNull(),
-  resultJson: jsonb('result_json').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-}, t => ({ ownerCreatedIdx: index('broker_preview_owner_created_idx').on(t.ownerId, t.createdAt) }));
+KˆÛİ\˜ÙNˆ^
+	ÜÛİ\˜ÙIÊK››İ[
 
-/** One logical, tenant-isolated document repository for a held security. */
-export const companyWorkspaces = pgTable('company_workspaces', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  securityId: uuid('security_id').references(() => securities.id, { onDelete: 'cascade' }).notNull(),
-  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  ticker: text('ticker').notNull(),
-  exchange: text('exchange').notNull(),
-  country: text('country'),
-  status: text('status').notNull().default('active'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  lastIngestedAt: timestamp('last_ingested_at', { withTimezone: true }),
-  documentCount: integer('document_count').notNull().default(0),
-  chunkCount: integer('chunk_count').notNull().default(0),
-  ragEnabled: boolean('rag_enabled').notNull().default(false),
-}, t => ({
-  securityOwnerIdx: uniqueIndex('cw_security_owner_idx').on(t.securityId, t.ownerId),
-  ownerIdx: index('cw_owner_idx').on(t.ownerId),
-}));
+Kˆİ\œ™[˜ŞNˆ^
+	Øİ\œ™[˜ŞIÊK››İ[
 
-export const intelligenceDocuments = pgTable('documents', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  workspaceId: uuid('workspace_id').references(() => companyWorkspaces.id, { onDelete: 'cascade' }).notNull(),
-  securityId: uuid('security_id').references(() => securities.id, { onDelete: 'cascade' }).notNull(),
-  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  folderType: text('folder_type').notNull(),
-  documentType: text('document_type').notNull(),
-  source: text('source').notNull(),
-  title: text('title').notNull(),
-  description: text('description'),
-  url: text('url'),
-  localPath: text('local_path'),
-  contentHash: text('content_hash'),
-  externalId: text('external_id'),
-  publishedDate: timestamp('published_date', { withTimezone: true }),
-  fiscalYearEnd: date('fiscal_year_end'),
-  fiscalPeriod: text('fiscal_period'),
-  retrievedAt: timestamp('retrieved_at', { withTimezone: true }).defaultNow().notNull(),
-  processedAt: timestamp('processed_at', { withTimezone: true }),
-  contentText: text('content_text'),
-  contentLength: integer('content_length'),
-  processingStatus: text('processing_status').notNull().default('pending'),
-  processingError: text('processing_error'),
-  retryCount: integer('retry_count').notNull().default(0),
-  language: text('language').default('en'),
-  pageCount: integer('page_count'),
-  fileFormat: text('file_format'),
-  isPrimarySource: boolean('is_primary_source').notNull().default(true),
-  isAmendment: boolean('is_amendment').default(false),
-  amendedDocumentId: uuid('amended_document_id').references((): AnyPgColumn => intelligenceDocuments.id),
-  supersededAt: timestamp('superseded_at', { withTimezone: true }),
-  metadataJson: jsonb('metadata_json'),
-}, t => ({
-  workspaceIdx: index('documents_workspace_idx').on(t.workspaceId),
-  securityIdx: index('documents_security_idx').on(t.securityId),
-  ownerIdx: index('documents_owner_idx').on(t.ownerId),
-  typeIdx: index('documents_type_idx').on(t.folderType, t.documentType),
-  statusIdx: index('documents_status_idx').on(t.processingStatus),
-  externalIdIdx: index('documents_external_id_idx').on(t.externalId),
-  contentHashIdx: index('documents_content_hash_idx').on(t.contentHash),
-  publishedDateIdx: index('documents_published_date_idx').on(t.publishedDate),
-}));
+KˆÛ[™ÜÒ\Úˆ^
+	ÚÛ[™Ü×Ú\Ú	ÊK››İ[
 
-export const documentChunks = pgTable('document_chunks', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  documentId: uuid('document_id').references(() => intelligenceDocuments.id, { onDelete: 'cascade' }).notNull(),
-  workspaceId: uuid('workspace_id').references(() => companyWorkspaces.id, { onDelete: 'cascade' }).notNull(),
-  securityId: uuid('security_id').references(() => securities.id, { onDelete: 'cascade' }).notNull(),
-  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  chunkIndex: integer('chunk_index').notNull(),
-  chunkText: text('chunk_text').notNull(),
-  chunkLength: integer('chunk_length').notNull(),
-  contextBefore: text('context_before'),
-  contextAfter: text('context_after'),
-  sectionTitle: text('section_title'),
-  sectionType: text('section_type'),
-  chunkHash: text('chunk_hash').notNull(),
-  embeddingStatus: text('embedding_status').notNull().default('pending'),
-  embeddedAt: timestamp('embedded_at', { withTimezone: true }),
-}, t => ({
-  documentIdx: index('chunks_document_idx').on(t.documentId),
-  workspaceIdx: index('chunks_workspace_idx').on(t.workspaceId),
-  securityIdx: index('chunks_security_idx').on(t.securityId),
-  ownerIdx: index('chunks_owner_idx').on(t.ownerId),
-  statusIdx: index('chunks_embedding_status_idx').on(t.embeddingStatus),
-}));
+Kˆ˜\ÙQXÚ\Ú[Û’Yˆ]ZY
+	Ø˜\ÙWÙXÚ\Ú[Û—ÚY	ÊKˆÛÛ™šYÒœÛÛˆœÛÛ˜Š	ØÛÛ™šY×ÚœÛÛ‰ÊK‰\O[\Ü
+	Ë‹‹ÜÜ›Û[Ë]ÙZYÚÉÊK•ÙZYÚÛÛ™šYÏŠ
+K››İ[
 
-export const documentEmbeddings = pgTable('document_embeddings', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  chunkId: uuid('chunk_id').references(() => documentChunks.id, { onDelete: 'cascade' }).notNull(),
-  documentId: uuid('document_id').references(() => intelligenceDocuments.id, { onDelete: 'cascade' }).notNull(),
-  workspaceId: uuid('workspace_id').references(() => companyWorkspaces.id, { onDelete: 'cascade' }).notNull(),
-  securityId: uuid('security_id').references(() => securities.id, { onDelete: 'cascade' }).notNull(),
-  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  embedding: vector('embedding', { dimensions: 768 }).notNull(),
-  embeddingModel: text('embedding_model').notNull().default('text-embedding-004'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-}, t => ({
-  documentIdx: index('emb_document_idx').on(t.documentId),
-  workspaceIdx: index('emb_workspace_idx').on(t.workspaceId),
-  securityIdx: index('emb_security_idx').on(t.securityId),
-  ownerIdx: index('emb_owner_idx').on(t.ownerId),
-  vectorIdx: index('document_embeddings_hnsw_idx').using('hnsw', t.embedding.op('vector_cosine_ops')).with({ m: 16, ef_construction: 64 }),
-}));
+Kˆ™\İ[œÛÛˆœÛÛ˜Š	Ü™\İ[ÚœÛÛ‰ÊK‰\O[\Ü
+	Ë‹‹ÜÜ›Û[Ë]ÙZYÚÉÊK•ÙZYÚ™\İ[Š
+K››İ[
 
-export const ingestionJobs = pgTable('ingestion_jobs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  workspaceId: uuid('workspace_id').references(() => companyWorkspaces.id, { onDelete: 'cascade' }).notNull(),
-  securityId: uuid('security_id').references(() => securities.id, { onDelete: 'cascade' }).notNull(),
-  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  jobType: text('job_type').notNull(),
-  status: text('status').notNull().default('queued'),
-  startedAt: timestamp('started_at', { withTimezone: true }),
-  completedAt: timestamp('completed_at', { withTimezone: true }),
-  documentsDiscovered: integer('documents_discovered').default(0),
-  documentsIngested: integer('documents_ingested').default(0),
-  chunksCreated: integer('chunks_created').default(0),
-  chunksEmbedded: integer('chunks_embedded').default(0),
-  errorMessage: text('error_message'),
-  logJson: jsonb('log_json').$type<string[]>(),
-  triggeredBy: text('triggered_by').default('schedule'),
-}, t => ({
-  workspaceIdx: index('ij_workspace_idx').on(t.workspaceId),
-  statusIdx: index('ij_status_idx').on(t.status),
-  typeIdx: index('ij_type_idx').on(t.jobType, t.status),
-}));
+Kˆš[˜[œÛÛˆœÛÛ˜Š	Ùš[˜[ÚœÛÛ‰ÊK‰\O[\Ü
+	Ë‹‹ÜÜ›Û[Ë]ÙZYÚÉÊK‘š[˜[ÙZYÚÏŠ
+KˆÛÛ™š\›YYNˆ]ZY
+	ØÛÛ™š\›YYØIÊKœ™Y™\™[˜Ù\Ê
 
-export const ragConversations = pgTable('rag_conversations', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  workspaceId: uuid('workspace_id').references(() => companyWorkspaces.id, { onDelete: 'cascade' }).notNull(),
-  securityId: uuid('security_id').references(() => securities.id, { onDelete: 'cascade' }).notNull(),
-  ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  title: text('title').default('New Conversation'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-}, t => ({
-  workspaceIdx: index('rag_conv_workspace_idx').on(t.workspaceId),
-  userIdx: index('rag_conv_user_idx').on(t.userId),
-}));
+HOˆ\Ù\œËšY
+KˆXÚÛ›İÛYÙYØ\›š[™ÜÎˆœÛÛ˜Š	ØXÚÛ›İÛYÙYİØ\›š[™ÜÉÊK‰\Oİš[™Ö×OŠ
+KˆÜ™X]Y]ˆ[Y\İ[\
+	ØÜ™X]YØ]	ËÈÚ][Y^›Û™NˆYHJK™Y˜][›İÊ
+K››İ[
 
-export type RagCitation = { chunkId: string; documentId: string; documentTitle: string; source: string; publishedDate: string; excerpt: string; relevanceScore: number; isPrimarySource: boolean };
-export const ragMessages = pgTable('rag_messages', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  conversationId: uuid('conversation_id').references(() => ragConversations.id, { onDelete: 'cascade' }).notNull(),
-  role: text('role').notNull(),
-  content: text('content').notNull(),
-  citationsJson: jsonb('citations_json').$type<RagCitation[]>(),
-  retrievedChunksJson: jsonb('retrieved_chunks_json'),
-  promptTokens: integer('prompt_tokens'),
-  completionTokens: integer('completion_tokens'),
-  model: text('model').default('gemini-1.5-flash'),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-}, t => ({ conversationIdx: index('rag_msg_conversation_idx').on(t.conversationId) }));
+KˆÛÛ™š\›YY]ˆ[Y\İ[\
+	ØÛÛ™š\›YYØ]	ËÈÚ][Y^›Û™NˆYHJKŸKOˆ
+ÈÜ›Û[ĞÜ™X]YYˆ[™^
+	İÙZYÚÜ[œ×ÜÜ›Û[×ØÜ™X]YÚY	ÊK›ÛŠœÜ›Û[ÒY˜Ü™X]Y]
+HJJNÂ‚‹ÊŠˆ[[]]X›K™XY[Û›HÛ˜\Úİ™]šY]™Yœ›ÛHHÛÛ›™XİYœ›ÚÙ\ˆÙ\ÜÚ[Û‹ˆ
+‹Â™^ÜÛÛœİœ›ÚÙ\XØÛİ[Û˜\ÚİÈHÕX›J	Øœ›ÚÙ\—ØXØÛİ[ÜÛ˜\ÚİÉËÂˆYˆ]ZY
+	ÚY	ÊKœš[X\RÙ^J
+K™Y˜][˜[™ÛJ
+KˆİÛ™\’Yˆ]ZY
+	ÛİÛ™\—ÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆ\Ù\œËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+Kˆ›İšY\ˆ^
+	Ü›İšY\‰ÊK››İ[
+
+KˆXØÛİ[X\ÚÙYˆ^
+	ØXØÛİ[ÛX\ÚÙY	ÊK››İ[
+
+Kˆ˜\ÙPİ\œ™[˜ŞNˆ^
+	Ø˜\ÙWØİ\œ™[˜ŞIÊK››İ[
+
+KˆØ\Úˆ[Y\šXÊ	ØØ\Ú	ËÈ™XÚ\Ú[ÛˆØØ[NˆJK››İ[
+
+Kˆ™]\]ZY][Ûˆ[Y\šXÊ	Û™]Û\]ZY][Û‰ËÈ™XÚ\Ú[ÛˆØØ[NˆJK››İ[
+
+Kˆ]˜Z[X›Q[™Îˆ[Y\šXÊ	Ø]˜Z[X›WÙ[™ÉËÈ™XÚ\Ú[ÛˆØØ[NˆJK››İ[
+
+Kˆ^Z[™ÔİÙ\ˆ[Y\šXÊ	Ø^Z[™×ÜİÙ\‰ËÈ™XÚ\Ú[ÛˆØØ[NˆJK››İ[
+
+Kˆ[™›Ü›X][Û‘Ø\ÎˆœÛÛ˜Š	Ú[™›Ü›X][Û—ÙØ\ÉÊK‰\Oİš[™Ö×OŠ
+K››İ[
+
+KˆØ\\™Y]ˆ[Y\İ[\
+	ØØ\\™YØ]	ËÈÚ][Y^›Û™NˆYHJK››İ[
+
+KˆŞ[˜ÙY]ˆ[Y\İ[\
+	ÜŞ[˜ÙYØ]	ËÈÚ][Y^›Û™NˆYHJK™Y˜][›İÊ
+K››İ[
+
+KŸKOˆ
+ÈİÛ™\Ø\\™YYˆ[™^
+	Øœ›ÚÙ\—ÜÛ˜\ÚİÛİÛ™\—ØØ\\™YÚY	ÊK›ÛŠ›İÛ™\’Y˜Ø\\™Y]
+HJJNÂ‚™^ÜÛÛœİœ›ÚÙ\”ÜÚ][Û”Û˜\ÚİÈHÕX›J	Øœ›ÚÙ\—ÜÜÚ][Û—ÜÛ˜\ÚİÉËÂˆYˆ]ZY
+	ÚY	ÊKœš[X\RÙ^J
+K™Y˜][˜[™ÛJ
+KˆÛ˜\ÚİYˆ]ZY
+	ÜÛ˜\ÚİÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆœ›ÚÙ\XØÛİ[Û˜\ÚİËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+KˆÛÛ’Yˆ^
+	ØÛÛ—ÚY	ÊK››İ[
+
+KˆŞ[X›Ûˆ^
+	ÜŞ[X›Û	ÊK››İ[
+
+Kˆ^Ú[™ÙNˆ^
+	Ù^Ú[™ÙIÊK››İ[
+
+Kˆİ\œ™[˜ŞNˆ^
+	Øİ\œ™[˜ŞIÊK››İ[
+
+Kˆ]X[]Nˆ[Y\šXÊ	Ü]X[]IËÈ™XÚ\Ú[ÛˆØØ[NˆJK››İ[
+
+Kˆ]™ĞÛÜİˆ[Y\šXÊ	Ø]™×ØÛÜİ	ËÈ™XÚ\Ú[ÛˆØØ[NˆJK››İ[
+
+Kˆ\İšXÙNˆ[Y\šXÊ	Û\İÜšXÙIËÈ™XÚ\Ú[ÛˆØØ[NˆJK››İ[
+
+KˆÛÜİ˜\Ú\Îˆ[Y\šXÊ	ØÛÜİØ˜\Ú\ÉËÈ™XÚ\Ú[ÛˆØØ[NˆJK››İ[
+
+KˆX\šÙ]˜[YNˆ[Y\šXÊ	ÛX\šÙ]İ˜[YIËÈ™XÚ\Ú[ÛˆØØ[NˆJK››İ[
+
+Kˆ[œ™X[^™Y›ˆ[Y\šXÊ	İ[œ™X[^™YÜ›	ËÈ™XÚ\Ú[ÛˆØØ[NˆJK››İ[
+
+Kˆ™]\›”İˆ™X[
+	Ü™]\›—Üİ	ÊKˆš\œİ]XİYš[ˆ^
+	Ùš\œİÙ]XİYÙš[	ÊKˆ^\ÔÚ[˜ÙQ]XİYš[ˆ[YÙ\Š	Ù^\×ÜÚ[˜ÙWÙ]XİYÙš[	ÊKˆ[›X[^™Y™]\›”İˆ™X[
+	Ø[›X[^™YÜ™]\›—Üİ	ÊKŸKOˆ
+ÈÛ˜\Úİ˜[YRYˆ[™^
+	Øœ›ÚÙ\—ÜÜÚ][Û—ÜÛ˜\Úİİ˜[YWÚY	ÊK›ÛŠœÛ˜\ÚİY›X\šÙ]˜[YJHJJNÂ‚‹ÊŠˆ™]šY]È]Y]ˆ™\İ[ÈØ[ˆ™]™\ˆ™\™\Ù[İX›Z]YÜˆš[YÜ™\œËˆ
+‹Â™^ÜÛÛœİœ›ÚÙ\“Ü™\”™]šY]ÜÈHÕX›J	Øœ›ÚÙ\—ÛÜ™\—Ü™]šY]ÜÉËÂˆYˆ]ZY
+	ÚY	ÊKœš[X\RÙ^J
+K™Y˜][˜[™ÛJ
+KˆİÛ™\’Yˆ]ZY
+	ÛİÛ™\—ÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆ\Ù\œËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+KˆÛ˜\ÚİYˆ]ZY
+	ÜÛ˜\ÚİÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆœ›ÚÙ\XØÛİ[Û˜\ÚİËšYÈÛ‘[]Nˆ	ÜÙ][	ÈJKˆ›İšY\ˆ^
+	Ü›İšY\‰ÊK››İ[
+
+Kˆ™\]Y\İœÛÛˆœÛÛ˜Š	Ü™\]Y\İÚœÛÛ‰ÊK››İ[
+
+Kˆ™\İ[œÛÛˆœÛÛ˜Š	Ü™\İ[ÚœÛÛ‰ÊK››İ[
+
+KˆÜ™X]Y]ˆ[Y\İ[\
+	ØÜ™X]YØ]	ËÈÚ][Y^›Û™NˆYHJK™Y˜][›İÊ
+K››İ[
+
+KŸKOˆ
+ÈİÛ™\Ü™X]YYˆ[™^
+	Øœ›ÚÙ\—Ü™]šY]×ÛİÛ™\—ØÜ™X]YÚY	ÊK›ÛŠ›İÛ™\’Y˜Ü™X]Y]
+HJJNÂ‚‹ÊŠˆÛ™HÙÚXØ[[˜[Z\ÛÛ]YØİ[Y[™\ÜÚ]ÜH›ÜˆH[ÙXİ\š]Kˆ
+‹Â™^ÜÛÛœİÛÛ\[UÛÜšÜÜXÙ\ÈHÕX›J	ØÛÛ\[WİÛÜšÜÜXÙ\ÉËÂˆYˆ]ZY
+	ÚY	ÊKœš[X\RÙ^J
+K™Y˜][˜[™ÛJ
+KˆÙXİ\š]RYˆ]ZY
+	ÜÙXİ\š]WÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆÙXİ\š]Y\ËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+KˆİÛ™\’Yˆ]ZY
+	ÛİÛ™\—ÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆ\Ù\œËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+KˆXÚÙ\ˆ^
+	İXÚÙ\‰ÊK››İ[
+
+Kˆ^Ú[™ÙNˆ^
+	Ù^Ú[™ÙIÊK››İ[
+
+KˆÛİ[Nˆ^
+	ØÛİ[IÊKˆİ]\Îˆ^
+	Üİ]\ÉÊK››İ[
+
+K™Y˜][
+	ØXİ]™IÊKˆÜ™X]Y]ˆ[Y\İ[\
+	ØÜ™X]YØ]	ËÈÚ][Y^›Û™NˆYHJK™Y˜][›İÊ
+K››İ[
+
+Kˆ\İ[™Ù\İY]ˆ[Y\İ[\
+	Û\İÚ[™Ù\İYØ]	ËÈÚ][Y^›Û™NˆYHJKˆØİ[Y[Ûİ[ˆ[YÙ\Š	ÙØİ[Y[ØÛİ[	ÊK››İ[
+
+K™Y˜][
+
+KˆÚ[šĞÛİ[ˆ[YÙ\Š	ØÚ[š×ØÛİ[	ÊK››İ[
+
+K™Y˜][
+
+Kˆ˜YÑ[˜X›Yˆ›ÛÛX[Š	Ü˜Y×Ù[˜X›Y	ÊK››İ[
+
+K™Y˜][
+˜[ÙJKŸKOˆ
+ÂˆÙXİ\š]SİÛ™\’Yˆ[š\]YR[™^
+	Øİ×ÜÙXİ\š]WÛİÛ™\—ÚY	ÊK›ÛŠœÙXİ\š]RY›İÛ™\’Y
+KˆİÛ™\’Yˆ[™^
+	Øİ×ÛİÛ™\—ÚY	ÊK›ÛŠ›İÛ™\’Y
+KŸJJNÂ‚™^ÜÛÛœİ[[YÙ[˜ÙQØİ[Y[ÈHÕX›J	ÙØİ[Y[ÉËÂˆYˆ]ZY
+	ÚY	ÊKœš[X\RÙ^J
+K™Y˜][˜[™ÛJ
+KˆÛÜšÜÜXÙRYˆ]ZY
+	İÛÜšÜÜXÙWÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆÛÛ\[UÛÜšÜÜXÙ\ËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+KˆÙXİ\š]RYˆ]ZY
+	ÜÙXİ\š]WÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆÙXİ\š]Y\ËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+KˆİÛ™\’Yˆ]ZY
+	ÛİÛ™\—ÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆ\Ù\œËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+Kˆ›Û\•\Nˆ^
+	Ù›Û\—İ\IÊK››İ[
+
+KˆØİ[Y[\Nˆ^
+	ÙØİ[Y[İ\IÊK››İ[
+
+KˆÛİ\˜ÙNˆ^
+	ÜÛİ\˜ÙIÊK››İ[
+
+Kˆ]Nˆ^
+	İ]IÊK››İ[
+
+Kˆ\ØÜš\[Ûˆ^
+	Ù\ØÜš\[Û‰ÊKˆ\›ˆ^
+	İ\›	ÊKˆØØ[]ˆ^
+	ÛØØ[Ü]	ÊKˆÛÛ[\Úˆ^
+	ØÛÛ[Ú\Ú	ÊKˆ^\›˜[Yˆ^
+	Ù^\›˜[ÚY	ÊKˆX›\ÚY]Nˆ[Y\İ[\
+	ÜX›\ÚYÙ]IËÈÚ][Y^›Û™NˆYHJKˆš\ØØ[YX\‘[™ˆ]J	Ùš\ØØ[ŞYX\—Ù[™	ÊKˆš\ØØ[\š[Ùˆ^
+	Ùš\ØØ[Ü\š[Ù	ÊKˆ™]šY]™Y]ˆ[Y\İ[\
+	Ü™]šY]™YØ]	ËÈÚ][Y^›Û™NˆYHJK™Y˜][›İÊ
+K››İ[
+
+Kˆ›ØÙ\ÜÙY]ˆ[Y\İ[\
+	Ü›ØÙ\ÜÙYØ]	ËÈÚ][Y^›Û™NˆYHJKˆÛÛ[^ˆ^
+	ØÛÛ[İ^	ÊKˆÛÛ[[™İˆ[YÙ\Š	ØÛÛ[Û[™İ	ÊKˆ›ØÙ\ÜÚ[™Ôİ]\Îˆ^
+	Ü›ØÙ\ÜÚ[™×Üİ]\ÉÊK››İ[
+
+K™Y˜][
+	Ü[™[™ÉÊKˆ›ØÙ\ÜÚ[™Ñ\œ›Üˆ^
+	Ü›ØÙ\ÜÚ[™×Ù\œ›Ü‰ÊKˆ™]PÛİ[ˆ[YÙ\Š	Ü™]WØÛİ[	ÊK››İ[
+
+K™Y˜][
+
+Kˆ[™İXYÙNˆ^
+	Û[™İXYÙIÊK™Y˜][
+	Ù[‰ÊKˆYÙPÛİ[ˆ[YÙ\Š	ÜYÙWØÛİ[	ÊKˆš[Q›Ü›X]ˆ^
+	Ùš[WÙ›Ü›X]	ÊKˆ\Ôš[X\TÛİ\˜ÙNˆ›ÛÛX[Š	Ú\×Üš[X\WÜÛİ\˜ÙIÊK››İ[
+
+K™Y˜][
+YJKˆ\Ğ[Y[™Y[ˆ›ÛÛX[Š	Ú\×Ø[Y[™Y[	ÊK™Y˜][
+˜[ÙJKˆ[Y[™YØİ[Y[Yˆ]ZY
+	Ø[Y[™YÙØİ[Y[ÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+Nˆ[TĞÛÛ[[ˆOˆ[[YÙ[˜ÙQØİ[Y[ËšY
+Kˆİ\\œÙYY]ˆ[Y\İ[\
+	Üİ\\œÙYYØ]	ËÈÚ][Y^›Û™NˆYHJKˆY]Y]RœÛÛˆœÛÛ˜Š	ÛY]Y]WÚœÛÛ‰ÊKŸKOˆ
+ÂˆÛÜšÜÜXÙRYˆ[™^
+	ÙØİ[Y[×İÛÜšÜÜXÙWÚY	ÊK›ÛŠÛÜšÜÜXÙRY
+KˆÙXİ\š]RYˆ[™^
+	ÙØİ[Y[×ÜÙXİ\š]WÚY	ÊK›ÛŠœÙXİ\š]RY
+KˆİÛ™\’Yˆ[™^
+	ÙØİ[Y[×ÛİÛ™\—ÚY	ÊK›ÛŠ›İÛ™\’Y
+Kˆ\RYˆ[™^
+	ÙØİ[Y[×İ\WÚY	ÊK›ÛŠ™›Û\•\K™Øİ[Y[\JKˆİ]\ÒYˆ[™^
+	ÙØİ[Y[×Üİ]\×ÚY	ÊK›ÛŠœ›ØÙ\ÜÚ[™Ôİ]\ÊKˆ^\›˜[YYˆ[™^
+	ÙØİ[Y[×Ù^\›˜[ÚYÚY	ÊK›ÛŠ™^\›˜[Y
+KˆÛÛ[\ÚYˆ[™^
+	ÙØİ[Y[×ØÛÛ[Ú\ÚÚY	ÊK›ÛŠ˜ÛÛ[\Ú
+KˆX›\ÚY]RYˆ[™^
+	ÙØİ[Y[×ÜX›\ÚYÙ]WÚY	ÊK›ÛŠœX›\ÚY]JKŸJJNÂ‚™^ÜÛÛœİØİ[Y[Ú[šÜÈHÕX›J	ÙØİ[Y[ØÚ[šÜÉËÂˆYˆ]ZY
+	ÚY	ÊKœš[X\RÙ^J
+K™Y˜][˜[™ÛJ
+KˆØİ[Y[Yˆ]ZY
+	ÙØİ[Y[ÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆ[[YÙ[˜ÙQØİ[Y[ËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+KˆÛÜšÜÜXÙRYˆ]ZY
+	İÛÜšÜÜXÙWÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆÛÛ\[UÛÜšÜÜXÙ\ËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+KˆÙXİ\š]RYˆ]ZY
+	ÜÙXİ\š]WÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆÙXİ\š]Y\ËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+KˆİÛ™\’Yˆ]ZY
+	ÛİÛ™\—ÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆ\Ù\œËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+KˆÚ[šÒ[™^ˆ[YÙ\Š	ØÚ[š×Ú[™^	ÊK››İ[
+
+KˆÚ[šÕ^ˆ^
+	ØÚ[š×İ^	ÊK››İ[
+
+KˆÚ[šÓ[™İˆ[YÙ\Š	ØÚ[š×Û[™İ	ÊK››İ[
+
+KˆÛÛ^™Y›Ü™Nˆ^
+	ØÛÛ^Ø™Y›Ü™IÊKˆÛÛ^Y\ˆ^
+	ØÛÛ^ØY\‰ÊKˆÙXİ[Û•]Nˆ^
+	ÜÙXİ[Û—İ]IÊKˆÙXİ[Û•\Nˆ^
+	ÜÙXİ[Û—İ\IÊKˆÚ[šÒ\Úˆ^
+	ØÚ[š×Ú\Ú	ÊK››İ[
+
+Kˆ[X™Y[™Ôİ]\Îˆ^
+	Ù[X™Y[™×Üİ]\ÉÊK››İ[
+
+K™Y˜][
+	Ü[™[™ÉÊKˆ[X™YY]ˆ[Y\İ[\
+	Ù[X™YYØ]	ËÈÚ][Y^›Û™NˆYHJKŸKOˆ
+ÂˆØİ[Y[Yˆ[™^
+	ØÚ[šÜ×ÙØİ[Y[ÚY	ÊK›ÛŠ™Øİ[Y[Y
+KˆÛÜšÜÜXÙRYˆ[™^
+	ØÚ[šÜ×İÛÜšÜÜXÙWÚY	ÊK›ÛŠÛÜšÜÜXÙRY
+KˆÙXİ\š]RYˆ[™^
+	ØÚ[šÜ×ÜÙXİ\š]WÚY	ÊK›ÛŠœÙXİ\š]RY
+KˆİÛ™\’Yˆ[™^
+	ØÚ[šÜ×ÛİÛ™\—ÚY	ÊK›ÛŠ›İÛ™\’Y
+Kˆİ]\ÒYˆ[™^
+	ØÚ[šÜ×Ù[X™Y[™×Üİ]\×ÚY	ÊK›ÛŠ™[X™Y[™Ôİ]\ÊKŸJJNÂ‚™^ÜÛÛœİØİ[Y[[X™Y[™ÜÈHÕX›J	ÙØİ[Y[Ù[X™Y[™ÜÉËÂˆYˆ]ZY
+	ÚY	ÊKœš[X\RÙ^J
+K™Y˜][˜[™ÛJ
+KˆÚ[šÒYˆ]ZY
+	ØÚ[š×ÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆØİ[Y[Ú[šÜËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+KˆØİ[Y[Yˆ]ZY
+	ÙØİ[Y[ÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆ[[YÙ[˜ÙQØİ[Y[ËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+KˆÛÜšÜÜXÙRYˆ]ZY
+	İÛÜšÜÜXÙWÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆÛÛ\[UÛÜšÜÜXÙ\ËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+KˆÙXİ\š]RYˆ]ZY
+	ÜÙXİ\š]WÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆÙXİ\š]Y\ËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+KˆİÛ™\’Yˆ]ZY
+	ÛİÛ™\—ÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆ\Ù\œËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+Kˆ[X™Y[™Îˆ™XİÜŠ	Ù[X™Y[™ÉËÈ[Y[œÚ[ÛœÎˆÍJK››İ[
+
+Kˆ[X™Y[™Ó[Ù[ˆ^
+	Ù[X™Y[™×Û[Ù[	ÊK››İ[
+
+K™Y˜][
+	İ^Y[X™Y[™ËL	ÊKˆÜ™X]Y]ˆ[Y\İ[\
+	ØÜ™X]YØ]	ËÈÚ][Y^›Û™NˆYHJK™Y˜][›İÊ
+K››İ[
+
+KŸKOˆ
+ÂˆØİ[Y[Yˆ[™^
+	Ù[X—ÙØİ[Y[ÚY	ÊK›ÛŠ™Øİ[Y[Y
+KˆÛÜšÜÜXÙRYˆ[™^
+	Ù[X—İÛÜšÜÜXÙWÚY	ÊK›ÛŠÛÜšÜÜXÙRY
+KˆÙXİ\š]RYˆ[™^
+	Ù[X—ÜÙXİ\š]WÚY	ÊK›ÛŠœÙXİ\š]RY
+KˆİÛ™\’Yˆ[™^
+	Ù[X—ÛİÛ™\—ÚY	ÊK›ÛŠ›İÛ™\’Y
+Kˆ™XİÜ’Yˆ[™^
+	ÙØİ[Y[Ù[X™Y[™Ü×Úœİ×ÚY	ÊK\Ú[™Ê	ÚœİÉË™[X™Y[™Ë›Ü
+	İ™XİÜ—ØÛÜÚ[™WÛÜÉÊJKÚ]
+ÈNˆM‹Y—ØÛÛœİXİ[ÛˆJKŸJJNÂ‚™^ÜÛÛœİ[™Ù\İ[Û’›ØœÈHÕX›J	Ú[™Ù\İ[Û—Ú›ØœÉËÂˆYˆ]ZY
+	ÚY	ÊKœš[X\RÙ^J
+K™Y˜][˜[™ÛJ
+KˆÛÜšÜÜXÙRYˆ]ZY
+	İÛÜšÜÜXÙWÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆÛÛ\[UÛÜšÜÜXÙ\ËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+KˆÙXİ\š]RYˆ]ZY
+	ÜÙXİ\š]WÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆÙXİ\š]Y\ËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+KˆİÛ™\’Yˆ]ZY
+	ÛİÛ™\—ÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆ\Ù\œËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+Kˆ›Ø•\Nˆ^
+	Ú›Ø—İ\IÊK››İ[
+
+Kˆİ]\Îˆ^
+	Üİ]\ÉÊK››İ[
+
+K™Y˜][
+	Ü]Y]YY	ÊKˆİ\Y]ˆ[Y\İ[\
+	Üİ\YØ]	ËÈÚ][Y^›Û™NˆYHJKˆÛÛ\]Y]ˆ[Y\İ[\
+	ØÛÛ\]YØ]	ËÈÚ][Y^›Û™NˆYHJKˆØİ[Y[Ñ\ØÛİ™\™Yˆ[YÙ\Š	ÙØİ[Y[×Ù\ØÛİ™\™Y	ÊK™Y˜][
+
+KˆØİ[Y[Ò[™Ù\İYˆ[YÙ\Š	ÙØİ[Y[×Ú[™Ù\İY	ÊK™Y˜][
+
+KˆÚ[šÜĞÜ™X]Yˆ[YÙ\Š	ØÚ[šÜ×ØÜ™X]Y	ÊK™Y˜][
+
+KˆÚ[šÜÑ[X™YYˆ[YÙ\Š	ØÚ[šÜ×Ù[X™YY	ÊK™Y˜][
+
+Kˆ\œ›Ü“Y\ÜØYÙNˆ^
+	Ù\œ›Ü—ÛY\ÜØYÙIÊKˆÙÒœÛÛˆœÛÛ˜Š	ÛÙ×ÚœÛÛ‰ÊK‰\Oİš[™Ö×OŠ
+KˆšYÙÙ\™YNˆ^
+	İšYÙÙ\™YØIÊK™Y˜][
+	ÜØÚY[IÊKŸKOˆ
+ÂˆÛÜšÜÜXÙRYˆ[™^
+	ÚZ—İÛÜšÜÜXÙWÚY	ÊK›ÛŠÛÜšÜÜXÙRY
+Kˆİ]\ÒYˆ[™^
+	ÚZ—Üİ]\×ÚY	ÊK›ÛŠœİ]\ÊKˆ\RYˆ[™^
+	ÚZ—İ\WÚY	ÊK›ÛŠš›Ø•\Kœİ]\ÊKŸJJNÂ‚™^ÜÛÛœİ˜YĞÛÛ™\œØ][ÛœÈHÕX›J	Ü˜Y×ØÛÛ™\œØ][ÛœÉËÂˆYˆ]ZY
+	ÚY	ÊKœš[X\RÙ^J
+K™Y˜][˜[™ÛJ
+KˆÛÜšÜÜXÙRYˆ]ZY
+	İÛÜšÜÜXÙWÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆÛÛ\[UÛÜšÜÜXÙ\ËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+KˆÙXİ\š]RYˆ]ZY
+	ÜÙXİ\š]WÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆÙXİ\š]Y\ËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+KˆİÛ™\’Yˆ]ZY
+	ÛİÛ™\—ÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆ\Ù\œËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+Kˆ\Ù\’Yˆ]ZY
+	İ\Ù\—ÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆ\Ù\œËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+Kˆ]Nˆ^
+	İ]IÊK™Y˜][
+	Ó™]ÈÛÛ™\œØ][Û‰ÊKˆÜ™X]Y]ˆ[Y\İ[\
+	ØÜ™X]YØ]	ËÈÚ][Y^›Û™NˆYHJK™Y˜][›İÊ
+K››İ[
+
+Kˆ\]Y]ˆ[Y\İ[\
+	İ\]YØ]	ËÈÚ][Y^›Û™NˆYHJK™Y˜][›İÊ
+K››İ[
+
+KŸKOˆ
+ÂˆÛÜšÜÜXÙRYˆ[™^
+	Ü˜Y×ØÛÛ—İÛÜšÜÜXÙWÚY	ÊK›ÛŠÛÜšÜÜXÙRY
+Kˆ\Ù\’Yˆ[™^
+	Ü˜Y×ØÛÛ—İ\Ù\—ÚY	ÊK›ÛŠ\Ù\’Y
+KŸJJNÂ‚™^Ü\H˜YĞÚ]][ÛˆHÈÚ[šÒYˆİš[™ÎÈØİ[Y[Yˆİš[™ÎÈØİ[Y[]Nˆİš[™ÎÈÛİ\˜ÙNˆİš[™ÎÈX›\ÚY]Nˆİš[™ÎÈ^Ù\œˆİš[™ÎÈ™[]˜[˜ÙTØÛÜ™Nˆ[X™\È\Ôš[X\TÛİ\˜ÙNˆ›ÛÛX[ˆNÂ™^ÜÛÛœİ˜YÓY\ÜØYÙ\ÈHÕX›J	Ü˜Y×ÛY\ÜØYÙ\ÉËÂˆYˆ]ZY
+	ÚY	ÊKœš[X\RÙ^J
+K™Y˜][˜[™ÛJ
+KˆÛÛ™\œØ][Û’Yˆ]ZY
+	ØÛÛ™\œØ][Û—ÚY	ÊKœ™Y™\™[˜Ù\Ê
+
+HOˆ˜YĞÛÛ™\œØ][ÛœËšYÈÛ‘[]Nˆ	ØØ\ØØYIÈJK››İ[
+
+Kˆ›ÛNˆ^
+	Ü›ÛIÊK››İ[
+
+KˆÛÛ[ˆ^
+	ØÛÛ[	ÊK››İ[
+
+KˆÚ]][ÛœÒœÛÛˆœÛÛ˜Š	ØÚ]][Ûœ×ÚœÛÛ‰ÊK‰\O˜YĞÚ]][Û–×OŠ
+Kˆ™]šY]™YÚ[šÜÒœÛÛˆœÛÛ˜Š	Ü™]šY]™YØÚ[šÜ×ÚœÛÛ‰ÊKˆ›Û\ÚÙ[œÎˆ[YÙ\Š	Ü›Û\İÚÙ[œÉÊKˆÛÛ\][Û•ÚÙ[œÎˆ[YÙ\Š	ØÛÛ\][Û—İÚÙ[œÉÊKˆ[Ù[ˆ^
+	Û[Ù[	ÊK™Y˜][
+	ÙÙ[Z[šKLKKY›\Ú	ÊKˆÜ™X]Y]ˆ[Y\İ[\
+	ØÜ™X]YØ]	ËÈÚ][Y^›Û™NˆYHJK™Y˜][›İÊ
+K››İ[
+
+KŸKOˆ
+ÈÛÛ™\œØ][Û’Yˆ[™^
+	Ü˜Y×Û\Ù×ØÛÛ™\œØ][Û—ÚY	ÊK›ÛŠ˜ÛÛ™\œØ][Û’Y
+HJJNÂ

@@ -74,7 +74,11 @@ export type Foundation = Awaited<ReturnType<typeof loadFoundation>>;
 export function sourceEvidence(data:Foundation):Record<string,string> {
   const evidence:Record<string,string>={};
   const add=(source:string,text:string)=>{evidence[source]=(evidence[source] ?? '')+'\n'+text;};
-  data.sources.forEach(source=>add(source,JSON.stringify(data.facts)));
+  // Attribute each observed value only to its own retained source, not every filing URL.
+  data.sources.forEach(source=>{
+    const rows=data.observations.filter(row=>row.source===source && row.currency===data.company.currency && row.date===data.fiscalDate && row.metric in data.facts && Number(row.value)===data.facts[row.metric]);
+    if(rows.length)add(source,JSON.stringify({currency:data.company.currency,fiscalDate:data.fiscalDate,observations:rows}));
+  });
   data.documents.forEach(row=>add(row.source,row.excerpt));
   data.peers.forEach(row=>add(row.sourceUrl,JSON.stringify(row)));
   data.estimates.forEach(row=>add(row.source,JSON.stringify(row)));

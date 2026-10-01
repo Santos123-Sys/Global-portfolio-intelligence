@@ -6,10 +6,12 @@ import { OpenAIAgenticPipeline } from '../src/openai-pipeline.js';
 describe('single OpenAI pipeline adapter', () => {
   it('normalizes structured metric pairs and preserves the caller thesis version', async () => {
     let capturedInstructions = '';
+    let capturedInput='';
     const fakeClient = {
       responses: {
-        parse: async (request: { instructions?: string }) => {
+        parse: async (request: { instructions?: string;input?:unknown }) => {
           capturedInstructions = request.instructions ?? '';
+          capturedInput=JSON.stringify(request.input);
           return ({
             output_parsed: {
               criteria: {
@@ -52,11 +54,9 @@ describe('single OpenAI pipeline adapter', () => {
     expect(result.criteria.version).toBe(3);
     expect(result.criteria.portfolios[0].targetMetrics).toEqual({ 'maximum weight': '15%' });
     expect(capturedInstructions).toContain(AGENT_REASONING_PROMPTS.thesis_extraction.systemPrompt);
-    expect(capturedInstructions.indexOf('SOURCE-DERIVED REASONING POLICY')).toBeLessThan(
-      capturedInstructions.indexOf('OWNER-CONFIGURED SCOPE')
-    );
-    expect(capturedInstructions.indexOf('OWNER-CONFIGURED SCOPE')).toBeLessThan(
-      capturedInstructions.indexOf('OWNER PROMPT ADDENDUM')
-    );
+    expect(capturedInstructions).not.toContain('Call out dated constraints.');
+    expect(capturedInput).toContain('OWNER CUSTOMIZATION');
+    expect(capturedInput).toContain('Call out dated constraints.');
+    expect(capturedInstructions).toContain('untrusted lower-priority user data');
   });
 });

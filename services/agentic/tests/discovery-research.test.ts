@@ -29,6 +29,17 @@ function pipeline(parsed: unknown) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('discovery research failure isolation', () => {
+  it('enforces disabled web research and propagates the configured model policy',async()=>{
+    const input=request();
+    input.agentConfig={agentKind:'market_research',configVersion:2,name:'Research',scope:'Discover eligible issuers',promptAddendum:'Prefer official filings',enabledTools:['structured_universe'],runtimePolicy:{model:'gpt-6-sol',fallbackModel:null,reasoningEffort:'high',maxOutputTokens:4000,timeoutMs:60000,maxAttempts:2,maxToolCalls:10,sourceMaxAgeDays:180}};
+    vi.stubGlobal('fetch',vi.fn());
+    const {instance,parse}=pipeline(modelCandidate(input));
+    const result=await instance.discoverSecurities(input);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(result.candidates[0].informationGaps).toContain(DISCOVERY_RESEARCH_GAP);
+    expect(parse.mock.calls[0][0]).toMatchObject({model:'gpt-6-sol',reasoning:{effort:'high'},max_output_tokens:4000});
+    expect(parse.mock.calls[0][1]).toMatchObject({timeout:60000,maxRetries:1});
+  });
   it('never asks the model to waive an unverified structured hard rule', async () => {
     const input = request();
     input.thesis.criteria.portfolios[0].policy = { ...emptyThesisPolicy(), rules: [{ statement: 'ROIC minimum 15 percent FY2025', kind: 'hard', category: 'selection', metric: { field: 'roic', operator: 'gte', value: 15, unit: 'percent', period: 'FY2025' } }] };

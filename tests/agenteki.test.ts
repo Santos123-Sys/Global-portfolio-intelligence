@@ -48,8 +48,8 @@ describe('output schema', () => {
     expect(r.success).toBe(false);
   });
 
-  it('rejects empty thesisBreakers — untested thinking', () => {
-    expect(AnalysisOutput.safeParse({ ...valid, thesisBreakers: [] }).success).toBe(false);
+  it('allows no evidenced thesis breakers instead of forcing hypothetical breaches', () => {
+    expect(AnalysisOutput.safeParse({ ...valid, thesisBreakers: [] }).success).toBe(true);
   });
 
   it('rejects out-of-range scores', () => {
