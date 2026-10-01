@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { authenticateRequest } from '@/lib/api-auth';
 import { db } from '@/lib/db';
-import { agentAnalysisSessions } from '@/lib/db/agent-schema';
+import { agentAnalysisSessions, agentSessionEvents } from '@/lib/db/agent-schema';
 import { dashboardData } from '@/lib/company-intelligence';
 import { analyzeSchema } from '@/lib/agent-finance/contracts';
 import { assertSameOrigin } from '@/lib/auth';
@@ -27,6 +27,7 @@ export async function POST(req: Request) {
     const active = await tx.select({ id: agentAnalysisSessions.id }).from(agentAnalysisSessions).where(and(eq(agentAnalysisSessions.ownerId, auth.auth.userId), inArray(agentAnalysisSessions.status, ['queued', 'running']))).limit(3);
     if (active.length >= 3) return null;
     const [created] = await tx.insert(agentAnalysisSessions).values({ ownerId: auth.auth.userId, securityId: data.securityId, sessionType: parsed.data.analysisType, requestPayload: parsed.data }).returning();
+    await tx.insert(agentSessionEvents).values({sessionId:created.id,eventType:'plan_created',summary:'Research queued: collect evidence, check statements, evaluate industry and review conclusions.',detail:'Research only. No orders, weight changes or automatic report acceptance. Pause and cancellation retain completed records.',authority:'autonomous',consequence:'low',reversible:1});
     return created;
   });
   if (!row) return NextResponse.json({ error: 'Three analyses are already active; wait before starting another.' }, { status: 429 });

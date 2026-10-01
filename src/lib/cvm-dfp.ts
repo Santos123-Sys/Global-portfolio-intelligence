@@ -2,11 +2,11 @@ import { unzipSync } from 'fflate';
 import type { InvestorRelationsFundamentals } from './investor-relations';
 
 const METRIC_CODES: Record<string, Record<string, string>> = {
-  DRE: { '3.01': 'revenue', '3.03': 'gross_profit', '3.05': 'operating_income', '3.11': 'net_income' },
+  DRE: { '3.01': 'revenue', '3.02':'cost_of_revenue','3.03': 'gross_profit', '3.05': 'operating_income', '3.11': 'net_income' },
   DFC_MI: { '6.01': 'operating_cash_flow' },
   DFC_MD: { '6.01': 'operating_cash_flow' },
-  BPA: { '1.01.01': 'cash_and_equivalents' },
-  BPP: { '2.03': 'total_equity' },
+  BPA: { '1':'total_assets','1.01':'current_assets','1.01.01': 'cash_and_equivalents','1.01.03':'accounts_receivable','1.01.04':'inventory' },
+  BPP: { '2.01':'current_liabilities','2.02':'noncurrent_liabilities','2.03': 'total_equity' },
 };
 const FILES = ['DRE', 'DFC_MI', 'DFC_MD', 'BPA', 'BPP'] as const;
 const archiveUrl = (year: number) => `https://dados.cvm.gov.br/dados/CIA_ABERTA/DOC/DFP/DADOS/dfp_cia_aberta_${year}.zip`;
@@ -75,6 +75,7 @@ export function extractCvmDfpArchive(archive: Uint8Array, year: number, cnpj: st
     else fundamentals[item.metric] = item.value;
   }
   for (const metric of conflicts) delete fundamentals[metric];
+  if(fundamentals.current_liabilities!=null && fundamentals.noncurrent_liabilities!=null) fundamentals.total_liabilities=fundamentals.current_liabilities+fundamentals.noncurrent_liabilities;
   if (!Object.keys(fundamentals).length) return null;
   return { fundamentals, currency: 'BRL', periodEnd: end, sourceUrl: archiveUrl(year),
     sourceName: `CVM DFP · ${facts[0].issuer} · version ${version}`,

@@ -35,6 +35,7 @@ export async function activeAgentSnapshot(ownerId:string,runId:string=ownerId):P
 }
 export function selectPrior(id:string,prior:Record<string,import('./agent-finance/contracts').AgentOutput>) {
   const specialists=['fundamental-analyst','technical-analyst','sentiment-analyst','ratio-analyst','quality-analyst'];
-  const allowed=id==='judge-agent' ? [...specialists,'bull-agent','bear-agent','sanity-checker','terminal-value'] : ['bull-agent','bear-agent'].includes(id) ? [...specialists,'sanity-checker','terminal-value'] : id==='analysis-director' || specialists.includes(id) ? ['sanity-checker','terminal-value'] : Object.keys(prior);
+  const context=['financial-statement-analyzer','market-industry-research'];
+  const allowed=id==='judge-agent' ? [...context,...specialists,'bull-agent','bear-agent','sanity-checker','terminal-value'] : ['bull-agent','bear-agent'].includes(id) ? [...context,...specialists,'sanity-checker','terminal-value'] : id==='analysis-director' || specialists.includes(id) ? [...context,'sanity-checker','terminal-value'] : Object.keys(prior);
   return Object.fromEntries(Object.entries(prior).filter(([key])=>allowed.includes(key) || key==='qa-feedback'));
 }

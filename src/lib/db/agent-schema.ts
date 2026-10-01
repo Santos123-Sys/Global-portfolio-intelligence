@@ -53,6 +53,15 @@ export const agentBeliefUpdates = pgTable('agent_belief_updates', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Semantic user-facing events; technical requests remain in operational run records. */
+export const agentSessionEvents = pgTable('agent_session_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sessionId: uuid('session_id').notNull().references(() => agentAnalysisSessions.id, { onDelete: 'cascade' }),
+  eventType: text('event_type').notNull(), summary: text('summary').notNull(), detail: text('detail'),
+  agent: text('agent'), authority: text('authority').notNull(), consequence: text('consequence').notNull(),
+  reversible: integer('reversible').notNull().default(1),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('agent_session_events_session_idx').on(table.sessionId, table.occurredAt)]);
 export const agentToolTraces = pgTable('agent_tool_traces', {
   id: uuid('id').primaryKey().defaultRandom(),
   sessionId: uuid('session_id').notNull().references(() => agentAnalysisSessions.id, { onDelete: 'cascade' }),

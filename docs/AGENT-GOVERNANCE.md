@@ -4,7 +4,7 @@
 
 The existing four-layer architecture, PostgreSQL/Drizzle infrastructure, Next.js routes, Railway finance worker, NewsAdapter and deterministic finance engines remain in place. There is no migration to an autonomous-agent framework and no trading capability.
 
-The shared contract registry contains 23 identities: four legacy agents, eight DCF agents, nine Analysis Swarm agents, the research director and the quality validator. Market-adaptive modules inside legacy Security Analysis inherit its model policy; they remain internal modules, not separately configurable autonomous agents.
+The shared contract registry contains 26 identities: four legacy agents, eight DCF agents, nine original Analysis Swarm agents, the research director, the quality validator, the deterministic financial statement analyzer, market-industry research and the optional value-scorecard analyst. Market-adaptive modules inside legacy Security Analysis inherit its model policy; they remain internal modules, not separately configurable autonomous agents.
 
 ## Priorities delivered
 
@@ -57,7 +57,7 @@ An optional Next.js `after()` kick runs one pair when a dashboard API key is ava
 2. Deploy both dashboard and Agentic Worker from this revision (`npm run build:agentic` rebuilds the bundled finance runtime and shared contract).
 3. Keep the existing `FINANCE_DATABASE_URL` on the worker pointing at the dashboard/finance database. The worker needs its existing `OPENAI_API_KEY`; no credential belongs in browser/public variables.
 4. Confirm the existing finance worker or authorized `/api/cron/agent-finance` caller is running.
-5. Open Agent Settings and check all 23 registry identities, historical versions, policy previews and current model settings.
+5. Open Agent Settings and check all 26 registry identities, historical versions, policy previews and current model settings. Financial/industry/scorecard integration and migration 0024 are documented in `AGENTIC-EQUITY-RESEARCH-PLAN.md`.
 6. Test disabled web search, tool denials, session scope, immutable snapshots and rollback in a staging environment.
 7. Explicitly start paid diagnostics; then run real issuer fixtures with reviewed source data before broad promotion.
 

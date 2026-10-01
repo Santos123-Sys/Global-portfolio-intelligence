@@ -3,21 +3,25 @@ import { useEffect, useState } from 'react';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { AgentOutput, AnalyzeRequest } from '@/lib/agent-finance/contracts';
 import {driverSchema,capitalSchema,type Drivers} from '@/lib/agent-finance/l4/financial-model';
+import { AgentRunStatus, StatementAnalysisSummary, type RunEvent, type RunBriefing } from './agent-run-status';
+import type { SessionAction } from '@/lib/agent-finance/l3/session-control';
+import { useLanguage } from '@/lib/i18n';
 
 interface Session {
   id: string; status: string; phase: string; progress: number; error?: string | null;
   agentsCompleted?: string[]; agentsPending?: string[];
   requestPayload?:AnalyzeRequest;
-  finalOutput?: { status?:string; outputs: Record<string, AgentOutput>; confidenceScore: number; limitations: string[] } | null;
+  events?:RunEvent[];briefing?:RunBriefing;
+  partialOutputs?:Record<string,AgentOutput>;
+  finalOutput?: { status?:string; outputs: Record<string, AgentOutput>; confidenceScore: number; limitations: string[];valueScorecard?:{status:string;total:number|null;coverage?:number} } | null;
 }
-const screens: Record<string, string> = { research: 'loading_research_phase.html', analysis: 'loading_financial_analysis.html', valuation: 'loading_valuation_phase.html' };
 
 export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; securityId: string; viewer: boolean }) {
+  const {language}=useLanguage();
   const [type, setType] = useState<AnalyzeRequest['analysisType']>('combined');
   const [session, setSession] = useState<Session | null>(null);
   const [history, setHistory] = useState<Session[]>([]);
   const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
-  const [frameFailed, setFrameFailed] = useState(false);
   const [growth, setGrowth] = useState(''); const [wacc, setWacc] = useState(''); const [terminal, setTerminal] = useState('');
   const [scopes,setScopes]=useState<Array<{portfolioId:string;thesisVersionId:string;name:string}>>([]);
   const [scope,setScope]=useState('');
@@ -28,35 +32,43 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
   const [editDrivers,setEditDrivers]=useState(false),[editCapital,setEditCapital]=useState(false);
   const [driverInputs,setDriverInputs]=useState<Partial<Record<keyof Drivers,string>>>({});
   const [capitalInputs,setCapitalInputs]=useState<Record<string,string>>({});
+  const [financialPeriods,setFinancialPeriods]=useState<Record<string,{days:string;sourceQuality:string}>>({});
   const active = session?.status === 'queued' || session?.status === 'running';
   const sessionId = session?.id;
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/agents/sessions?securityId=${encodeURIComponent(securityId)}`).then(async response => {
+    const controller=new AbortController();setSession(null);setHistory([]);setScopes([]);setScope('');
+    fetch(`/api/agents/sessions?securityId=${encodeURIComponent(securityId)}`,{signal:controller.signal}).then(async response => {
       const body = await response.json(); if (!response.ok) throw new Error(body.error ?? 'Unable to load history');
-      if (!cancelled) { setHistory(body.sessions); setScopes(body.scopes ?? []); if(body.scopes?.length===1) setScope(body.scopes[0].portfolioId); if (body.sessions[0]) setSession(body.sessions[0]); }
+      if (!cancelled) { setHistory(body.sessions); setScopes(body.scopes ?? []); if(body.scopes?.length===1) setScope(body.scopes[0].portfolioId); }
+      if(body.sessions[0] && !cancelled) {
+        const detail=await fetch(`/api/agents/sessions/${body.sessions[0].id}`,{signal:controller.signal});
+        if(!detail.ok)throw new Error('Unable to load the retained research run');
+        const saved=await detail.json();if(!cancelled)setSession(saved);
+      }
     }).catch(e => { if (!cancelled) setError(String(e.message)); });
-    return () => { cancelled = true; };
+    return () => { cancelled = true; controller.abort(); };
   }, [securityId]);
   useEffect(() => {
     if (!sessionId || !active) return;
     let cancelled = false;
+    const controller=new AbortController(); let timer:ReturnType<typeof setTimeout>;
     async function poll() {
       try {
-        const response = await fetch(`/api/agents/sessions/${sessionId}`); const body = await response.json();
+        const response = await fetch(`/api/agents/sessions/${sessionId}`,{signal:controller.signal}); const body = await response.json();
         if (!response.ok) throw new Error(body.error ?? 'Unable to load session');
-        if (!cancelled) { setSession(body); setError(''); }
+        if (!cancelled) { setSession(current=>current?.id===sessionId ? body : current); setError(''); }
       } catch (e) { if (!cancelled) setError(e instanceof Error ? e.message : 'Polling failed'); }
+      if(!cancelled) timer=setTimeout(()=>void poll(),2500);
     }
-    void poll(); const timer = setInterval(() => void poll(), 2500);
-    return () => { cancelled = true; clearInterval(timer); };
+    void poll();
+    return () => { cancelled = true; controller.abort(); clearTimeout(timer); };
   }, [sessionId, active]);
-  useEffect(() => setFrameFailed(false), [session?.phase]);
-  useEffect(()=>{setAccepted('');setReview({});},[sessionId]);
+  useEffect(()=>{setAccepted('');setReview({});setFinancialPeriods({});},[sessionId]);
   async function start() {
     setBusy(true); setError('');
     try {
-      const body: AnalyzeRequest = { ticker, analysisType: type };
+      const body: AnalyzeRequest = { ticker, analysisType: type,researchProfile:{locale:language==='pt'?'pt-BR':language} };
       const selected=scopes.find(row=>row.portfolioId===scope); if(selected) {body.portfolioId=selected.portfolioId;body.thesisVersionId=selected.thesisVersionId;}
       if (growth || wacc || terminal) body.userOverrides = { discountRate: wacc ? Number(wacc) / 100 : undefined,
         assumptions: { annualGrowthRate: growth ? Number(growth) / 100 : undefined, terminalGrowthRate: terminal ? Number(terminal) / 100 : undefined } };
@@ -68,7 +80,28 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
       setSession({ id: result.sessionId, status: result.status, phase: 'research', progress: 0 });
     } catch (e) { setError(e instanceof Error ? e.message : 'Unable to start'); } finally { setBusy(false); }
   }
+  async function control(action:SessionAction) {
+    if(!sessionId || (action==='cancel' && !window.confirm('Cancel this research run? Completed records remain available; no portfolio action will be taken.'))) return;
+    setBusy(true);setError('');
+    try {
+      const response=await fetch(`/api/agents/sessions/${sessionId}/control`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,confirmed:true})});
+      const body=await response.json();if(!response.ok) throw new Error(body.error ?? 'Unable to change run state');
+      setSession(current=>current?.id===sessionId ? {...current,status:body.status} : current);
+      const updated=await fetch(`/api/agents/sessions/${sessionId}`); if(!updated.ok) throw new Error('Control succeeded, but the updated timeline could not be loaded. Refresh this page.');
+      const detail=await updated.json();setSession(current=>current?.id===sessionId ? detail : current);
+    } catch(error) {setError(error instanceof Error ? error.message : 'Run control failed');} finally {setBusy(false);}
+  }
   const outputs = session?.finalOutput?.outputs;
+  const pendingFinancials=session?.partialOutputs?.['financial-statement-analyzer'];
+  const pendingPeriods=Array.isArray(pendingFinancials?.data.metrics) ? pendingFinancials.data.metrics as Array<{date:string}> : [];
+  async function reviewFinancialInputs() {
+    if(!sessionId) return;setBusy(true);setError('');
+    try {
+      const response=await fetch(`/api/agents/sessions/${sessionId}/financial-review`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({confirmed:true,periods:pendingPeriods.map(period=>({date:period.date,days:Number(financialPeriods[period.date]?.days),sourceQuality:financialPeriods[period.date]?.sourceQuality ?? 'unknown'}))})});
+      const body=await response.json();if(!response.ok) throw new Error(body.error ?? 'Review could not be saved');
+      setSession(current=>current?.id===sessionId ? {...current,status:body.status} : current);
+    } catch(error) {setError(error instanceof Error ? error.message : 'Financial input review failed');} finally {setBusy(false);}
+  }
   const sensitivity = outputs?.['sensitivity-analyst']?.data.scenarios as Array<{ scenario: string; fairValuePerShare: number }> | undefined;
   const sensitivityData=outputs?.['sensitivity-analyst']?.data;
   const matrix=sensitivityData?.matrix as Array<{discountRate:number;terminalGrowthRate:number;fairValuePerShare:number|null}> | undefined;
@@ -88,6 +121,7 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
   return <section className="card glow-card">
     <h2>Agent Analysis</h2>
     <p className="note">Research Director · DCF Swarm · Analysis Swarm. Evidence-backed research, never automatic trading.</p>
+    <details><summary>Research plan and authority</summary><ol><li>Collect existing filings, provider evidence and NewsAdapter articles.</li><li>Run deterministic financial-statement checks and sector-specific industry research.</li><li>Build reviewed valuation scenarios and specialist interpretations.</li><li>Compare bull and bear cases; independent judge reviews the conclusions.</li><li>You review and explicitly accept the report. No timeout or confidence score can authorize trading or weight changes.</li></ol><p className="note">Value scoring is optional and must be enabled in the approved thesis. Its total is unavailable when financial-data quality or source coverage is insufficient.</p></details>
     {!viewer && <div className="form-grid">
       {scopes.length>0 && <label>Portfolio and active thesis<select value={scope} onChange={e=>setScope(e.target.value)}><option value="">Select portfolio</option>{scopes.map(row=><option key={`${row.portfolioId}:${row.thesisVersionId}`} value={row.portfolioId}>{row.name}</option>)}</select></label>}
       <label>Analysis type<select value={type} onChange={e => setType(e.target.value as AnalyzeRequest['analysisType'])}><option value="combined">Combined research</option><option value="dcf">DCF valuation</option><option value="fundamental">Financial analysis</option><option value="quick">Quick analysis (no debate)</option></select></label>
@@ -103,14 +137,13 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
       {editCapital && <>{['riskFreeRate','beta','equityRiskPremium','countryRiskPremium','costOfDebt','taxRate','debtWeight'].map(key=><label key={key}>{key} {key==='beta' ? '' : '(%)'}<input type="number" step=".01" value={capitalInputs[key] ?? ''} onChange={e=>setCapitalInputs({...capitalInputs,[key]:e.target.value})}/></label>)}<label>Currency (ISO code)<input value={capitalInputs.currency ?? ''} onChange={e=>setCapitalInputs({...capitalInputs,currency:e.target.value.toUpperCase()})}/></label><label>Source date<input type="date" value={capitalInputs.asOf ?? ''} onChange={e=>setCapitalInputs({...capitalInputs,asOf:e.target.value})}/></label><label>Source URLs (one per line)<textarea value={capitalInputs.sources ?? ''} onChange={e=>setCapitalInputs({...capitalInputs,sources:e.target.value})}/></label></>}
     </div>}
     {error && <p role="alert" className="error-text">{error}</p>}
-    {active && <div role="status" aria-live="polite">
-      {!frameFailed ? <iframe src={`/loading/${screens[session?.phase ?? 'research'] ?? screens.research}`} title={`Agent phase: ${session?.phase}`} sandbox="" onError={() => setFrameFailed(true)} style={{ width: '100%', height: 280, border: 0, borderRadius: 12 }} /> : <p>Processing {session?.phase}…</p>}
-      <progress value={session?.progress ?? 0} max={100} aria-label="Completed agent tasks" />
-      <p>{session?.progress ?? 0}% · {session?.agentsCompleted?.length ?? 0} agents finished. Live status, not a time estimate.</p>
-    </div>}
-    {session?.status === 'failed' && <p role="alert">{session.error ?? 'Analysis failed. Start a new run.'}</p>}
+    {session && <AgentRunStatus status={session.status} progress={session.progress} events={session.events} briefing={session.briefing} busy={busy} viewer={viewer} onControl={action=>void control(action)}/>}
+    {session?.status==='awaiting_approval' && pendingFinancials && <section className="card glass-panel"><StatementAnalysisSummary output={pendingFinancials}/><h3>Review retained financial inputs</h3><p>Check these annual statement dates, actual period lengths and source categories against the linked filings. This confirms retained inputs; it does not fill gaps or authorize investment decisions.</p>{!viewer && <form onSubmit={event=>{event.preventDefault();void reviewFinancialInputs();}}><div className="form-grid">{pendingPeriods.map(period=><fieldset key={period.date}><legend>{period.date}</legend><label>Actual annual period length (days)<input type="number" required min="330" max="380" value={financialPeriods[period.date]?.days ?? ''} onChange={event=>setFinancialPeriods(current=>({...current,[period.date]:{days:event.target.value,sourceQuality:current[period.date]?.sourceQuality ?? 'unknown'}}))}/></label><label>Reviewed source category<select value={financialPeriods[period.date]?.sourceQuality ?? 'unknown'} onChange={event=>setFinancialPeriods(current=>({...current,[period.date]:{days:current[period.date]?.days ?? '',sourceQuality:event.target.value}}))}><option value="unknown">Unknown / not verified</option><option value="primary">Primary issuer / regulatory filing</option><option value="official_api">Official API</option><option value="licensed_data">Licensed data provider</option><option value="secondary">Secondary source</option></select></label></fieldset>)}</div><details><summary>Retained source references</summary><ul>{pendingFinancials.citations.map(source=><li key={source}>{/^https?:\/\//.test(source)?<a href={source} target="_blank" rel="noreferrer">{source}</a>:source}</li>)}</ul></details><button className="action-button" type="submit" disabled={busy}>Confirm reviewed inputs and continue research</button><p className="note">Secondary or unknown provenance continues to withhold automatic totals. Approval is never inferred from elapsed time.</p></form>}</section>}
+    {session?.status === 'failed' && <p role="alert">{session.error ?? 'Analysis failed. Inspect the timeline and retry after correcting the missing inputs.'}</p>}
     {outputs && <>
       <p className="caveat">Human review required · Evidence confidence {session.finalOutput!.confidenceScore}/100</p>
+      {outputs['financial-statement-analyzer'] && <StatementAnalysisSummary output={outputs['financial-statement-analyzer']}/>}
+      {session.finalOutput!.valueScorecard && <section className="card"><h3>Optional Value Quality Scorecard</h3><p>{session.finalOutput!.valueScorecard!.status.replaceAll('_',' ')} · Total: {session.finalOutput!.valueScorecard!.total?.toFixed(1) ?? 'Unavailable'}</p><p className="note">A thesis-configured research lens; never an automatic buy/sell recommendation.</p></section>}
       {sensitivity && <ResponsiveContainer width="100%" height={260}><BarChart data={sensitivity}><XAxis dataKey="scenario"/><YAxis/><Tooltip/><Bar dataKey="fairValuePerShare" fill="#14b8a6"/></BarChart></ResponsiveContainer>}
       {matrix && <details><summary>WACC / terminal growth sensitivity</summary><div className="table-scroll"><table><thead><tr><th>WACC</th><th>Terminal growth</th><th>Value per share</th></tr></thead><tbody>{matrix.map((row,i)=><tr key={i}><td>{(row.discountRate*100).toFixed(2)}%</td><td>{(row.terminalGrowthRate*100).toFixed(2)}%</td><td>{row.fairValuePerShare?.toFixed(2) ?? 'Invalid rates'}</td></tr>)}</tbody></table></div></details>}
       {tornado && <><h3>Driver sensitivity</h3><ResponsiveContainer width="100%" height={260}><BarChart data={tornado} layout="vertical"><XAxis type="number"/><YAxis type="category" dataKey="driver" width={140}/><Tooltip/><Bar dataKey="low" fill="#22c55e"/><Bar dataKey="high" fill="#14b8a6"/></BarChart></ResponsiveContainer></>}
@@ -120,7 +153,8 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
       {Object.entries(outputs).map(([name, output]) => <details key={name} className="card">
         <summary>{name.replaceAll('-', ' ')} · {output.status.replaceAll('_', ' ')} · {output.confidenceScore}/100</summary>
         <h3>Evidence and calculation summary</h3><ul>{output.reasoningChain.map((item, i) => <li key={i}>{item}</li>)}</ul>
-        <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{JSON.stringify(output.data, null, 2)}</pre>
+        <details><summary>Structured calculations and technical payload</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{JSON.stringify(output.data, null, 2)}</pre></details>
+        {output.sourceLineage?.length ? <details><summary>Source lineage ({output.sourceLineage.length})</summary><ul>{output.sourceLineage.map((source,index)=><li key={index}>{source.field} · {source.provider} · {source.asOf} · {source.quality}</li>)}</ul></details> : null}
         {output.limitations.length > 0 && <><h4>Limitations</h4><ul>{output.limitations.map((item, i) => <li key={i}>{item}</li>)}</ul></>}
         <h4>Sources</h4><ul>{output.citations.map((source, i) => <li key={i}>{/^https?:\/\//.test(source) ? <a href={source} target="_blank" rel="noreferrer">{source}</a> : source}</li>)}</ul>
       </details>)}

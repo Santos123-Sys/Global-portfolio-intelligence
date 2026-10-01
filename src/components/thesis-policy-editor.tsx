@@ -48,6 +48,13 @@ export function ThesisPolicyEditor({
   return (
     <div className="setup-form">
       <details>
+        <summary>Research language and optional value lens</summary>
+        <p className="note">The scorecard is a sector-relative research lens, not a buy/sell rule. Changes are saved with the approved thesis. Missing evidence is not scored as poor performance.</p>
+        <label>Research language<select value={policy.research?.locale ?? 'en'} onChange={event=>onChange({...policy,research:{...policy.research,locale:event.target.value as 'pt-BR'|'en'|'de'|'es'}})}><option value="en">English</option><option value="pt-BR">Português (Brasil)</option><option value="de">Deutsch</option><option value="es">Español</option></select></label>
+        <label><input type="checkbox" checked={policy.research?.valueScorecard?.enabled ?? false} onChange={event=>onChange({...policy,research:{locale:policy.research?.locale ?? 'en',valueScorecard:{enabled:event.target.checked,weights:policy.research?.valueScorecard?.weights ?? {moat:.25,management:.25,financials:.25,valuation:.25},minimumEvidenceCoverage:policy.research?.valueScorecard?.minimumEvidenceCoverage ?? .8}}})}/>Enable Value Quality Scorecard</label>
+        {policy.research?.valueScorecard?.enabled && <div className="setup-form-row">{(['moat','management','financials','valuation'] as const).map(dimension=><label key={dimension}>{dimension} weight (%)<input type="number" min="0" max="100" value={policy.research!.valueScorecard!.weights[dimension]*100} onChange={event=>onChange({...policy,research:{...policy.research!,valueScorecard:{...policy.research!.valueScorecard!,weights:{...policy.research!.valueScorecard!.weights,[dimension]:Number(event.target.value)/100}}}})}/></label>)}<label>Required evidence coverage (%)<input type="number" min="50" max="100" value={policy.research.valueScorecard.minimumEvidenceCoverage*100} onChange={event=>onChange({...policy,research:{...policy.research!,valueScorecard:{...policy.research!.valueScorecard!,minimumEvidenceCoverage:Number(event.target.value)/100}}})}/></label><p className="note">Weights must sum to 100%. Automatic totals require verified financial data; final decisions always require human review.</p></div>}
+      </details>
+      <details>
         <summary>Mandate and portfolio rules</summary>
         <div className="setup-form-row">
           {(

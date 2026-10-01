@@ -10,6 +10,19 @@ export interface InvestorRelationsFundamentals {
 }
 
 const XBRL_METRICS: Record<string, string> = {
+  'us-gaap:AccountsReceivableNetCurrent':'accounts_receivable',
+  'us-gaap:AccountsPayableCurrent':'accounts_payable',
+  'us-gaap:InventoryNet':'inventory',
+  'us-gaap:Goodwill':'goodwill',
+  'us-gaap:Liabilities':'total_liabilities',
+  'us-gaap:CostOfRevenue':'cost_of_revenue',
+  'us-gaap:CostOfGoodsAndServicesSold':'cost_of_revenue',
+  'ifrs-full:TradeReceivables':'accounts_receivable',
+  'ifrs-full:TradePayables':'accounts_payable',
+  'ifrs-full:Inventories':'inventory',
+  'ifrs-full:Goodwill':'goodwill',
+  'ifrs-full:Liabilities':'total_liabilities',
+  'ifrs-full:CostOfSales':'cost_of_revenue',
   'us-gaap:Assets': 'total_assets',
   'us-gaap:AssetsCurrent': 'current_assets',
   'us-gaap:LiabilitiesCurrent': 'current_liabilities',

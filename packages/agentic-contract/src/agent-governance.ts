@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const GOVERNANCE_VERSION = 2;
+export const GOVERNANCE_VERSION = 3;
 export const runtimePolicySchema = z.object({
   model: z.string().trim().min(1).max(100).default('gpt-6-sol'),
   fallbackModel:z.string().trim().min(1).max(100).nullable().default(null),
@@ -30,7 +30,7 @@ const specialists = {
   'technical-analyst': 'Interpret supplied deterministic technical indicators only. Null indicators and unadjusted prices are limitations, not neutral signals.',
   'sentiment-analyst': 'Assess available dated news, management disclosures and tone. Do not infer sentiment from missing transcripts or social feeds.',
   'ratio-analyst': 'Interpret supplied ratios with matching fiscal periods and currency. Flag zero denominators and unavailable ratios.',
-  'quality-analyst': 'Assess cash conversion, accruals and accounting quality. Missing footnotes prevent a comprehensive quality conclusion.',
+  'quality-analyst': 'Interpret the supplied financial-statement-analyzer metrics, sector-suppressed signals and data-quality status without recalculating them. Assess cash conversion, accruals and accounting quality. Signals are not proof of misconduct. Missing footnotes prevent a comprehensive quality conclusion.',
   'bull-agent': 'Build the strongest cited bull case. Identify assumptions and rebut specific bear risks without suppressing counterevidence.',
   'bear-agent': 'Build the strongest cited bear case. Distinguish evidenced breakers from prospective monitoring triggers.',
   'judge-agent': 'Resolve bull/bear disagreements claim by claim. Reject unsupported claims rather than average them. Return a scorecard, unresolvedDisagreements, swingFactors, monitoringTriggers and evidencedThesisBreakers. Copy price targets only from supplied deterministic outputs or null.',
@@ -44,6 +44,9 @@ export const AGENT_REGISTRY: AgentDefinition[] = [
   {id:'quality-validator',layer:'L3 validation',execution:'model',objective:'Verify source entailment, coverage, dates, units, currencies and contradictions independently of the authoring pass.',tools:['deliver_message','verify_claims']},
   ...dcf.map(id=>({id,layer:'DCF Swarm',execution:'deterministic' as const,objective:`Run the registered ${id} calculation with reviewed inputs; never use prompt text as financial parameters.`,tools:['deliver_message','run_dcf']})),
   {id:'analysis-director',layer:'Analysis Swarm',execution:'deterministic',objective:'Plan independent specialists and opposing cases.',tools:['deliver_message']},
+  {id:'financial-statement-analyzer',layer:'L4 financial computation',execution:'deterministic',objective:'Calculate normalized financial metrics and sector-aware screening signals from retained evidence.',tools:['deliver_message','analyze_financial_statements']},
+  {id:'market-industry-research',layer:'Analysis Swarm',execution:'model',objective:'Apply relevant industry modules to attributed evidence; distinguish sourced market sizing from assumptions.',tools:['deliver_message','research_market_structure']},
+  {id:'value-scorecard-analyst',layer:'Analysis Swarm',execution:'model',objective:'Evaluate the 20 approved thesis criteria with exact source evidence. Missing or inapplicable criteria remain unscored; totals are deterministic and review-only.',tools:['deliver_message','calculate_value_scorecard']},
   ...Object.entries(specialists).map(([id,objective])=>({id,layer:'Analysis Swarm',execution:'model' as const,objective,tools:['deliver_message',...(id==='technical-analyst' ? ['fetch_price_history'] : id==='sentiment-analyst' ? ['fetch_news','query_documents'] : ['fundamental-analyst','ratio-analyst','quality-analyst'].includes(id) ? ['fetch_financial_statements'] : [])]})),
 ];
 export function agentDefinition(id:string):AgentDefinition {
