@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { PortfolioWorkspaceNav } from '@/components/portfolio-workspace-nav';
 
 type Severity = 'info' | 'watch' | 'breach';
@@ -10,10 +9,9 @@ interface GovernanceData {
   construction: Array<{ portfolioName: string; currency: string; mandateStatus: 'active' | 'holdings_only'; holdingCount: number; weightsAvailable: boolean; weightSource: string | null; weightReason: string | null; issues: Array<{ severity: Severity; label: string; detail: string }>; sectors: Array<{ name: string; weight: number }>; countries: Array<{ name: string; weight: number }>; holdings: Array<{ ticker: string; companyName: string; weight: number | null }>; attribution: Array<{ ticker: string; contribution: number; dataAsOf: string | null }>; riskAsOf: string | null }>;
   freshness: Array<{ portfolioName: string; ticker: string; companyName: string; priceAgeDays: number | null; analysisAgeDays: number | null; evidenceAgeDays: number | null; priceStatus: string; evidenceStatus: string; analysisStatus: string; lastPriceDate: string | null; latestProvider: string | null }>;
   reviewQueue: Array<{ severity: Severity; title: string; detail: string; portfolioName: string | null; ticker: string | null; category: string }>;
-  providerHealth: Array<{ provider: string; endpoint: string; ok: number; errors: number; planLimits: number; rateLimited: number; lastCalledAt: string }>;
   committeeMemos: Array<{ candidateId: string; companyName: string; ticker: string; portfolioName: string; decision: string; thesisVersion: number | null; investmentThesis: string | null; catalysts: string[]; risks: string[]; gaps: string[]; evidenceAsOf: string | null; valuation: { currency: string; fairValuePerShare: number; terminalShare: number | null; caveats: string[] } | null; journal: Record<string, string> | null; decisionDate: string | null }>;
   valuationCoverage: { total: number; dcf: number; comparables: number; latest: Array<{ candidate: string; method: string; createdAt: string; status: string }> };
-  versioning: { thesisVersions: Array<{ version: number; effectiveDate: string; supersededAt: string | null; excludedAt: string | null }>; decisions: Array<{ title: string; decision: string; date: string; metadata: { thesisVersionId?: string; valuationScenarioId?: string; evidenceAsOf?: string } | null }> };
+  eventEvidenceCount: number;
   monitoringCoverage: Array<{ capability: string; status: string; detail: string }>;
 }
 
@@ -24,7 +22,6 @@ export function GovernanceDashboard() {
   const [data, setData] = useState<GovernanceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -38,9 +35,6 @@ export function GovernanceDashboard() {
   }
   useEffect(() => {
     void load();
-    fetch('/api/auth/session').then((response) => response.ok ? response.json() : null)
-      .then((session) => setIsPlatformAdmin(Boolean(session?.account?.isPlatformAdmin)))
-      .catch(() => undefined);
   }, []);
   const queue = useMemo(() => data?.reviewQueue ?? [], [data]);
 
@@ -57,7 +51,7 @@ export function GovernanceDashboard() {
       <article className="card"><span>Review queue</span><strong>{queue.length}</strong><p>{queue.filter((item) => item.severity === 'breach').length} breaches · {queue.filter((item) => item.severity === 'watch').length} watch items</p></article>
       <article className="card"><span>Valuation scenarios</span><strong>{data.valuationCoverage.total}</strong><p>{data.valuationCoverage.dcf} DCF · {data.valuationCoverage.comparables} comparables</p></article>
       <article className="card"><span>Freshness coverage</span><strong>{data.freshness.filter((item) => item.priceStatus === 'current').length}/{data.freshness.length}</strong><p>holdings with current price evidence</p></article>
-      <article className="card"><span>Thesis versions</span><strong>{data.versioning.thesisVersions.length}</strong><p>Immutable decisions retain the context available when made.</p></article>
+      <article className="card"><span>Event evidence</span><strong>{data.eventEvidenceCount}</strong><p>indexed filings and news records monitored for review events</p></article>
     </section>
 
     <section className="card governance-section">
@@ -91,8 +85,5 @@ export function GovernanceDashboard() {
 
     <section className="card governance-section"><h2>Monitoring coverage</h2><div className="governance-coverage">{data.monitoringCoverage.map((item) => <article key={item.capability}><strong>{item.capability}</strong><span className={`badge ${item.status === 'active' ? 'ok' : 'watch'}`}>{item.status.replace('_', ' ')}</span><p>{item.detail}</p></article>)}</div></section>
 
-    <section className="card governance-section"><h2>Provider health</h2><p className="note">Aggregated call outcomes are operational diagnostics; no credentials or request payloads are exposed here.</p>{data.providerHealth.length === 0 ? <p className="note">No provider calls have been recorded.</p> : <div className="table-scroll"><table><thead><tr><th>Provider</th><th>Endpoint</th><th>OK</th><th>Errors</th><th>Plan limits</th><th>Rate limits</th><th>Last call</th></tr></thead><tbody>{data.providerHealth.map((item) => <tr key={`${item.provider}:${item.endpoint}`}><td>{item.provider}</td><td><code>{item.endpoint}</code></td><td>{item.ok}</td><td>{item.errors}</td><td>{item.planLimits}</td><td>{item.rateLimited}</td><td>{new Date(item.lastCalledAt).toLocaleString()}</td></tr>)}</tbody></table></div>}</section>
-
-    <section className="card governance-section" id="decision-history"><h2>Thesis and decision history</h2><p className="note">Historical decisions remain append-only. Optional monitoring guardrails now sit with the investment thesis.</p><div className="governance-versioning"><div><strong>Thesis history</strong>{data.versioning.thesisVersions.map((thesis) => <p key={thesis.version}>Version {thesis.version} · effective {new Date(thesis.effectiveDate).toLocaleDateString()}{thesis.excludedAt ? ' · excluded' : thesis.supersededAt ? ' · superseded' : ' · active'}</p>)}</div><div><strong>Recent immutable decisions</strong>{data.versioning.decisions.map((decision, index) => <p key={`${decision.date}:${index}`}>{new Date(decision.date).toLocaleDateString()} · {decision.decision} · {decision.title}{decision.metadata?.thesisVersionId ? ' · thesis snapshot retained' : ''}</p>)}{isPlatformAdmin && <Link className="text-link" href="/decisions">Search full decision log →</Link>}</div></div><Link className="text-link" href="/investment-thesis#portfolio-guardrails">Review optional thesis guardrails →</Link></section>
   </main>;
 }

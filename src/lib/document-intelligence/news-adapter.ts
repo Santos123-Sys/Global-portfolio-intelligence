@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '../db';
 import { companyWorkspaces, intelligenceDocuments } from '../db/workflow-schema';
 import { indexTextDocument } from './ingestion-pipeline';
+import { classifyMonitoredEvents, publishMonitoredEventAlerts } from './alerts/event-monitoring';
 
 export interface NewsArticle { id: string | number; ticker: string; title: string; summary?: string; content?: string; source?: string; url: string; published_date?: string; sentiment?: unknown; relevance_score?: unknown; keywords?: unknown; ai_summary?: unknown; word_count?: unknown }
 export interface NewsSource { getArticles(ticker: string, options: { days: number }): Promise<NewsArticle[]> }
@@ -32,7 +33,12 @@ export async function syncNewsArticles(workspaceId: string, ownerId: string, sec
       if (byHash) continue;
     }
     const [document] = await db.insert(intelligenceDocuments).values({ workspaceId, securityId, ownerId, folderType: 'NEWS_ARTICLE', documentType: 'NEWS_ARTICLE', source: 'news_scraper', title: article.title, description: article.summary, url: article.url, externalId, contentText: content, contentLength: content.length, contentHash, publishedDate: article.published_date ? new Date(article.published_date) : null, isPrimarySource: false, processingStatus: content ? 'embedding' : 'failed', processingError: content ? null : 'News adapter received no article content', metadataJson: { originalSource: article.source, sentiment: article.sentiment, relevanceScore: article.relevance_score, keywords: article.keywords, aiSummary: article.ai_summary, wordCount: article.word_count } }).returning({ id: intelligenceDocuments.id });
-    if (content) await indexTextDocument({ documentId: document.id, workspaceId, securityId, ownerId, text: content });
+    if (content) {
+      await indexTextDocument({ documentId: document.id, workspaceId, securityId, ownerId, text: content });
+      const evidence = { folderType: 'NEWS_ARTICLE', documentType: 'NEWS_ARTICLE', title: article.title, description: article.summary, contentText: content, source: article.source || 'news_scraper' };
+      const events = classifyMonitoredEvents(evidence);
+      await publishMonitoredEventAlerts({ ownerId, securityId, ticker: workspace.ticker, evidence, events });
+    }
     synced++;
   }
   return synced;

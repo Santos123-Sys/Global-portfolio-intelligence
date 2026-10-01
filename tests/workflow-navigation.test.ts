@@ -29,11 +29,13 @@ describe('discovery-first workflow', () => {
     expect(header).not.toContain("['/securities', 'nav.securities']");
     expect(header).toContain("['/agent-settings', 'nav.agentSettings']");
     expect(header).toContain("['/account/security', 'nav.accountSecurity']");
+    expect(header).toContain("['/admin', 'nav.adminPanel']");
     expect(i18n).toContain("'nav.investmentReview': 'Investment Review'");
     expect(i18n).toContain("'nav.researchInbox': 'Research & Analysis Inbox'");
     expect(i18n).toContain("'nav.investmentControl': 'Investment Control'");
     expect(i18n).toContain("'nav.researchOperations': 'Research Operations'");
     expect(i18n).toContain("'nav.settings': 'Settings'");
+    expect(i18n).toContain("'nav.adminPanel': 'Admin'");
     expect(i18n).toContain("'nav.thesis': '1. Thesis'");
     expect(i18n).toContain("'nav.discover': '2. Discover'");
     expect(i18n).toContain("'nav.portfolio': '4. Portfolio'");

@@ -8,6 +8,7 @@ const portfoliosRoute = readFileSync('src/app/api/portfolios/route.ts', 'utf8');
 const dashboard = readFileSync('src/components/governance-dashboard.tsx', 'utf8');
 const thesisPage = readFileSync('src/app/investment-thesis/page.tsx', 'utf8');
 const governance = readFileSync('src/lib/governance.ts', 'utf8');
+const adminPage = readFileSync('src/app/admin/page.tsx', 'utf8');
 
 describe('investment governance controls', () => {
   it('uses transparent review guardrails rather than autonomous trading thresholds', () => {
@@ -30,13 +31,20 @@ describe('investment governance controls', () => {
     expect(dashboard).not.toContain('Save guardrails');
   });
 
-  it('surfaces freshness, provider health, committee memos, attribution, and explicit monitoring gaps', () => {
+  it('keeps investment evidence in control and moves operational diagnostics to admin', () => {
     expect(dashboard).toContain('Evidence freshness');
-    expect(dashboard).toContain('Provider health');
+    expect(dashboard).not.toContain('Provider health');
+    expect(dashboard).not.toContain('Thesis and decision history');
+    expect(adminPage).toContain('Provider health');
+    expect(adminPage).toContain('Thesis and decision history');
+    expect(adminPage).toContain('Research Operations');
+    expect(adminPage).toContain('Agent settings');
+    expect(adminPage).toContain('Account security');
     expect(dashboard).toContain('Investment committee memos');
     expect(dashboard).toContain('Return contribution');
     expect(governance).toContain('Earnings, leverage, management events');
-    expect(governance).toContain('not_connected');
+    expect(governance).not.toContain('not_connected');
+    expect(governance).toContain("status: 'active'");
   });
 
   it('hides empty portfolios whose thesis mandate was excluded while retaining invested portfolios', () => {

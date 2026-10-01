@@ -1,11 +1,10 @@
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, count, desc, eq, inArray } from 'drizzle-orm';
 import { db } from './db';
 import { portfolioExposure } from './portfolio-exposure';
 import { activeThesisPortfolioRoles, operationalPortfolioIds } from './operational-portfolios';
 import {
   aiAnalyses,
   alerts,
-  decisionLog,
   governancePolicies,
   portfolios,
   positions,
@@ -16,8 +15,8 @@ import {
 } from './db/schema';
 import {
   discoveryCandidates,
+  intelligenceDocuments,
   marketDataObservations,
-  providerCalls,
   valuationScenarios,
 } from './db/workflow-schema';
 
@@ -109,7 +108,7 @@ export async function buildGovernanceDashboard(ownerId: string) {
   const portfolioIds = ownedPortfolios.map(portfolio => portfolio.id);
   const holdings = allHoldings.filter(holding => operationalIds.has(holding.portfolioId));
   const securityIds = [...new Set(holdings.map((holding) => holding.securityId))];
-  const [analysisRows, priceRows, observationRows, riskRows, rawCandidates, rawValuations, rawAlerts, decisions, providerRows] = await Promise.all([
+  const [analysisRows, priceRows, observationRows, riskRows, rawCandidates, rawValuations, rawAlerts, eventDocumentRows] = await Promise.all([
     securityIds.length ? db.select().from(aiAnalyses).where(and(eq(aiAnalyses.ownerId, ownerId), inArray(aiAnalyses.securityId, securityIds))).orderBy(desc(aiAnalyses.analysisTimestamp)) : [],
     securityIds.length ? db.select().from(priceHistory).where(inArray(priceHistory.securityId, securityIds)).orderBy(desc(priceHistory.priceDate)) : [],
     securityIds.length ? db.select().from(marketDataObservations).where(inArray(marketDataObservations.securityId, securityIds)).orderBy(desc(marketDataObservations.retrievedAt)) : [],
@@ -117,10 +116,17 @@ export async function buildGovernanceDashboard(ownerId: string) {
     db.select().from(discoveryCandidates).where(eq(discoveryCandidates.ownerId, ownerId)).orderBy(desc(discoveryCandidates.updatedAt)),
     db.select().from(valuationScenarios).where(eq(valuationScenarios.ownerId, ownerId)).orderBy(desc(valuationScenarios.createdAt)),
     db.select().from(alerts).where(eq(alerts.ownerId, ownerId)).orderBy(desc(alerts.createdAt)),
-    db.select().from(decisionLog).where(eq(decisionLog.ownerId, ownerId)).orderBy(desc(decisionLog.decisionDate)).limit(20),
-    db.select().from(providerCalls).orderBy(desc(providerCalls.calledAt)).limit(250),
+    securityIds.length ? db.select({ total: count() })
+      .from(intelligenceDocuments)
+      .where(and(
+        eq(intelligenceDocuments.ownerId, ownerId),
+        inArray(intelligenceDocuments.securityId, securityIds),
+        eq(intelligenceDocuments.processingStatus, 'indexed'),
+        inArray(intelligenceDocuments.folderType, ['REGULATORY_FILING', 'MATERIAL_FACT', 'FINANCIAL_REPORT', 'NEWS_ARTICLE']),
+      )) : [],
   ]);
   const candidates = rawCandidates.filter(candidate => operationalIds.has(candidate.portfolioId));
+  const eventEvidenceCount = eventDocumentRows[0]?.total ?? 0;
   const candidateIds = new Set(candidates.map(candidate => candidate.id));
   const valuations = rawValuations.filter(valuation => candidateIds.has(valuation.candidateId));
   const ownedAlerts = rawAlerts.filter(alert => !alert.portfolioId || operationalIds.has(alert.portfolioId));
@@ -248,37 +254,28 @@ export async function buildGovernanceDashboard(ownerId: string) {
     };
   });
 
-  const providerHealth = [...providerRows.reduce((map, row) => {
-    const key = `${row.provider}:${row.endpoint}`;
-    const item = map.get(key) ?? { provider: row.provider, endpoint: row.endpoint, ok: 0, errors: 0, planLimits: 0, rateLimited: 0, lastCalledAt: row.calledAt.toISOString() };
-    if (row.outcome === 'ok') item.ok += 1;
-    else if (row.outcome === 'plan_limit') item.planLimits += 1;
-    else if (row.outcome === 'rate_limited') item.rateLimited += 1;
-    else item.errors += 1;
-    map.set(key, item);
-    return map;
-  }, new Map<string, { provider: string; endpoint: string; ok: number; errors: number; planLimits: number; rateLimited: number; lastCalledAt: string }>()).values()]
-    .sort((a, b) => new Date(b.lastCalledAt).getTime() - new Date(a.lastCalledAt).getTime());
-
   reviewQueue.sort((a, b) => severityRank(b.severity) - severityRank(a.severity) || a.title.localeCompare(b.title));
   return {
     generatedAt: new Date().toISOString(), policy, construction, freshness,
-    reviewQueue, providerHealth, committeeMemos,
+    reviewQueue, committeeMemos,
     valuationCoverage: {
       total: valuations.length,
       dcf: valuations.filter((valuation) => valuation.method === 'two_stage_fcff').length,
       comparables: valuations.filter((valuation) => valuation.method !== 'two_stage_fcff').length,
       latest: valuations.slice(0, 10).map((valuation) => ({ candidate: candidateById.get(valuation.candidateId)?.companyName ?? 'Unknown company', method: valuation.method, createdAt: valuation.createdAt.toISOString(), status: valuation.status })),
     },
-    versioning: {
-      thesisVersions: theses.map((thesis) => ({ version: thesis.versionNumber, effectiveDate: thesis.effectiveDate.toISOString(), supersededAt: thesis.supersededAt?.toISOString() ?? null, excludedAt: thesis.excludedAt?.toISOString() ?? null })),
-      decisions: decisions.map((decision) => ({ title: decision.title, decision: decision.decision, date: decision.decisionDate.toISOString(), metadata: decision.metadata ?? null })),
-    },
+    eventEvidenceCount,
     monitoringCoverage: [
       { capability: 'Price freshness', status: 'active', detail: 'Derived from stored close observations.' },
       { capability: 'Research freshness', status: 'active', detail: 'Derived from analysis and evidence timestamps.' },
       { capability: 'Thesis-breaker review', status: 'active', detail: 'Recorded thesis breakers enter the review queue.' },
-      { capability: 'Earnings, leverage, management events', status: 'not_connected', detail: 'Requires an event or filing-change feed; no event is inferred without a source.' },
+      {
+        capability: 'Earnings, leverage, management events',
+        status: 'active',
+        detail: eventEvidenceCount
+          ? `${eventEvidenceCount} indexed SEC, CVM, company-IR, or news documents feed evidence-based review alerts. No event direction is inferred without source evidence.`
+          : 'Connected to SEC, CVM, company-IR, and NewsAdapter ingestion. Alerts begin when relevant evidence is indexed; no event is inferred without a source.',
+      },
     ],
   };
 }

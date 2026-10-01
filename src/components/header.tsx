@@ -33,6 +33,13 @@ const SETTINGS_NAV = [
   ['/account/security', 'nav.accountSecurity'],
 ] as const satisfies ReadonlyArray<readonly [string, TranslationKey]>;
 
+const ADMIN_NAV = [
+  ['/admin', 'nav.adminPanel'],
+  ['/research-operations', 'nav.researchOperations'],
+  ['/agent-settings', 'nav.agentSettings'],
+  ['/account/security', 'nav.accountSecurity'],
+] as const satisfies ReadonlyArray<readonly [string, TranslationKey]>;
+
 const PORTFOLIO_WORKSPACE_PATHS = new Set(['/positions', '/allocation', '/risk', '/governance']);
 
 function ThemeToggle() {
@@ -189,12 +196,13 @@ export function Header() {
   }, [openMenu, mobileNavigationOpen]);
 
   const reviewNav = REVIEW_NAV;
-  const supportNav = SUPPORT_NAV;
-  const settingsNav = SETTINGS_NAV.filter(([href]) => isPlatformAdmin || href !== '/agent-settings');
+  const supportNav = isPlatformAdmin ? [] : SUPPORT_NAV;
+  const settingsNav = isPlatformAdmin ? [] : SETTINGS_NAV.filter(([href]) => href !== '/agent-settings');
   const reviewActive = REVIEW_NAV.some(([href]) => pathname === href);
   const supportActive = SUPPORT_NAV.some(([href]) => pathname === href);
   const settingsActive = SETTINGS_NAV.some(([href]) => pathname === href);
-  const pageMatches = [...WORKFLOW_NAV, ...reviewNav, ...supportNav, ...settingsNav].filter(([href, key]) => `${t(key)} ${href}`.toLocaleLowerCase().includes(pageQuery.toLocaleLowerCase()));
+  const adminActive = isPlatformAdmin && (ADMIN_NAV.some(([href]) => pathname === href) || pathname === '/decisions');
+  const pageMatches = [...WORKFLOW_NAV, ...reviewNav, ...(isPlatformAdmin ? ADMIN_NAV : [...supportNav, ...settingsNav])].filter(([href, key]) => `${t(key)} ${href}`.toLocaleLowerCase().includes(pageQuery.toLocaleLowerCase()));
 
   return (
     <header className="app-header">
@@ -268,7 +276,7 @@ export function Header() {
               </div>
             )}
           </div>
-          <div className="nav-more">
+          {!isPlatformAdmin && <div className="nav-more">
             <button
               type="button"
               className={`nav-link${supportActive ? ' active' : ''}`}
@@ -287,8 +295,9 @@ export function Header() {
                 ))}
               </div>
             )}
-          </div>
-          <div className="nav-more">
+          </div>}
+          {isPlatformAdmin && <Link href="/admin" className={`nav-link${adminActive ? ' active' : ''}`} aria-current={pathname === '/admin' ? 'page' : undefined} onClick={() => setMobileNavigationOpen(false)}>{t('nav.adminPanel')}</Link>}
+          {!isPlatformAdmin && <div className="nav-more">
             <button
               type="button"
               className={`nav-link${settingsActive ? ' active' : ''}`}
@@ -307,7 +316,7 @@ export function Header() {
                 ))}
               </div>
             )}
-          </div>
+          </div>}
         </nav>
 
         <div className="header-actions">
