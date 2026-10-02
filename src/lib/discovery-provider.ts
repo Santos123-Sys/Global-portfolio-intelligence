@@ -308,30 +308,46 @@ async function saveUniverse(provider: string, exchange: string, records: Securit
  */
 export async function loadDiscoveryUniverse(exchange: string, limit: number): Promise<{ records: SecurityUniverseRecordType[]; provider: string; cached: boolean }> {
   const env = getEnv();
-  const primary = getDiscoveryProvider(exchange);
+  // Resolve the configured provider inside the guarded block. In particular,
+  // a missing BrAPI key must still allow the explicitly configured EODHD
+  // fallback to serve a B3 universe.
+  const primaryName = exchange === 'BVMF' ? 'brapi' : env.DISCOVERY_PROVIDER;
+  let primaryError: unknown;
   try {
+    const primary = getDiscoveryProvider(exchange);
     const records = await primary.getSecurityUniverse(exchange, limit);
     if (!records.length) throw new Error(`${primary.name} returned an empty security universe`);
     await saveUniverse(primary.name, exchange, records);
     return { records: mergeResearchUniverse(records, exchange), provider: primary.name, cached: false };
-  } catch (primaryError) {
-    const cached = await cachedUniverse(primary.name, exchange);
-    if (cached?.length) return { records: mergeResearchUniverse(cached.slice(0, limit), exchange), provider: primary.name, cached: true };
-    if (env.DISCOVERY_FALLBACK_PROVIDER === 'eodhd' && primary.name !== 'eodhd') {
-      if (!env.MARKET_DATA_API_KEY) throw primaryError;
-      const fallback = new EodhdDiscoveryProvider(new EodhdProvider(env.MARKET_DATA_API_KEY, getProviderGateway()));
-      try {
-        const records = await fallback.getSecurityUniverse(exchange, limit);
-        if (!records.length) throw new Error('EODHD returned an empty security universe');
-        await saveUniverse(fallback.name, exchange, records);
-        return { records: mergeResearchUniverse(records, exchange), provider: fallback.name, cached: false };
-      } catch (fallbackError) {
-        throw new Error(
-          `${marketLabel(exchange)} could not be loaded. ${primary.name}: ${errorMessage(primaryError)}. ` +
-          `EODHD fallback: ${errorMessage(fallbackError)}`
-        );
-      }
-    }
-    throw new Error(`${marketLabel(exchange)} could not be loaded from ${primary.name}: ${errorMessage(primaryError)}`);
+  } catch (error) {
+    primaryError = error;
   }
+
+  try {
+    const cached = await cachedUniverse(primaryName, exchange);
+    if (cached?.length) return { records: mergeResearchUniverse(cached.slice(0, limit), exchange), provider: primaryName, cached: true };
+  } catch { /* A cache outage must not prevent trying the configured live fallback. */ }
+
+  if (env.DISCOVERY_FALLBACK_PROVIDER === 'eodhd' && primaryName !== 'eodhd') {
+    if (!env.MARKET_DATA_API_KEY) {
+      throw new Error(
+        `${marketLabel(exchange)} could not be loaded from ${primaryName}: ${errorMessage(primaryError)}. ` +
+        'EODHD fallback is enabled but MARKET_DATA_API_KEY is not configured on the dashboard service.'
+      );
+    }
+    const fallback = new EodhdDiscoveryProvider(new EodhdProvider(env.MARKET_DATA_API_KEY, getProviderGateway()));
+    try {
+      const records = await fallback.getSecurityUniverse(exchange, limit);
+      if (!records.length) throw new Error('EODHD returned an empty security universe');
+      await saveUniverse(fallback.name, exchange, records);
+      return { records: mergeResearchUniverse(records, exchange), provider: fallback.name, cached: false };
+    } catch (fallbackError) {
+      throw new Error(
+        `${marketLabel(exchange)} could not be loaded. ${primaryName}: ${errorMessage(primaryError)}. ` +
+        `EODHD fallback: ${errorMessage(fallbackError)}`
+      );
+    }
+  }
+
+  throw new Error(`${marketLabel(exchange)} could not be loaded from ${primaryName}: ${errorMessage(primaryError)}`);
 }

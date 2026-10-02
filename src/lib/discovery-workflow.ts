@@ -150,11 +150,22 @@ export async function buildDiscoveryRunRequest(
   // expand them. Report this bounded coverage instead of claiming a full market.
   const attempts = await Promise.allSettled(exchanges.map((exchange) => loadDiscoveryUniverse(exchange, getEnv().DISCOVERY_UNIVERSE_LIMIT)));
   const universeFailures = attempts.flatMap((result, i) => result.status === 'rejected'
-    ? [{ exchange: exchanges[i], reason: 'Market universe could not be retrieved; check provider access and retry.' }] : []);
+    ? [{
+      exchange: exchanges[i],
+      reason: result.reason instanceof Error
+        ? result.reason.message.slice(0, 400)
+        : 'Market universe could not be retrieved; check provider access and retry.',
+    }] : []);
   const loaded = attempts.flatMap(result => result.status === 'fulfilled' ? [result.value] : []);
   const batches = loaded.map((result) => result.records);
   const universe = uniqueBy(batches.flat(), (record) => `${record.exchange}:${record.ticker}`);
-  if (!universe.length) throw new Error('The configured market-data provider returned an empty security universe');
+  if (!universe.length) {
+    const causes = universeFailures.map(failure => `${failure.exchange}: ${failure.reason}`).join(' ');
+    throw new Error(
+      `No eligible security listings were returned for ${exchanges.join(', ')}.` +
+      (causes ? ` Provider details: ${causes}` : ' Check market-data provider configuration and retry.')
+    );
+  }
 
   const [held, prior] = await Promise.all([
     db.select({ portfolioId: positions.portfolioId, ticker: securities.ticker, exchange: securities.exchange })
