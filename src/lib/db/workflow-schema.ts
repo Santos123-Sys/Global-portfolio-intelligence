@@ -231,6 +231,7 @@ export const externalThesisExtractions = pgTable(
     sourceFileName: text('source_file_name').notNull(),
     sourceMimeType: text('source_mime_type').notNull(),
     resultJson: jsonb('result_json'),
+    investorProfileJson: jsonb('investor_profile_json').$type<import('../investor-profile').InvestorProfileSnapshot>(),
     errorMessage: text('error_message'),
     requestedAt: timestamp('requested_at', { withTimezone: true }).defaultNow().notNull(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
@@ -552,3 +553,11 @@ export const ragMessages = pgTable('rag_messages', {
   model: text('model').default('gemini-1.5-flash'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, t => ({ conversationIdx: index('rag_msg_conversation_idx').on(t.conversationId) }));
+
+/** Saved, tenant-scoped Portfolio Creator interview. Revision fences concurrent turns. */
+export const portfolioCreatorSessions = pgTable('portfolio_creator_sessions', {
+  ownerId: uuid('owner_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  revision: integer('revision').notNull().default(0),
+  stateJson: jsonb('state_json').$type<import('../portfolio-creator-state').PortfolioCreatorState>().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});

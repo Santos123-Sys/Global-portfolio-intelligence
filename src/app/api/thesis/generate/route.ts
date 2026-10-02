@@ -10,6 +10,9 @@ import { externalThesisExtractions } from '@/lib/db/workflow-schema';
 import { getActiveAgentCustomization } from '@/lib/agent-config';
 import { startExternalThesisExtraction } from '@/lib/integrations/agentic-client';
 import { readBoundedJson } from '@/lib/request-body';
+import { loadCreatorSession } from '@/lib/portfolio-creator-store';
+import { requiredCreatorProfile } from '@/lib/portfolio-creator-state';
+import { profileConstraints } from '@/lib/investor-profile';
 import { generatedThesisFileName, renderGeneratedThesisPdf } from '@/lib/thesis-generator';
 
 export const runtime = 'nodejs';
@@ -44,7 +47,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Portfolio destination names must produce distinct, readable identifiers' }, { status: 400 });
   }
   try {
-    const pdf = await renderGeneratedThesisPdf({ ...parsed.data, mandates: parsed.data.mandates.map((mandate, index) => ({ ...mandate, role: roles[index]! })) });
+    const profile = requiredCreatorProfile((await loadCreatorSession(session.auth.userId)).state);
+    const pdf = await renderGeneratedThesisPdf({ ...parsed.data, investorProfile: profile, globalConstraints: [...parsed.data.globalConstraints, ...profileConstraints(profile)], mandates: parsed.data.mandates.map((mandate, index) => ({ ...mandate, role: roles[index]! })) });
     const document = validateThesisDocument({ fileName: generatedThesisFileName(parsed.data.title), mimeType: 'application/pdf', contentBase64: pdf.toString('base64') });
     const [latest] = await db.select({ versionNumber: thesisVersions.versionNumber }).from(thesisVersions)
       .where(eq(thesisVersions.ownerId, session.auth.userId)).orderBy(desc(thesisVersions.versionNumber)).limit(1);
@@ -53,7 +57,7 @@ export async function POST(req: Request) {
     const remote = await startExternalThesisExtraction({ document: toAgenticThesisDocument(document, requestedVersion), agentConfig });
     const [extraction] = await db.insert(externalThesisExtractions).values({
       ownerId: session.auth.userId, externalExtractionId: remote.externalExtractionId, status: remote.status, requestedVersion,
-      sourceFileName: document.fileName, sourceMimeType: document.mimeType, resultJson: remote.result, errorMessage: remote.errorMessage,
+      sourceFileName: document.fileName, sourceMimeType: document.mimeType, investorProfileJson: profile, resultJson: remote.result, errorMessage: remote.errorMessage,
     }).returning();
     return NextResponse.json({ extraction, remote, generatedDocument: { fileName: document.fileName, contentBase64: document.contentBase64 } }, { status: 202 });
   } catch (error) {

@@ -306,6 +306,7 @@ export const thesisVersions = pgTable(
     ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
     versionNumber: integer('version_number').notNull(),
     criteriaJson: jsonb('criteria_json').notNull(),
+    investorProfileJson: jsonb('investor_profile_json').$type<import('../investor-profile').InvestorProfileSnapshot>(),
     rawDocument: text('raw_document'),
     effectiveDate: timestamp('effective_date', { withTimezone: true }).defaultNow().notNull(),
     supersededAt: timestamp('superseded_at', { withTimezone: true }),

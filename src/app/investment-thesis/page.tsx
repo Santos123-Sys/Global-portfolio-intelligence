@@ -9,19 +9,23 @@ import { assessThesisReview } from '@/lib/thesis-review';
 import { ThesisDiscoveryPreview } from '@/components/thesis-discovery-preview';
 import { ThesisCriteriaEditor } from '@/components/thesis-criteria-editor';
 import { GovernancePolicyEditor } from '@/components/governance-policy-editor';
-import { ThesisStrategyChat } from '@/components/thesis-strategy-chat';
+import { isCreatorExtraction } from '@/lib/portfolio-creator-state';
+import { InvestorProfileSummary } from '@/components/investor-profile-summary';
+import type { InvestorProfileSnapshot } from '@/lib/investor-profile';
+import { PortfolioCreator } from '@/components/portfolio-creator';
 import { canDismissThesisExtraction } from '@/lib/thesis-extraction-lifecycle';
 
 interface ThesisVersionRow {
   id: string;
   versionNumber: number;
   criteriaJson: unknown;
+  investorProfileJson?: InvestorProfileSnapshot | null;
   effectiveDate: string;
   supersededAt: string | null;
 }
 
 function downloadThesisVersion(thesis: ThesisVersionRow) {
-  const url = URL.createObjectURL(new Blob([JSON.stringify({ thesisVersionId: thesis.id, effectiveDate: thesis.effectiveDate, criteria: thesis.criteriaJson }, null, 2)], { type: 'application/json' }));
+  const url = URL.createObjectURL(new Blob([JSON.stringify({ thesisVersionId: thesis.id, effectiveDate: thesis.effectiveDate, investorProfile: thesis.investorProfileJson ?? null, criteria: thesis.criteriaJson }, null, 2)], { type: 'application/json' }));
   const link = document.createElement('a'); link.href = url; link.download = `thesis-version-${thesis.versionNumber}.json`; link.click(); URL.revokeObjectURL(url);
 }
 
@@ -32,6 +36,7 @@ interface ExtractionRow {
   requestedVersion: number;
   sourceFileName: string;
   resultJson: ThesisExtractionResult | null;
+  investorProfileJson?: InvestorProfileSnapshot | null;
   errorMessage: string | null;
   requestedAt: string;
   confirmedAt: string | null;
@@ -68,6 +73,7 @@ export default function InvestmentThesisPage() {
   const [busy, setBusy] = useState(false);
   const [documentBusy, setDocumentBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [transitionNotice, setTransitionNotice] = useState<string | null>(null);
   const reviewRef = useRef<HTMLElement>(null);
   const pendingExtractionIds = extractions
@@ -102,22 +108,27 @@ export default function InvestmentThesisPage() {
   }, [load]);
 
   useEffect(() => {
-    if (!pendingExtractionIds) return;
+    if (!pendingExtractionIds) { setRefreshError(null); return; }
+    const controller = new AbortController(); let timer: ReturnType<typeof setTimeout>;
     const pendingIds = pendingExtractionIds.split('|');
-    const interval = window.setInterval(async () => {
+    async function refresh() {
       try {
-      const refreshed = await Promise.all(pendingIds.map(async (externalExtractionId) => {
-        const response = await fetch(`/api/integrations/agentic/thesis-extractions?externalExtractionId=${encodeURIComponent(externalExtractionId)}`);
-        if (!response.ok) return null;
-        const body = await response.json() as { extraction: ExtractionRow };
-        return body.extraction;
-      }));
-      setExtractions((current) => current.map((item) =>
-        refreshed.find((candidate) => candidate?.externalExtractionId === item.externalExtractionId) ?? item
-      ));
-      } catch { setError('Could not refresh extraction status. Your draft remains available; retry loading when the connection returns.'); }
-    }, 3_000);
-    return () => window.clearInterval(interval);
+        const refreshed = await Promise.all(pendingIds.map(async externalExtractionId => {
+          const response = await fetch(`/api/integrations/agentic/thesis-extractions?externalExtractionId=${encodeURIComponent(externalExtractionId)}`, { signal: controller.signal, cache: 'no-store' });
+          if (!response.ok) throw new Error('Extraction status is unavailable');
+          const body = await response.json() as { extraction: ExtractionRow; remoteError?: string };
+          if (body.remoteError) throw new Error(body.remoteError);
+          return body.extraction;
+        }));
+        if (!controller.signal.aborted) {
+          setExtractions(current => current.map(item => refreshed.find(candidate => candidate.externalExtractionId === item.externalExtractionId) ?? item));
+          setRefreshError(null);
+        }
+      } catch { if (!controller.signal.aborted) setRefreshError('Live extraction status could not refresh. Saved results remain visible; automatic refresh will retry.'); }
+      finally { if (!controller.signal.aborted) timer = setTimeout(() => void refresh(), 3000); }
+    }
+    timer = setTimeout(() => void refresh(), 3000);
+    return () => { controller.abort(); clearTimeout(timer); };
   }, [pendingExtractionIds]);
 
   useEffect(() => {
@@ -144,7 +155,7 @@ export default function InvestmentThesisPage() {
   useEffect(() => {
     if (!ownerId || !criteriaDraft || !restored.current) return;
     try {
-      sessionStorage.setItem(`thesis-draft:${ownerId}`, JSON.stringify({ schemaVersion: 1, criteria: criteriaDraft, selectedId, baseVersionId, reviewNotes }));
+      sessionStorage.setItem(`thesis-draft:${ownerId}`, JSON.stringify({ schemaVersion: 1, manual: false, criteria: criteriaDraft, selectedId, baseVersionId, reviewNotes }));
       setSaveStatus('Draft saved in this browser tab — not yet approved');
     } catch { setSaveStatus('Draft could not be saved in this browser. Keep this page open and approve when ready.'); }
   }, [ownerId, criteriaDraft, selectedId, baseVersionId, reviewNotes]);
@@ -345,26 +356,32 @@ export default function InvestmentThesisPage() {
   return (
     <main className="portfolio-strategy-page">
       <h1 className="text-glow">Portfolio Strategy</h1>
-      <p className="sub">Describe your investment goals with Gemini. Review the strategy PDF and structured mandate before research begins.</p>
+      <p className="sub">Assess your investor profile with Portfolio Creator, then describe your goals and constraints. Review the strategy PDF and structured mandate before research begins.</p>
 
       {error && <div className="caveat" role="alert"><p>{error}</p><button type="button" className="secondary-button" disabled={busy} onClick={() => void load().catch(cause => setError(cause.message))}>Retry loading</button></div>}
+      {refreshError && <p className="caveat" role="status">{refreshError}</p>}
       {transitionNotice && <p className="caveat" role="status">{transitionNotice}</p>}
 
       {(!activeThesis || selected) && <ol className="thesis-process" aria-label="Strategy approval steps">
-        <li aria-current={!selected ? 'step' : undefined}><span>1</span> Describe your strategy</li>
+        <li aria-current={!selected ? 'step' : undefined}><span>1</span> Assess profile and define constraints</li>
         <li aria-current={selected && ['queued', 'running'].includes(selected.status) ? 'step' : undefined}><span>2</span> Generate and review the PDF</li>
         <li aria-current={criteriaDraft ? 'step' : undefined}><span>3</span> Review and approve</li>
       </ol>}
       {!loading && activeThesis && <section className="card thesis-active" aria-labelledby="active-thesis-title">
         <div className="section-heading"><div><p className="analysis-eyebrow">Current strategy</p><h2 id="active-thesis-title">Approved portfolio strategy</h2></div><span className="badge ok">Active · v{activeThesis.versionNumber}</span></div>
+        {activeThesis.investorProfileJson && <InvestorProfileSummary profile={activeThesis.investorProfileJson} />}
         <p className="note">Approved: {new Date(activeThesis.effectiveDate).toLocaleDateString()}</p><div className="thesis-destination-list">{(activeThesis.criteriaJson as ThesisCriteria).portfolios.map((portfolio, index) => <article key={`${portfolio.role}-${index}`}>
           <strong>{portfolio.policy?.name || roleLabel(portfolio.role)}</strong><span className="badge">{portfolio.currency}</span><p>{portfolio.objective}</p>
         </article>)}</div>
         <div className="workflow-actions"><Link className="action-button inline-action" href="/ai-stock-discovery">Continue to Discovery</Link><a className="secondary-button" href={`/api/thesis/pdf?versionId=${encodeURIComponent(activeThesis.id)}`}>Download strategy PDF</a></div>
         <details><summary>Approved criteria and management</summary><ThesisSummary criteria={activeThesis.criteriaJson as ThesisCriteria} /><ThesisDiscoveryPreview criteria={activeThesis.criteriaJson as ThesisCriteria} /><button className="secondary-button" type="button" onClick={() => downloadThesisVersion(activeThesis)}>Download approved criteria (JSON)</button><button className="secondary-button dismiss-button" type="button" disabled={busy} onClick={() => void excludeVersion(activeThesis)}>Exclude version {activeThesis.versionNumber}</button></details>
       </section>}
+      {!loading && criteriaDraft && !selected && <section className="card" role="alert"><h2>Saved review source is unavailable</h2><p>The browser retained edits, but the source is outside the current review queue or was removed. Approval is blocked. Return to Portfolio Creator to reopen its saved review or import the source again.</p><button className="secondary-button" type="button" onClick={() => {
+        setCriteriaDraft(null); setSelectedId(null); setBaseVersionId(null); setReviewNotes('');
+        if (ownerId) { try { sessionStorage.removeItem(`thesis-draft:${ownerId}`); } catch { setError('Draft recovery could not be cleared from this browser tab.'); } }
+      }}>Return to saved interview</button></section>}
       {loading && <p role="status">Loading your thesis workspace…</p>}
-      {!loading && !selected && !criteriaDraft && <ThesisStrategyChat
+      {!loading && !selected && !criteriaDraft && <PortfolioCreator
         key={activeThesis?.id ?? 'new-thesis'}
         nextVersion={nextVersion}
         startingCriteria={activeThesis?.criteriaJson as ThesisCriteria | undefined}
@@ -374,12 +391,12 @@ export default function InvestmentThesisPage() {
           setSelectedId(extraction.id);
           setCriteriaDraft(null);
           setReviewNotes('');
-          setTransitionNotice('Gemini created a strategy PDF and a structured draft. Review the criteria below; Discovery starts only after you approve.');
+          setTransitionNotice('Portfolio Creator created a strategy PDF and a structured draft. Review the criteria below; Discovery starts only after you approve.');
         }}
       />}
       <details className="card thesis-upload strategy-entry-card">
         <summary>{documentBusy ? 'Importing strategy document…' : 'Import an existing strategy document (optional)'}</summary>
-        <p className="note">If you already have a written mandate, import a PDF, text or Markdown file. The document extraction workflow remains available; the conversational Gemini flow is the recommended way to create or update a strategy.</p>
+        <p className="note">If you already have a written mandate, import a PDF, text or Markdown file. The document extraction workflow remains available; Portfolio Creator is the recommended way to create or update a strategy.</p>
         <label className="thesis-file-label">
           Choose strategy document
           <input type="file" accept="application/pdf,text/plain,text/markdown,.pdf,.md,.txt" aria-label="Choose strategy document" disabled={busy || loading} onChange={(event) => { const file = event.target.files?.[0] ?? null; event.target.value = ''; void upload(file); }} />
@@ -399,8 +416,9 @@ export default function InvestmentThesisPage() {
           <fieldset disabled={busy} className="thesis-review-fields">
           {staleDraft && <div role="alert" className="caveat"><p>The approved strategy changed while this document was being reviewed. Upload it again to review a version based on the latest strategy.</p></div>}
 
-          {selected?.resultJson && (selected.externalExtractionId.startsWith('strategy-chat:')
-            ? <p className="note">Gemini drafted this strategy from your conversation; no external issuer research has been performed. Verify every field below before approval.</p>
+          {selected?.investorProfileJson && <InvestorProfileSummary profile={selected.investorProfileJson} />}
+          {selected?.resultJson && (isCreatorExtraction(selected.externalExtractionId)
+            ? <p className="note">Portfolio Creator drafted this strategy from your conversation; no external issuer research has been performed. Verify every field below before approval.</p>
             : <p className="note">Extraction confidence: {(selected.resultJson.extractionConfidence * 100).toFixed(0)}%. Check the details below against your source document.</p>)}
           {!!selected?.resultJson?.ambiguousPoints.length && (
             <div className="caveat">
@@ -511,7 +529,7 @@ export default function InvestmentThesisPage() {
       <details className="card"><summary>Approved source documents ({extractions.filter(item => item.confirmedAt).length})</summary>
         {extractions.filter(item => item.confirmedAt).map(extraction => <article className="thesis-mandate" key={extraction.id}>
           <h3>{extraction.sourceFileName}</h3><p className="note">Approved · v{extraction.requestedVersion}</p>
-          {extraction.resultJson && <details><summary>{extraction.externalExtractionId.startsWith('strategy-chat:') ? 'Generated mandate' : 'Original extraction and evidence'}</summary><ThesisSummary criteria={extraction.resultJson.criteria} />{!extraction.externalExtractionId.startsWith('strategy-chat:') && <><p>Extraction confidence: {(extraction.resultJson.extractionConfidence * 100).toFixed(0)}%</p><ul>{extraction.resultJson.ambiguousPoints.map((point, index) => <li key={index}>{point.location}: {point.issue} — “{point.sourceExcerpt}”</li>)}</ul><p>{extraction.resultJson.unmappedContent.join(' · ')}</p></>}</details>}
+          {extraction.resultJson && <details><summary>{isCreatorExtraction(extraction.externalExtractionId) ? 'Generated mandate' : 'Original extraction and evidence'}</summary><ThesisSummary criteria={extraction.resultJson.criteria} />{!isCreatorExtraction(extraction.externalExtractionId) && <><p>Extraction confidence: {(extraction.resultJson.extractionConfidence * 100).toFixed(0)}%</p><ul>{extraction.resultJson.ambiguousPoints.map((point, index) => <li key={index}>{point.location}: {point.issue} — “{point.sourceExcerpt}”</li>)}</ul><p>{extraction.resultJson.unmappedContent.join(' · ')}</p></>}</details>}
           <button className="secondary-button dismiss-button" type="button" disabled={busy || !canDismissThesisExtraction(extraction.status)} onClick={() => void dismiss(extraction)} aria-label={`Dismiss ${extraction.sourceFileName} from the review queue`}>Dismiss document and linked thesis</button>
         </article>)}
       </details>

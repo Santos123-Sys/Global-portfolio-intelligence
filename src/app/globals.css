@@ -1501,3 +1501,13 @@ button.nav-link:hover, button.nav-link[aria-expanded="true"] { background: var(-
 }
 .company-intelligence-dashboard .quick-actions-bar { position: static; transform: none; max-width: none; width: 100%; flex-wrap: wrap; align-items: center; margin-top: 1.5rem; }
 .company-export-options { padding: 0.65rem; font-size: 0.85rem; }
+
+/* Portfolio Creator reuses the existing glass-green cards, controls and transcript. */
+.creator-progress { display: flex; flex-wrap: wrap; gap: .6rem 1rem; padding: 0; list-style: none; font-size: .85rem; }
+.creator-progress li[aria-current="step"] { font-weight: 700; text-decoration: underline; text-underline-offset: .3rem; }
+.creator-answer-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: .65rem; margin: 1rem 0; }
+.creator-answer-options button { text-align: left; white-space: normal; min-height: 44px; }
+.creator-profile-confirmation { display: grid; gap: 1rem; }
+.creator-profile-confirmation fieldset { display: grid; gap: .75rem; padding: 1rem; border: 1px solid var(--border); border-radius: 12px; }
+.creator-profile-confirmation label { display: block; }
+.creator-reset { margin-top: 1rem; }

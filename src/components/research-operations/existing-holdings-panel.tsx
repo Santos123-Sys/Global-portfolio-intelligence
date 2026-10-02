@@ -31,7 +31,7 @@ export default function ExistingHoldingsPanel() {
   const [starting, setStarting] = useState(false);
 
   const loadRuns = useCallback(async (signal?: AbortSignal) => {
-    const response = await fetch('/api/integrations/agentic/runs', { signal });
+    const response = await fetch('/api/integrations/agentic/runs', { signal, cache: 'no-store' });
     if (!response.ok) throw new Error(`Runs API returned ${response.status}`);
     const data = (await response.json()) as { runs: ExternalRun[]; readiness: AgenticReadiness };
     if (!signal?.aborted) {
@@ -42,21 +42,14 @@ export default function ExistingHoldingsPanel() {
   }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
-    loadRuns(controller.signal)
-      .catch((cause) => {
-        if (!controller.signal.aborted) setLoadError((cause as Error).message);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    const interval = window.setInterval(() => {
-      void loadRuns(controller.signal).catch(() => undefined);
-    }, 5_000);
-    return () => {
-      controller.abort();
-      window.clearInterval(interval);
-    };
+    const controller = new AbortController(); let timer: ReturnType<typeof setTimeout>;
+    async function refresh() {
+      try { await loadRuns(controller.signal); }
+      catch (cause) { if (!controller.signal.aborted) setLoadError(`${(cause as Error).message}. Saved results remain visible; automatic refresh will retry.`); }
+      finally { if (!controller.signal.aborted) { setLoading(false); timer = setTimeout(() => void refresh(), 5000); } }
+    }
+    void refresh();
+    return () => { controller.abort(); clearTimeout(timer); };
   }, [loadRuns]);
 
   async function startRun() {

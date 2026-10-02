@@ -57,7 +57,7 @@ export const ThesisDraft = z
         .min(1),
     }),
     selectedId: z.string().nullable(),
-    manual: z.boolean(),
+    manual: z.boolean().default(false),
     baseVersionId: z.string().uuid().nullable(),
     reviewNotes: z.string(),
   })

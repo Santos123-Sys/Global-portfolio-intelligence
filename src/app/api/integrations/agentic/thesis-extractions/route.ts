@@ -19,6 +19,7 @@ import {
 } from '@/lib/document-security';
 import { readBoundedJson } from '@/lib/request-body';
 import { getActiveAgentCustomization } from '@/lib/agent-config';
+import { isCreatorExtraction } from '@/lib/portfolio-creator-state';
 import { canDismissThesisExtraction } from '@/lib/thesis-extraction-lifecycle';
 import { excludeThesisVersion } from '@/lib/services/thesis-exclusion';
 
@@ -52,10 +53,10 @@ export async function GET(req: Request) {
   )).limit(1);
   if (!local) return NextResponse.json({ error: 'Thesis extraction not found' }, { status: 404 });
 
-  // Gemini chat drafts are generated and completed inside the dashboard. They
+  // Portfolio Creator drafts are generated and completed inside the dashboard. They
   // have no remote agentic job to poll, even though they share the same human
   // review queue and thesis approval contract.
-  if (local.externalExtractionId.startsWith('strategy-chat:')) {
+  if (isCreatorExtraction(local.externalExtractionId)) {
     return NextResponse.json({ extraction: local }, { headers: { 'Cache-Control': 'no-store' } });
   }
 
@@ -74,8 +75,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Thesis extraction was dismissed' }, { status: 404 });
     }
     return NextResponse.json({ extraction: updated, remote });
-  } catch (error) {
-    return NextResponse.json({ extraction: local, remoteError: (error as Error).message });
+  } catch {
+    return NextResponse.json({ extraction: local, remoteError: 'Live extraction status could not be refreshed. The saved status remains available; automatic refresh will retry.' }, { headers: { 'Cache-Control': 'no-store' } });
   }
 }
 

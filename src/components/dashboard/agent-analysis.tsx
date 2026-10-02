@@ -39,6 +39,7 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
   const [capitalInputs,setCapitalInputs]=useState<Record<string,string>>({});
   const [financialPeriods,setFinancialPeriods]=useState<Record<string,{days:string;sourceQuality:string}>>({});
   const active = session?.status === 'queued' || session?.status === 'running';
+  const observing = session && ['queued', 'running', 'paused', 'awaiting_approval'].includes(session.status);
   const sessionId = session?.id;
   useEffect(() => {
     let cancelled = false;
@@ -55,7 +56,7 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
     return () => { cancelled = true; controller.abort(); };
   }, [securityId]);
   useEffect(() => {
-    if (!sessionId || !active) return;
+    if (!sessionId || !observing) return;
     let cancelled = false;
     const controller=new AbortController(); let timer:ReturnType<typeof setTimeout>;
     async function poll() {
@@ -63,12 +64,12 @@ export function AgentAnalysis({ ticker, securityId, viewer }: { ticker: string; 
         const response = await fetch(`/api/agents/sessions/${sessionId}?view=company`,{signal:controller.signal}); const body = await response.json();
         if (!response.ok) throw new Error(body.error ?? 'Unable to load session');
         if (!cancelled) { setSession(current=>current?.id===sessionId ? body : current); setError(''); }
-      } catch (e) { if (!cancelled) setError(e instanceof Error ? e.message : 'Polling failed'); }
+      } catch (e) { if (!cancelled) setError(e instanceof Error ? e.message : 'Live research status could not refresh. Saved outputs remain visible; automatic refresh will retry.'); }
       if(!cancelled) timer=setTimeout(()=>void poll(),2500);
     }
     void poll();
     return () => { cancelled = true; controller.abort(); clearTimeout(timer); };
-  }, [sessionId, active]);
+  }, [sessionId, observing]);
   useEffect(()=>{setAccepted('');setReview({});setFinancialPeriods({});},[sessionId]);
   async function start() {
     setBusy(true); setError('');
