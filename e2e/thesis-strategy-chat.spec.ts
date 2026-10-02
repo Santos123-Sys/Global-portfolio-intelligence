@@ -79,9 +79,12 @@ for (const width of [390, 1440]) {
     await page.getByRole('button', { name: 'Generate strategy PDF and review' }).click();
     expect((await download).suggestedFilename()).toContain('investment-thesis.pdf');
     await expect(page.getByRole('heading', { name: 'Review portfolio strategy' })).toBeVisible();
+    await expect(page.getByText('Ready for your approval', { exact: true })).toBeVisible();
     const reviewNote = page.getByLabel('Review note (required)');
     if (await reviewNote.isVisible()) await reviewNote.fill('Reviewed the confirmed profile, equity sleeve, B3 market and liquidity context before approval.');
-    await page.getByRole('button', { name: 'Approve strategy and start research' }).click();
+    const approve = page.getByRole('button', { name: 'Approve strategy and start research' });
+    await expect(approve).toBeEnabled();
+    await approve.click();
     await expect(page.getByText('Strategy approved. Open Discovery when you are ready to search using this version.')).toBeVisible();
     expect(approval).toMatchObject({ externalExtractionId: 'portfolio-creator:generated-test', criteriaJson: { version: 1, portfolios: [{ role: 'brazilian_growth', currency: 'BRL' }] }, startDiscovery: true });
     expect((approval as unknown as { criteriaJson: { globalConstraints: string[] } }).criteriaJson.globalConstraints.join(' ')).toContain('48/75');
