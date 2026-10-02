@@ -14,6 +14,8 @@ import { excludeThesisVersion, ThesisVersionNotFoundError } from '@/lib/services
 import { startDiscoveryAfterThesisConfirmation } from '@/lib/thesis-discovery-transition';
 import { assessThesisReview } from '@/lib/thesis-review';
 import { readBoundedJson } from '@/lib/request-body';
+import { validateInvestorProfileSnapshot, profileConstraints, type InvestorProfileSnapshot } from '@/lib/investor-profile';
+import { isCreatorExtraction } from '@/lib/portfolio-creator-state';
 import { portfoliosRequiredByThesis, ThesisPortfolioConfigurationError } from '@/lib/thesis-portfolios';
 
 export const runtime = 'nodejs';
@@ -81,6 +83,8 @@ export async function POST(req: Request) {
 
       let extractionId: string | null = null;
       let sourceReview: ThesisExtractionResult | null = null;
+      let investorProfile: InvestorProfileSnapshot | null = null;
+      let confirmedCriteria = criteriaJson;
       if (parsed.data.externalExtractionId) {
         const [extraction] = await tx.select().from(externalThesisExtractions).where(and(
           eq(externalThesisExtractions.externalExtractionId, parsed.data.externalExtractionId),
@@ -97,6 +101,16 @@ export async function POST(req: Request) {
         if ((extracted.data.ambiguousPoints.length || extracted.data.unmappedContent.length) && (parsed.data.reviewNotes?.length ?? 0) < 20) {
           throw new ConfirmationError('Explain how ambiguous or unmapped content was corrected, retained or deferred (at least 20 characters).');
         }
+        if (isCreatorExtraction(extraction.externalExtractionId) && !extraction.investorProfileJson) {
+          throw new ConfirmationError('This older Portfolio Creator draft has no confirmed investor profile. Complete profiling and generate a new strategy before approval.');
+        }
+        if (extraction.investorProfileJson) {
+          investorProfile = validateInvestorProfileSnapshot(extraction.investorProfileJson);
+          confirmedCriteria = { ...criteriaJson, globalConstraints: [
+            ...criteriaJson.globalConstraints.filter(line => !/^(Investor profile:|Strategy scope:|Liquidity context:|Profiling framework)/.test(line)),
+            ...profileConstraints(investorProfile),
+          ] };
+        }
         sourceReview = extracted.data;
         extractionId = extraction.id;
       }
@@ -108,13 +122,14 @@ export async function POST(req: Request) {
       const [created] = await tx.insert(thesisVersions).values({
         ownerId: session.auth.userId,
         versionNumber: nextVersion,
-        criteriaJson,
+        criteriaJson: confirmedCriteria,
+        investorProfileJson: investorProfile,
       }).returning();
       const existingPortfolios = await tx.select({ portfolioType: portfolios.portfolioType })
         .from(portfolios)
         .where(eq(portfolios.ownerId, session.auth.userId));
       const existingRoles = new Set(existingPortfolios.map((portfolio) => portfolio.portfolioType));
-      const requiredPortfolios = portfoliosRequiredByThesis(criteriaJson)
+      const requiredPortfolios = portfoliosRequiredByThesis(confirmedCriteria)
         .filter((portfolio) => !existingRoles.has(portfolio.portfolioType));
       if (requiredPortfolios.length) {
         await tx.insert(portfolios).values(requiredPortfolios.map((portfolio) => ({
@@ -125,8 +140,8 @@ export async function POST(req: Request) {
       await tx.insert(thesisMutationAudit).values({
         thesisVersionId: created.id,
         ownerId: session.auth.userId,
-        action: parsed.data.externalExtractionId.startsWith('strategy-chat:')
-          ? 'confirmed_gemini_strategy'
+        action: isCreatorExtraction(parsed.data.externalExtractionId)
+          ? 'confirmed_portfolio_creator_strategy'
           : 'confirmed_external_extraction',
         actor: session.auth.email,
         metadata: {
@@ -134,7 +149,8 @@ export async function POST(req: Request) {
           reviewNotes: parsed.data.reviewNotes ?? null,
           reviewWarnings: review.warnings,
           originalExtraction: sourceReview,
-          confirmedCriteria: criteriaJson,
+          confirmedCriteria,
+          investorProfile,
           externalExtractionId: parsed.data.externalExtractionId,
         },
       });

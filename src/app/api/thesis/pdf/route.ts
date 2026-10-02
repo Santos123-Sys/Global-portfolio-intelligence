@@ -4,6 +4,7 @@ import { ThesisCriteria } from '@portfolio-intelligence/agentic-contract';
 import { authenticateRequest } from '@/lib/api-auth';
 import { db } from '@/lib/db';
 import { thesisVersions } from '@/lib/db/schema';
+import { validateInvestorProfileSnapshot } from '@/lib/investor-profile';
 import { generatedThesisFileName, renderGeneratedThesisPdf, thesisCriteriaToPdfInput } from '@/lib/thesis-generator';
 
 export const runtime = 'nodejs';
@@ -24,7 +25,7 @@ export async function GET(req: Request) {
   try {
     const criteria = ThesisCriteria.parse(version.criteriaJson);
     const input = thesisCriteriaToPdfInput(criteria, session.auth.email);
-    const pdf = await renderGeneratedThesisPdf(input);
+    const pdf = await renderGeneratedThesisPdf({ ...input, ...(version.investorProfileJson ? { investorProfile: validateInvestorProfileSnapshot(version.investorProfileJson) } : {}) });
     return new Response(new Uint8Array(pdf), {
       headers: {
         'Content-Type': 'application/pdf',

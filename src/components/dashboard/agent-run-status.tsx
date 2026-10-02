@@ -12,10 +12,12 @@ export function AgentRunStatus({status,progress,events=[],liveStatus,briefing,bu
     {working && <div role="status"><progress value={progress} max={100} aria-label="Research steps finished"/><p>{progress}% of planned steps finished — not a time estimate or guarantee of data quality.</p></div>}
     {!viewer && <div className="workflow-actions">
       {working && <button type="button" className="secondary-button" disabled={busy} onClick={()=>onControl('pause')}>Pause research</button>}
-      {status==='paused' && <button type="button" className="action-button" disabled={busy} onClick={()=>onControl('resume')}>Resume research</button>}
+      {status==='awaiting_approval' && <p className="caveat" role="status">Research is waiting for your review. Confirm retained financial inputs below to continue; elapsed time never counts as approval.</p>}
+    {status==='paused' && <button type="button" className="action-button" disabled={busy} onClick={()=>onControl('resume')}>Resume research</button>}
       {status==='failed' && <button type="button" className="action-button" disabled={busy} onClick={()=>onControl('retry')}>Retry with retained evidence</button>}
       {['queued','running','paused','awaiting_approval'].includes(status) && <button type="button" className="secondary-button" disabled={busy} onClick={()=>onControl('cancel')}>Cancel research</button>}
     </div>}
+    {status==='awaiting_approval' && <p className="caveat" role="status">Research is waiting for your review. Confirm retained financial inputs below to continue; elapsed time never counts as approval.</p>}
     {status==='paused' && <p className="caveat">Completed steps are saved. Already-sent provider requests cannot be revoked, but superseded workers cannot publish results or start another step.</p>}
     {briefing && ['completed','failed','cancelled'].includes(status) && <section className="glass-panel card" aria-label="Return briefing">
       <p className="eyebrow">Research briefing</p><h4>{briefing.outcome}</h4>
@@ -27,7 +29,7 @@ export function AgentRunStatus({status,progress,events=[],liveStatus,briefing,bu
       <h5>Your next action</h5><p>{briefing.nextAction}</p>
       <p className="note">This briefing summarizes validated outputs; it is not private chain-of-thought, an investment guarantee, or authorization to trade or alter portfolio weights.</p>
     </section>}
-    {working && <div className="glass-panel card" aria-label="Current research step"><h4>Current step</h4><p>{liveStatus?.currentAgent ? `${liveStatus.currentAgent} · ${liveStatus.phase}` : `Preparing ${liveStatus?.phase ?? 'research'}`}</p><p className="note">{liveStatus?.latestActivity ?? events.at(-1)?.summary ?? 'The worker has not recorded its first update yet.'}</p></div>}
+    {['queued','running','paused','awaiting_approval'].includes(status) && <div className="glass-panel card" aria-label="Current research step"><h4>Current step</h4><p>{liveStatus?.currentAgent ? `${liveStatus.currentAgent} · ${liveStatus.phase}` : `Preparing ${liveStatus?.phase ?? 'research'}`}</p><p className="note">{liveStatus?.latestActivity ?? events.at(-1)?.summary ?? 'The worker has not recorded its first update yet.'}</p>{liveStatus?.updatedAt && <p className="note">Last recorded activity: {new Date(liveStatus.updatedAt).toLocaleString()}</p>}<details><summary>Recent research activity</summary>{events.length ? <ol>{events.slice(-6).map(event => <li key={event.id}><strong>{event.summary}</strong><p className="note">{event.consequence}</p></li>)}</ol> : <p className="note">The queued worker has not recorded an event yet.</p>}</details></div>}
   </section>;
 }
 

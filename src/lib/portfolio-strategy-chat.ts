@@ -22,7 +22,9 @@ export const PortfolioStrategyDraft = z.object({
     exclusionCriteria: z.array(line).max(30),
     policy: ThesisPolicy,
   }).strict()).min(1).max(8),
-}).strict();
+}).strict().superRefine((draft, ctx) => {
+  if (new Set(draft.mandates.map(m => m.role)).size !== draft.mandates.length) ctx.addIssue({ code: 'custom', path: ['mandates'], message: 'Portfolio roles must be distinct' });
+});
 export type PortfolioStrategyDraft = z.infer<typeof PortfolioStrategyDraft>;
 
 export const StrategyChatRequest = z.object({
