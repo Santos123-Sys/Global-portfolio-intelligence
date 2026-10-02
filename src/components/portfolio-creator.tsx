@@ -117,11 +117,11 @@ export function PortfolioCreator(props: CoreProps) {
 
   const core = <PortfolioCreatorCore key={coreKey} {...props} />;
 
-  return <section className={styles.shell} aria-labelledby="portfolio-creator-assistant-title">
+  return <section className={styles.shell} aria-label="Portfolio Creator">
     <header className={styles.hero}>
       <div className={styles.avatar} aria-hidden="true">✦</div>
       <div>
-        <h2 id="portfolio-creator-assistant-title" translate="no">Portfolio Creator</h2>
+        <h2 id="portfolio-creator-assistant-title" aria-hidden="true" translate="no">Portfolio Creator</h2>
         <p>{pt ? 'Seu atalho para criar, revisar e atualizar a estratégia.' : 'Your shortcut to create, review and update the strategy.'}</p>
       </div>
     </header>
