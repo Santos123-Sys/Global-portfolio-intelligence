@@ -8,7 +8,8 @@ import {
   NotFoundError,
   RateLimitError,
 } from 'openai';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+afterEach(() => vi.unstubAllGlobals());
 import {
   AgenticPipelineError,
   OpenAIAgenticPipeline,
@@ -309,6 +310,7 @@ describe('schema failures name the field that failed', () => {
   });
 
   it('does not ask the model for thesisVersion, and supplies it itself', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ results: [{ url: 'https://example.test/research', content: 'Issuer research evidence' }] })));
     // The model omits thesisVersion entirely; the service injects the value it
     // already owns, so this must not be a schema failure.
     const pipeline = new OpenAIAgenticPipeline('k', 'gpt-5.6', 'medium', clientReturning({
@@ -321,7 +323,7 @@ describe('schema failures name the field that failed', () => {
       }],
       candidates: [],
       limitations: ['Universe is unranked.'],
-    }));
+    }), { provider: 'tavily', apiKey: 'test' });
 
     const output = await pipeline.discoverSecurities(discoveryRequest as never);
     expect(output.thesisVersion).toBe(thesis.version);
@@ -440,6 +442,7 @@ describe('schema failures name the field that failed', () => {
   });
 
   it('records a portfolio-specific limitation when no candidate qualifies', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ results: [{ url: 'https://example.test/research', content: 'Issuer research evidence' }] })));
     const pipeline = new OpenAIAgenticPipeline('k', 'gpt-5.6', 'medium', clientReturning({
       marketMandates: [{
         portfolioId,
@@ -450,7 +453,7 @@ describe('schema failures name the field that failed', () => {
       }],
       candidates: [],
       limitations: [],
-    }));
+    }), { provider: 'tavily', apiKey: 'test' });
 
     const output = await pipeline.discoverSecurities(discoveryRequest as never);
     expect(output.limitations).toContain(
@@ -459,6 +462,7 @@ describe('schema failures name the field that failed', () => {
   });
 
   it('pins mandate identity to the trusted portfolio when the thesis source is unspecified', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ results: [{ url: 'https://example.test/research', content: 'Issuer research evidence' }] })));
     const requestWithUnspecifiedSource = {
       ...discoveryRequest,
       thesis: {
@@ -482,7 +486,7 @@ describe('schema failures name the field that failed', () => {
       }],
       candidates: [],
       limitations: ['Universe is unranked.'],
-    }));
+    }), { provider: 'tavily', apiKey: 'test' });
 
     const output = await pipeline.discoverSecurities(requestWithUnspecifiedSource as never);
     expect(output.marketMandates[0]).toMatchObject({

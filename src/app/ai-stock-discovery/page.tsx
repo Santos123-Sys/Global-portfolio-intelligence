@@ -23,6 +23,7 @@ interface DiscoveryRun {
   externalDiscoveryId: string;
   status: string;
   progress?: { completed: number; total: number; currentStage: string };
+  syncWarning?: string;
   provider: string;
   requestedAt: string;
   completedAt: string | null;
@@ -96,6 +97,10 @@ interface Candidate {
   marketBriefJson: MarketBrief | null;
   marketBriefErrorMessage: string | null;
   analysisRunStatus: string | null;
+  marketBriefProgress?: { completed: number; total: number; currentStage: string } | null;
+  marketBriefSyncWarning?: string | null;
+  analysisProgress?: { completed: number; total: number; currentStage: string } | null;
+  analysisSyncWarning?: string | null;
   analysisRunError: string | null;
   analysisErrorMessage: string | null;
   reportUrl: string | null;
@@ -266,6 +271,8 @@ export default function AIStockDiscoveryPage() {
   const [candidateLimit, setCandidateLimit] = useState('6');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [refreshWarning, setRefreshWarning] = useState<string | null>(null);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
   const [candidateErrors, setCandidateErrors] = useState<Record<string, string>>({});
   const [valuationCandidateId, setValuationCandidateId] = useState<string | null>(null);
   const [preflight, setPreflight] = useState<DiscoveryPreflight | null>(null);
@@ -273,10 +280,10 @@ export default function AIStockDiscoveryPage() {
   const [journalDrafts, setJournalDrafts] = useState<Record<string, DecisionJournalDraft>>({});
 
   const loadRuns = useCallback(async (signal?: AbortSignal) => {
-    const runResponse = await fetch('/api/discovery/runs', { signal });
+    const runResponse = await fetch('/api/discovery/runs', { signal, cache: 'no-store' });
     const runBody = await runResponse.json().catch(() => ({})) as { runs?: DiscoveryRun[]; error?: string };
     if (!runResponse.ok) throw new Error(runBody.error ?? `Discovery runs failed (${runResponse.status})`);
-    if (!signal?.aborted) { setRuns(runBody.runs ?? []); setRunsLoading(false); }
+    if (!signal?.aborted) { setRuns(runBody.runs ?? []); setRunsLoading(false); setLastRefreshedAt(new Date().toISOString()); }
   }, []);
 
   const loadCandidates = useCallback(async (runId: string, signal?: AbortSignal) => {
@@ -289,7 +296,7 @@ export default function AIStockDiscoveryPage() {
   useEffect(() => {
     const controller = new AbortController();
     void loadRuns(controller.signal).catch((cause) => {
-      if (!controller.signal.aborted) { setError((cause as Error).message); setRunsLoading(false); }
+      if (!controller.signal.aborted) { setError((cause as Error).message); setRunsLoading(false); setLastRefreshedAt(new Date().toISOString()); }
     });
     return () => controller.abort();
   }, [loadRuns]);
@@ -327,15 +334,24 @@ export default function AIStockDiscoveryPage() {
   useEffect(() => {
     if (!hasActiveWork) return;
     const controller = new AbortController();
-    const interval = window.setInterval(() => {
-      void Promise.all([
-        loadRuns(controller.signal),
-        selectedRunId ? loadCandidates(selectedRunId, controller.signal) : Promise.resolve(),
-      ]).catch(() => undefined);
-    }, 4_000);
+    let timer: ReturnType<typeof setTimeout>;
+    const refresh = async () => {
+      try {
+        await Promise.all([
+          loadRuns(controller.signal),
+          selectedRunId ? loadCandidates(selectedRunId, controller.signal) : Promise.resolve(),
+        ]);
+        if (!controller.signal.aborted) setRefreshWarning(null);
+      } catch {
+        if (!controller.signal.aborted) setRefreshWarning('Live updates are temporarily unavailable. Saved results remain visible; automatic refresh will retry.');
+      } finally {
+        if (!controller.signal.aborted) timer = setTimeout(() => void refresh(), 4_000);
+      }
+    };
+    timer = setTimeout(() => void refresh(), 4_000);
     return () => {
       controller.abort();
-      window.clearInterval(interval);
+      clearTimeout(timer);
     };
   }, [hasActiveWork, loadCandidates, loadRuns, selectedRunId]);
 
@@ -505,6 +521,8 @@ export default function AIStockDiscoveryPage() {
       </section>
 
       {error && <div className="login-error workflow-error" role="alert"><p>{error}</p><button className="secondary-button" type="button" onClick={() => void loadRuns().then(() => setError(null)).catch(cause => setError(cause.message))}>Retry loading</button></div>}
+      {refreshWarning && <p className="caveat" role="status">{refreshWarning}</p>}
+      {busy === 'start' && <p role="status">Preparing research: loading market listings, checking thesis eligibility, and saving the request for the agent worker.</p>}
       <aside className="workflow-next-action card" aria-live="polite"><strong>{t('nextAction')}</strong><p>{runsLoading ? t('loadingRuns') : discoveryRunning ? t('researchInProgress') : latestRun?.status === 'completed' && latestRun.candidateCount > 0 ? t('nextReview') : t('nextSearch')}</p><Link className="text-link" href="/investment-thesis">{t('thesisLink')}</Link></aside>
 
       <section className="card glow-card workflow-stage">
@@ -553,6 +571,15 @@ export default function AIStockDiscoveryPage() {
         </div>
         {runsLoading ? <p className="note" role="status">{t('loadingRuns')}</p> : runs.length === 0 ? <p className="note">{t('noRuns')}</p> : (
           <div className="latest-run-summary" aria-live="polite">
+            <section className="card glass-panel" aria-label="Live research execution">
+              <h3>Agent execution</h3>
+              <p><strong>{latestRun!.status === 'dispatching' ? 'Delivering saved request' : latestRun!.status === 'queued' ? 'Queued — waiting for the research worker' : latestRun!.status === 'running' ? latestRun!.progress?.currentStage ?? 'Research worker is running; awaiting its next progress update' : latestRun!.status === 'failed' ? 'Needs attention — research failed' : latestRun!.candidateCount > 0 ? 'Completed — shortlist ready for review' : 'Completed — no shortlist produced'}</strong></p>
+              <p className="note">Inputs: approved thesis{latestRun!.resultJson?.thesisVersion ? ` v${latestRun!.resultJson.thesisVersion}` : ''} · {latestRun!.universeCoverage?.records ?? 'Saved'} supplied listings · {latestRun!.provider ?? latestRun!.universeCoverage?.providers.join(', ') ?? 'configured providers'}</p>
+              {latestRun!.progress && latestRun!.progress.total > 0 && <><progress aria-label="Research work completed" value={latestRun!.progress.completed} max={latestRun!.progress.total} /><p>{latestRun!.progress.completed}/{latestRun!.progress.total} work units completed</p></>}
+              {latestRun!.syncWarning && <p className="caveat" role="status">{latestRun!.syncWarning}</p>}
+              {lastRefreshedAt && <p className="note">Dashboard refreshed: {date(lastRefreshedAt)}</p>}
+              <Link className="text-link" href="/research-operations">Open Research Operations</Link>
+            </section>
             <p>
               <strong>{t('latestRun')}:</strong> {date(latestRun!.requestedAt)} ·{' '}
               <span className={`badge ${latestRun!.status === 'failed' ? 'breach' : latestRun!.status === 'completed' ? 'ok' : 'watch'}`}>{t(latestRun!.status === 'failed' ? 'failed' : latestRun!.status === 'completed' ? 'completed' : latestRun!.status === 'running' ? 'running' : 'queued')}</span>{' '}
@@ -560,14 +587,12 @@ export default function AIStockDiscoveryPage() {
             </p>
             {latestRun!.status === 'dispatching' && <p role="status">Request saved. Confirming delivery; retries reuse this run.</p>}
             {latestRun!.resultJson?.thesisVersion && <p>Approved thesis version {latestRun!.resultJson.thesisVersion}</p>}
-            {latestRun!.progress && latestRun!.status !== 'completed' && <p role="status">{latestRun!.progress.currentStage} · {latestRun!.progress.completed}/{latestRun!.progress.total} stages</p>}
             <div className="preflight-checks" aria-label="Research outcome by portfolio">
               {latestRun!.portfolioCandidateCounts.map((portfolio) => <div key={portfolio.portfolioId}>
                 <strong>{portfolio.portfolioName}</strong>
                 <p>{portfolio.count} candidates · {portfolio.status === 'failed' ? 'Research failed' : portfolio.status === 'no_candidates' ? 'No matches' : portfolio.status === 'pending' ? 'Research pending' : 'Research completed'}</p>
-                <p>{portfolio.status === 'no_candidates'
-                  ? 'No companies cleared the mandate evidence threshold in this run.'
-                  : portfolio.reason.length > 220 ? `${portfolio.reason.slice(0, 220).trimEnd()}…` : portfolio.reason}</p>
+                <p>{portfolio.reason.length > 220 ? `${portfolio.reason.slice(0, 220).trimEnd()}…` : portfolio.reason}</p>
+                {portfolio.status === 'no_candidates' && <p className="note">Inspect the screening funnel below to distinguish failed constraints, missing evidence, previously reviewed companies, and research-budget deferrals.</p>}
                 {portfolio.reason.length > 220 && <details className="run-outcome-details">
                   <summary>Read the full research explanation</summary>
                   <p>{portfolio.reason}</p>
@@ -721,6 +746,8 @@ export default function AIStockDiscoveryPage() {
                       {busy === `market-brief:${candidate.id}` ? 'Retrying market research…' : 'Retry market research'}
                     </button>}
                   </section>}
+                  {candidate.marketBriefProgress && ['queued', 'running'].includes(candidate.marketBriefStatus) && <p role="status">{candidate.marketBriefProgress.currentStage} · {candidate.marketBriefProgress.completed}/{candidate.marketBriefProgress.total} work units completed</p>}
+                  {candidate.marketBriefSyncWarning && <p className="caveat" role="status">{candidate.marketBriefSyncWarning}</p>}
                   {candidate.marketBriefStatus === 'completed' && candidate.marketBriefJson && <MarketBriefReview
                     brief={candidate.marketBriefJson}
                     busy={busy === `market-brief:${candidate.id}`}
@@ -730,6 +757,8 @@ export default function AIStockDiscoveryPage() {
                     <strong>{t('scope')}</strong>
                     <p>{t('scopeDetail')}</p>
                   </div>}
+                  {candidate.analysisProgress && ['queued', 'running'].includes(candidate.analysisRunStatus ?? '') && <p role="status">{candidate.analysisProgress.currentStage} · {candidate.analysisProgress.completed}/{candidate.analysisProgress.total} work units completed</p>}
+                  {candidate.analysisSyncWarning && <p className="caveat" role="status">{candidate.analysisSyncWarning}</p>}
                   <ResearchWorkspace candidate={{
                     companyName: candidate.companyName, runStatus: selectedRun?.status ?? 'completed',
                     decision: candidate.decision, workflowStatus: candidate.workflowStatus,

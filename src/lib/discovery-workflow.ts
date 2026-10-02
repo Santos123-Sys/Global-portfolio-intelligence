@@ -601,7 +601,9 @@ export async function startApprovedCandidateMarketBrief(ownerId: string, candida
   }
 }
 
-export async function synchronizeCandidateMarketBrief(ownerId: string, candidateId: string) {
+export async function synchronizeCandidateMarketBrief(ownerId: string, candidateId: string, onStatus?: (status: {
+  progress?: { completed: number; total: number; currentStage: string }; syncWarning?: string;
+}) => void) {
   const row = await ownedCandidate(ownerId, candidateId);
   if (!row?.candidate.externalMarketBriefId) return row?.candidate ?? null;
   const activeStatuses = ['dispatching', 'queued', 'running'];
@@ -609,10 +611,17 @@ export async function synchronizeCandidateMarketBrief(ownerId: string, candidate
   let remote;
   try { remote = await fetchExternalMarketBrief(row.candidate.externalMarketBriefId); }
   catch {
-    if (row.candidate.marketBriefStatus !== 'dispatching' || !row.candidate.marketBriefRequestJson) return row.candidate;
+    if (row.candidate.marketBriefStatus !== 'dispatching' || !row.candidate.marketBriefRequestJson) {
+      onStatus?.({ syncWarning: 'Live market-research status could not be refreshed. The last saved status is shown; automatic refresh will retry.' });
+      return row.candidate;
+    }
     try { remote = await startExternalMarketBrief(MarketBriefRequest.parse(row.candidate.marketBriefRequestJson)); }
-    catch { return row.candidate; }
+    catch {
+      onStatus?.({ syncWarning: 'Market-research delivery could not be confirmed. The saved request will be retried automatically.' });
+      return row.candidate;
+    }
   }
+  onStatus?.({ progress: remote.progress });
   const [updated] = await db.update(discoveryCandidates).set({ marketBriefStatus: remote.status,
     ...(remote.result ? { marketBriefJson: remote.result } : {}), marketBriefErrorMessage: remote.errorMessage ?? null,
     workflowStatus: remote.status === 'completed' ? 'market_research_review' : remote.status === 'failed' ? 'market_research_failed' : 'market_research_queued',
