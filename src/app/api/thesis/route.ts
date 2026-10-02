@@ -125,7 +125,9 @@ export async function POST(req: Request) {
       await tx.insert(thesisMutationAudit).values({
         thesisVersionId: created.id,
         ownerId: session.auth.userId,
-        action: 'confirmed_external_extraction',
+        action: parsed.data.externalExtractionId.startsWith('strategy-chat:')
+          ? 'confirmed_gemini_strategy'
+          : 'confirmed_external_extraction',
         actor: session.auth.email,
         metadata: {
           supersededVersionId: active?.id ?? null,

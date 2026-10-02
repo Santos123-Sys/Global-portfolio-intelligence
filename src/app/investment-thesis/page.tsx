@@ -9,6 +9,7 @@ import { assessThesisReview } from '@/lib/thesis-review';
 import { ThesisDiscoveryPreview } from '@/components/thesis-discovery-preview';
 import { ThesisCriteriaEditor } from '@/components/thesis-criteria-editor';
 import { GovernancePolicyEditor } from '@/components/governance-policy-editor';
+import { ThesisStrategyChat } from '@/components/thesis-strategy-chat';
 import { canDismissThesisExtraction } from '@/lib/thesis-extraction-lifecycle';
 
 interface ThesisVersionRow {
@@ -344,14 +345,14 @@ export default function InvestmentThesisPage() {
   return (
     <main className="portfolio-strategy-page">
       <h1 className="text-glow">Portfolio Strategy</h1>
-      <p className="sub">Upload your strategy document. The system extracts it for review before research begins.</p>
+      <p className="sub">Describe your investment goals with Gemini. Review the strategy PDF and structured mandate before research begins.</p>
 
       {error && <div className="caveat" role="alert"><p>{error}</p><button type="button" className="secondary-button" disabled={busy} onClick={() => void load().catch(cause => setError(cause.message))}>Retry loading</button></div>}
       {transitionNotice && <p className="caveat" role="status">{transitionNotice}</p>}
 
       {(!activeThesis || selected) && <ol className="thesis-process" aria-label="Strategy approval steps">
-        <li aria-current={!selected ? 'step' : undefined}><span>1</span> Upload a strategy document</li>
-        <li aria-current={selected && ['queued', 'running'].includes(selected.status) ? 'step' : undefined}><span>2</span> Extract the investment criteria</li>
+        <li aria-current={!selected ? 'step' : undefined}><span>1</span> Describe your strategy</li>
+        <li aria-current={selected && ['queued', 'running'].includes(selected.status) ? 'step' : undefined}><span>2</span> Generate and review the PDF</li>
         <li aria-current={criteriaDraft ? 'step' : undefined}><span>3</span> Review and approve</li>
       </ol>}
       {!loading && activeThesis && <section className="card thesis-active" aria-labelledby="active-thesis-title">
@@ -359,25 +360,31 @@ export default function InvestmentThesisPage() {
         <p className="note">Approved: {new Date(activeThesis.effectiveDate).toLocaleDateString()}</p><div className="thesis-destination-list">{(activeThesis.criteriaJson as ThesisCriteria).portfolios.map((portfolio, index) => <article key={`${portfolio.role}-${index}`}>
           <strong>{portfolio.policy?.name || roleLabel(portfolio.role)}</strong><span className="badge">{portfolio.currency}</span><p>{portfolio.objective}</p>
         </article>)}</div>
-        <div className="workflow-actions"><Link className="action-button inline-action" href="/ai-stock-discovery">Continue to Discovery</Link></div>
+        <div className="workflow-actions"><Link className="action-button inline-action" href="/ai-stock-discovery">Continue to Discovery</Link><a className="secondary-button" href={`/api/thesis/pdf?versionId=${encodeURIComponent(activeThesis.id)}`}>Download strategy PDF</a></div>
         <details><summary>Approved criteria and management</summary><ThesisSummary criteria={activeThesis.criteriaJson as ThesisCriteria} /><ThesisDiscoveryPreview criteria={activeThesis.criteriaJson as ThesisCriteria} /><button className="secondary-button" type="button" onClick={() => downloadThesisVersion(activeThesis)}>Download approved criteria (JSON)</button><button className="secondary-button dismiss-button" type="button" disabled={busy} onClick={() => void excludeVersion(activeThesis)}>Exclude version {activeThesis.versionNumber}</button></details>
       </section>}
       {loading && <p role="status">Loading your thesis workspace…</p>}
-      <section className="card thesis-upload strategy-entry-card" aria-labelledby="thesis-upload-title">
-        <p className="analysis-eyebrow">{activeThesis ? 'Update your strategy' : 'Start here'}</p><h2 id="thesis-upload-title">{activeThesis ? 'Upload an updated strategy' : 'Add your strategy document'}</h2>
-        <p className="note">Upload a PDF, text, or Markdown file. The system extracts the criteria for your review and approval.</p>
-        {documentBusy && <p className="note" role="status">Sending your thesis for extraction…</p>}
+      {!loading && !selected && !criteriaDraft && <ThesisStrategyChat
+        key={activeThesis?.id ?? 'new-thesis'}
+        nextVersion={nextVersion}
+        startingCriteria={activeThesis?.criteriaJson as ThesisCriteria | undefined}
+        onGenerated={(extraction) => {
+          setExtractions((current) => [extraction, ...current.filter((item) => item.id !== extraction.id)]);
+          setBaseVersionId(activeThesis?.id ?? null);
+          setSelectedId(extraction.id);
+          setCriteriaDraft(null);
+          setReviewNotes('');
+          setTransitionNotice('Gemini created a strategy PDF and a structured draft. Review the criteria below; Discovery starts only after you approve.');
+        }}
+      />}
+      <details className="card thesis-upload strategy-entry-card">
+        <summary>{documentBusy ? 'Importing strategy document…' : 'Import an existing strategy document (optional)'}</summary>
+        <p className="note">If you already have a written mandate, import a PDF, text or Markdown file. The document extraction workflow remains available; the conversational Gemini flow is the recommended way to create or update a strategy.</p>
         <label className="thesis-file-label">
           Choose strategy document
-          <input
-            type="file"
-            accept="application/pdf,text/plain,text/markdown,.pdf,.md,.txt"
-            aria-label="Choose strategy document"
-            disabled={busy || loading}
-            onChange={(event) => { const file = event.target.files?.[0] ?? null; event.target.value = ''; void upload(file); }}
-          />
+          <input type="file" accept="application/pdf,text/plain,text/markdown,.pdf,.md,.txt" aria-label="Choose strategy document" disabled={busy || loading} onChange={(event) => { const file = event.target.files?.[0] ?? null; event.target.value = ''; void upload(file); }} />
         </label>
-      </section>
+      </details>
 
       {selected && !criteriaDraft && <section className="card thesis-extraction-status" aria-live="polite">
         <h2>{selected.status === 'failed' ? 'Strategy document needs attention' : 'Reading your strategy'}</h2><p>{selected.sourceFileName}</p>
@@ -392,7 +399,9 @@ export default function InvestmentThesisPage() {
           <fieldset disabled={busy} className="thesis-review-fields">
           {staleDraft && <div role="alert" className="caveat"><p>The approved strategy changed while this document was being reviewed. Upload it again to review a version based on the latest strategy.</p></div>}
 
-          {selected?.resultJson && <p className="note">Extraction confidence: {(selected.resultJson.extractionConfidence * 100).toFixed(0)}%. Check the details below against your source document.</p>}
+          {selected?.resultJson && (selected.externalExtractionId.startsWith('strategy-chat:')
+            ? <p className="note">Gemini drafted this strategy from your conversation; no external issuer research has been performed. Verify every field below before approval.</p>
+            : <p className="note">Extraction confidence: {(selected.resultJson.extractionConfidence * 100).toFixed(0)}%. Check the details below against your source document.</p>)}
           {!!selected?.resultJson?.ambiguousPoints.length && (
             <div className="caveat">
               <strong>Ambiguities requiring judgment</strong>
@@ -491,7 +500,7 @@ export default function InvestmentThesisPage() {
               >
                 Exclude version
               </button>
-              <details><summary>Advanced export</summary><button type="button" className="secondary-button" onClick={() => downloadThesisVersion(thesis)}>Download confirmed criteria (JSON)</button></details>
+              <details><summary>Advanced export</summary><a className="secondary-button" href={`/api/thesis/pdf?versionId=${encodeURIComponent(thesis.id)}`}>Download strategy PDF</a><button type="button" className="secondary-button" onClick={() => downloadThesisVersion(thesis)}>Download confirmed criteria (JSON)</button></details>
               <ThesisSummary criteria={thesis.criteriaJson as ThesisCriteria} />
               <ThesisDiscoveryPreview criteria={thesis.criteriaJson as ThesisCriteria} />
             </article>
@@ -502,7 +511,7 @@ export default function InvestmentThesisPage() {
       <details className="card"><summary>Approved source documents ({extractions.filter(item => item.confirmedAt).length})</summary>
         {extractions.filter(item => item.confirmedAt).map(extraction => <article className="thesis-mandate" key={extraction.id}>
           <h3>{extraction.sourceFileName}</h3><p className="note">Approved · v{extraction.requestedVersion}</p>
-          {extraction.resultJson && <details><summary>Original extraction and evidence</summary><ThesisSummary criteria={extraction.resultJson.criteria} /><p>Extraction confidence: {(extraction.resultJson.extractionConfidence * 100).toFixed(0)}%</p><ul>{extraction.resultJson.ambiguousPoints.map((point, index) => <li key={index}>{point.location}: {point.issue} — “{point.sourceExcerpt}”</li>)}</ul><p>{extraction.resultJson.unmappedContent.join(' · ')}</p></details>}
+          {extraction.resultJson && <details><summary>{extraction.externalExtractionId.startsWith('strategy-chat:') ? 'Generated mandate' : 'Original extraction and evidence'}</summary><ThesisSummary criteria={extraction.resultJson.criteria} />{!extraction.externalExtractionId.startsWith('strategy-chat:') && <><p>Extraction confidence: {(extraction.resultJson.extractionConfidence * 100).toFixed(0)}%</p><ul>{extraction.resultJson.ambiguousPoints.map((point, index) => <li key={index}>{point.location}: {point.issue} — “{point.sourceExcerpt}”</li>)}</ul><p>{extraction.resultJson.unmappedContent.join(' · ')}</p></>}</details>}
           <button className="secondary-button dismiss-button" type="button" disabled={busy || !canDismissThesisExtraction(extraction.status)} onClick={() => void dismiss(extraction)} aria-label={`Dismiss ${extraction.sourceFileName} from the review queue`}>Dismiss document and linked thesis</button>
         </article>)}
       </details>

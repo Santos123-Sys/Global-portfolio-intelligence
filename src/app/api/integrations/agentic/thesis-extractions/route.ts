@@ -52,6 +52,13 @@ export async function GET(req: Request) {
   )).limit(1);
   if (!local) return NextResponse.json({ error: 'Thesis extraction not found' }, { status: 404 });
 
+  // Gemini chat drafts are generated and completed inside the dashboard. They
+  // have no remote agentic job to poll, even though they share the same human
+  // review queue and thesis approval contract.
+  if (local.externalExtractionId.startsWith('strategy-chat:')) {
+    return NextResponse.json({ extraction: local }, { headers: { 'Cache-Control': 'no-store' } });
+  }
+
   try {
     const remote = await fetchExternalThesisExtraction(externalExtractionId);
     const [updated] = await db.update(externalThesisExtractions).set({
