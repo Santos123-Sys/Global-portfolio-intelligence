@@ -14,6 +14,7 @@ export const PortfolioCreatorState = z.object({
   error: z.string().max(500).nullable(),
   extractionId: z.string().nullable(),
   language: z.enum(['en', 'pt']),
+  baseVersionId: z.string().uuid().nullable().default(null),
 }).strict();
 export type PortfolioCreatorState = z.infer<typeof PortfolioCreatorState>;
 export interface CreatorSession { revision: number; state: PortfolioCreatorState }
@@ -21,17 +22,33 @@ export const CreatorAction = z.discriminatedUnion('action', [
   z.object({ action: z.literal('answer'), revision: z.number().int().nonnegative(), questionId: z.string(), answer: z.enum(['A', 'B', 'C', 'D', 'E', 'F']), language: z.enum(['en', 'pt']).optional() }).strict(),
   z.object({ action: z.literal('confirm_profile'), revision: z.number().int().nonnegative(), confirmation: ProfileConfirmation }).strict(),
   z.object({ action: z.literal('restart_profile'), revision: z.number().int().nonnegative() }).strict(),
+  z.object({ action: z.literal('restart_strategy'), revision: z.number().int().nonnegative(), baseVersionId: z.string().uuid().nullable() }).strict(),
   z.object({ action: z.literal('cancel_turn'), revision: z.number().int().nonnegative() }).strict(),
 ]);
 export function emptyCreatorState(language: 'en' | 'pt' = 'en'): PortfolioCreatorState {
-  return { answers: {}, profile: null, phase: 'profiling', messages: [], draft: null, generationStatus: 'idle', generationStartedAt: null, error: null, extractionId: null, language };
+  return { answers: {}, profile: null, phase: 'profiling', messages: [], draft: null, generationStatus: 'idle', generationStartedAt: null, error: null, extractionId: null, language, baseVersionId: null };
 }
 export function requiredCreatorProfile(state: PortfolioCreatorState): InvestorProfileSnapshot {
   if (!state.profile || !['constraints', 'strategy_ready', 'document_ready'].includes(state.phase)) throw new Error('Complete and confirm the investor profile before generating a strategy');
   return validateInvestorProfileSnapshot(state.profile);
 }
 export function applyCreatorAction(state: PortfolioCreatorState, action: z.infer<typeof CreatorAction>): PortfolioCreatorState {
-  if (action.action === 'restart_profile') return emptyCreatorState(state.language);
+  if (action.action === 'restart_profile') return { ...emptyCreatorState(state.language), baseVersionId: state.baseVersionId };
+  if (action.action === 'restart_strategy') {
+    return {
+      ...state,
+      phase: state.profile ? 'constraints' : 'profiling',
+      messages: state.profile ? [{ role: 'assistant', content: state.language === 'pt'
+        ? 'Vamos atualizar a estratégia ativa. Seu perfil confirmado foi preservado; descreva apenas o que deve mudar.'
+        : 'Let’s update the active strategy. Your confirmed investor profile is preserved; describe only what should change.' }] : [],
+      draft: null,
+      generationStatus: 'idle',
+      generationStartedAt: null,
+      error: null,
+      extractionId: null,
+      baseVersionId: action.baseVersionId,
+    };
+  }
   if (action.action === 'cancel_turn') return { ...state, generationStatus: 'idle', generationStartedAt: null, phase: state.profile ? 'constraints' : state.phase, error: null };
   if (action.action === 'confirm_profile') {
     if (state.phase !== 'profile_review') throw new Error('Finish the profile questions before confirming');

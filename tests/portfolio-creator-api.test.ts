@@ -58,4 +58,19 @@ describe('Portfolio Creator server gates', () => {
     const response = await PATCH(request({ action: 'restart_profile', revision: 4 }, 'PATCH'));
     expect(response.status).toBe(409); expect(mocks.save).not.toHaveBeenCalled();
   });
+  it('starts a clean strategy update while preserving the confirmed investor profile', async () => {
+    const state = profiledState();
+    state.messages = [{ role: 'user', content: 'Old strategy request' }];
+    state.draft = null;
+    state.baseVersionId = '11111111-1111-4111-8111-111111111111';
+    stored = { revision: 8, state };
+    const nextVersionId = '22222222-2222-4222-8222-222222222222';
+    const response = await PATCH(request({ action: 'restart_strategy', revision: 8, baseVersionId: nextVersionId }, 'PATCH'));
+    expect(response.status).toBe(200);
+    expect(stored.state.profile).not.toBeNull();
+    expect(stored.state.baseVersionId).toBe(nextVersionId);
+    expect(stored.state.draft).toBeNull();
+    expect(stored.state.phase).toBe('constraints');
+    expect(stored.state.messages).toHaveLength(1);
+  });
 });
