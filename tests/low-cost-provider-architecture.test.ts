@@ -26,7 +26,7 @@ describe('low-cost provider architecture', () => {
     expect(discovery).toContain("env.DISCOVERY_PROVIDER === 'finnhub'");
     expect(discovery).toContain("exchange === 'BVMF'");
     expect(discovery).toContain('BrapiDiscoveryProvider');
-    expect(discovery).toContain("env.DISCOVERY_FALLBACK_PROVIDER === 'eodhd' && primary.name !== 'eodhd'");
+    expect(discovery).toContain("env.DISCOVERY_FALLBACK_PROVIDER === 'eodhd' && primaryName !== 'eodhd'");
     expect(discoveryTranslations).toContain('B3 discovery uses BrAPI');
     expect(workflow).toContain("analysisMode: 'limited_research_risk'");
     expect(workflow).toContain('researchEvidence,');
