@@ -863,7 +863,8 @@ export class OpenAIAgenticPipeline {
     await onProgress?.(0, 3, 'Applying thesis constraints');
     const screening = screenDiscoveryUniverse(request);
     const researchUniverse = [...new Map([...screening.eligibleByPortfolio.values()].flat().map(r => [listingKey(r), r])).values()];
-    await onProgress?.(1, 3, `Researching ${researchUniverse.length} eligible listings`);
+    const progressTotal = researchUniverse.length + request.portfolios.length + 2;
+    await onProgress?.(1, progressTotal, `Retrieving evidence for ${researchUniverse.length} eligible listings`);
     if(request.agentConfig) validateToolPolicy('market_research',request.agentConfig.enabledTools);
     let researchCalls=0;
     const { evidence: webEvidence, failures: researchFailures } = await collectDiscoveryResearch(
@@ -873,6 +874,7 @@ export class OpenAIAgenticPipeline {
         if(++researchCalls>(request.agentConfig?.runtimePolicy?.maxToolCalls ?? 100))throw new Error('Research tool budget exhausted');
         return researchSecurity(record, this.webResearch);
       },
+      (completed, _total, ticker) => onProgress?.(1 + completed, progressTotal, `Retrieving evidence: ${ticker}`) ?? Promise.resolve(),
     );
     try {
       const portfolioOutputs: z.infer<typeof MarketDiscoveryOutput>[] = [];
@@ -895,7 +897,10 @@ export class OpenAIAgenticPipeline {
           portfolioOutputs.push({ thesisVersion: request.thesis.criteria.version,
             marketMandates: [{ portfolioId: portfolio.id, role: portfolio.role, exchanges: discoveryMarkets(portfolio.role), currency: portfolio.baseCurrency, rationale: 'Deterministic screening completed before research' }],
             candidates: [], verifiedWebSources: [], limitations: screenLimitations });
-          portfolioOutcomes.push({ portfolioId: portfolio.id, status: 'no_candidates', reason: 'No new eligible issuers in the supplied universe; inspect screening results.' });
+          const breakdown = ['ineligible', 'unverified', 'duplicate', 'already_known', 'budget_deferred']
+            .map(status => `${screened.filter(record => record.status === status).length} ${status.replaceAll('_', ' ')}`).join(', ');
+          const reasons = [...new Set(screened.flatMap(record => record.reasons))].slice(0, 5);
+          portfolioOutcomes.push({ portfolioId: portfolio.id, status: 'no_candidates', reason: `No new eligible issuers entered research. ${screened.length} supplied listings screened: ${breakdown}. ${reasons.join(' ')} No financial analysis or valuation was started.` });
           continue;
         }
         const failedResearch = portfolioUniverse.filter(record => researchFailures.has(`${record.exchange}:${record.ticker}`));
@@ -914,7 +919,7 @@ export class OpenAIAgenticPipeline {
           researchLimitation: researchFailures.has(`${record.exchange}:${record.ticker}`) ? DISCOVERY_RESEARCH_GAP : null,
         }));
         const prompt = `DISCOVERY INTERPRETATION\n${JSON.stringify(thesisDiscoveryPlan(request.thesis.criteria))}\n\nCONFIRMED THESIS\n${JSON.stringify(request.thesis.criteria)}\n\nPORTFOLIO TO RESEARCH\n${JSON.stringify(portfolio)}\n\nMAX CANDIDATES FOR THIS PORTFOLIO\n${request.maxCandidatesPerPortfolio}\n\nSTRUCTURED UNIVERSE FOR THIS PORTFOLIO\n${JSON.stringify(universe)}`;
-        await onProgress?.(2, 3, `Assessing thesis fit for ${portfolio.name}`);
+        await onProgress?.(1 + researchUniverse.length + portfolioOutcomes.length, progressTotal, `Assessing thesis fit for ${portfolio.name}`);
         modelCalls += 1;
         const response = await this.client.responses.parse({
           ...this.modelOptions(request.agentConfig,'discovery'),
@@ -945,7 +950,7 @@ export class OpenAIAgenticPipeline {
               discoveryContext: {
                 thesisVersionId: request.thesis.versionId, issuerKey: issuerKey(record), channel: 'structured_universe',
                 eligibility: screened.find(r => r.exchange === record.exchange && r.ticker === record.ticker)!,
-                evidence: [{ url: record.sourceUrl, provider: record.provider, kind: 'structured_record', tier: ['eodhd', 'finnhub'].includes(record.provider) ? 'data_provider' : 'unclassified', retrievedAt: null, observedAt: record.observedAt, publishedAt: null },
+                evidence: [{ url: record.sourceUrl, provider: record.provider, kind: 'structured_record', tier: ['eodhd', 'finnhub', 'brapi'].includes(record.provider) ? 'data_provider' : 'unclassified', retrievedAt: null, observedAt: record.observedAt, publishedAt: null },
                   ...(web?.sources ?? []).map(source => ({ ...source, provider: source.kind === 'primary_document' ? 'issuer_or_filing' : this.webResearch.provider, kind: source.kind ?? 'search_result', tier: source.tier ?? 'unclassified' }))],
               },
               informationGaps: [...new Set([...candidate.informationGaps, ...(web?.gaps ?? []),
@@ -970,12 +975,15 @@ export class OpenAIAgenticPipeline {
         });
         validateDiscoveryOutput(portfolioOutput, portfolioRequest);
         portfolioOutputs.push(portfolioOutput);
+        const noUsableEvidence = !portfolioUniverse.some(record => webEvidence.get(`${record.exchange}:${record.ticker}`)?.urls.length);
         portfolioOutcomes.push({
           portfolioId: portfolio.id,
-          status: portfolioOutput.candidates.length ? 'candidates_found' : failedResearch.length ? 'failed' : 'no_candidates',
+          status: portfolioOutput.candidates.length ? 'candidates_found' : failedResearch.length || noUsableEvidence ? 'failed' : 'no_candidates',
           reason: portfolioOutput.candidates.length
             ? `${portfolioOutput.candidates.length} candidates matched the supplied universe and thesis.`
-            : portfolioOutput.limitations.join(' ') || 'No candidates met the confirmed mandate in the supplied universe.',
+            : noUsableEvidence
+              ? 'No shortlist could be verified: external research returned no usable sources. Review the agent web-search policy and search-provider access, then retry. Missing evidence does not establish a thesis mismatch.'
+              : portfolioOutput.limitations.join(' ') || 'No candidates met the confirmed mandate in the supplied universe.',
         });
         } catch (error) {
           // Preserve validated work from other markets. A failed market has no
@@ -1017,7 +1025,7 @@ export class OpenAIAgenticPipeline {
           modelCalls, elapsedMs: Date.now() - startedAt },
       });
       validateDiscoveryOutput(output, request);
-      await onProgress?.(3, 3, 'Shortlist ready for review');
+      await onProgress?.(progressTotal, progressTotal, output.candidates.length ? 'Shortlist ready for review' : 'Screening complete; no shortlist produced');
       return output;
     } catch (error) {
       if (error instanceof AgenticPipelineError) throw error;

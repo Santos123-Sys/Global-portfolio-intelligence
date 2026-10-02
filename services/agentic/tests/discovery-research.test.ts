@@ -2,7 +2,7 @@ import type OpenAI from 'openai';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { emptyThesisPolicy, type DiscoveryRunRequest } from '@portfolio-intelligence/agentic-contract';
 import { OpenAIAgenticPipeline } from '../src/openai-pipeline.js';
-import { DISCOVERY_RESEARCH_GAP } from '../src/discovery-research.js';
+import { collectDiscoveryResearch, DISCOVERY_RESEARCH_GAP } from '../src/discovery-research.js';
 import { portfolioId, thesis, thesisVersionId } from './fixtures.js';
 
 const brazilId = '22222222-2222-4222-8222-222222222222';
@@ -29,6 +29,24 @@ function pipeline(parsed: unknown) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('discovery research failure isolation', () => {
+  it('reports each unique listing before and after retrieval, including failures', async () => {
+    const input = request();
+    const progress = vi.fn(async (_completed: number, _total: number, _ticker: string) => undefined);
+    const research = vi.fn(async (_name: string, ticker: string) => {
+      if (ticker === 'BBB') throw new Error('Provider unavailable');
+      return { query: ticker, urls: ['https://example.test/issuer'], snippets: [] };
+    });
+    const result = await collectDiscoveryResearch([...input.universe, input.universe[0]], research, progress);
+    expect(progress.mock.calls).toEqual([[0, 2, 'XSWX:AAA'], [1, 2, 'XSWX:AAA'], [1, 2, 'XSWX:BBB'], [2, 2, 'XSWX:BBB']]);
+    expect(research).toHaveBeenCalledTimes(2);
+    expect([...result.failures]).toEqual(['XSWX:BBB']);
+  });
+  it('does not classify empty external evidence as a verified thesis mismatch', async () => {
+    const input = request();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ results: [] })));
+    const output = modelCandidate(input); output.candidates = [];
+    await expect(pipeline(output).instance.discoverSecurities(input)).rejects.toThrow(/no usable sources/);
+  });
   it('enforces disabled web research and propagates the configured model policy',async()=>{
     const input=request();
     input.agentConfig={agentKind:'market_research',configVersion:2,name:'Research',scope:'Discover eligible issuers',promptAddendum:'Prefer official filings',enabledTools:['structured_universe'],runtimePolicy:{model:'gpt-6-sol',fallbackModel:null,reasoningEffort:'high',maxOutputTokens:4000,timeoutMs:60000,maxAttempts:2,maxToolCalls:10,sourceMaxAgeDays:180}};
@@ -64,7 +82,7 @@ describe('discovery research failure isolation', () => {
     vi.stubGlobal('fetch', vi.fn(async (_url: unknown, init: RequestInit) => JSON.parse(init.body as string).query.startsWith('AAA ')
       ? new Response('', { status: 401 }) : Response.json({ results: [] })));
     const result = modelCandidate(input); result.candidates = [];
-    await expect(pipeline(result).instance.discoverSecurities(input)).rejects.toThrow(/partial assessment/);
+    await expect(pipeline(result).instance.discoverSecurities(input)).rejects.toThrow(/no usable sources|partial assessment/);
   });
   it('preserves a successful market when another market has no retrievable research', async () => {
     const input = request();

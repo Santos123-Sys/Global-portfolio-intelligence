@@ -6,6 +6,7 @@ import { DiscoveryCandidate } from '@portfolio-intelligence/agentic-contract';
 import { assertSameOrigin } from '@/lib/auth';
 import { authenticateRequest } from '@/lib/api-auth';
 import { db } from '@/lib/db';
+import { fetchExternalAgenticRun } from '@/lib/integrations/agentic-client';
 import { getPriceProvider } from '@/lib/connectors';
 import { loadDiscoveryLatestPrices } from '@/lib/discovery-market-data';
 import { scoreDiscoveryEvidence } from '@/lib/discovery-evidence';
@@ -67,9 +68,10 @@ export async function GET(req: Request) {
       isNull(thesisVersions.excludedAt)
     ))
     .orderBy(desc(discoveryCandidates.createdAt));
+  const marketBriefLive = new Map<string, { progress?: { completed: number; total: number; currentStage: string }; syncWarning?: string }>();
   if (rows.some(({ candidate }) => ['dispatching', 'queued', 'running'].includes(candidate.marketBriefStatus))) {
     await Promise.all(rows.filter(({ candidate }) => ['dispatching', 'queued', 'running'].includes(candidate.marketBriefStatus))
-      .map(({ candidate }) => synchronizeCandidateMarketBrief(session.auth.userId, candidate.id).catch(() => null)));
+      .map(({ candidate }) => synchronizeCandidateMarketBrief(session.auth.userId, candidate.id, status => marketBriefLive.set(candidate.id, status)).catch(() => { marketBriefLive.set(candidate.id, { syncWarning: 'Market-research status could not be refreshed. Automatic refresh will retry.' }); })));
     rows = await db.select({ candidate: discoveryCandidates, portfolioName: portfolios.name, discoveryRequestedAt: externalDiscoveryRuns.requestedAt })
       .from(discoveryCandidates).innerJoin(portfolios, eq(discoveryCandidates.portfolioId, portfolios.id))
       .innerJoin(externalDiscoveryRuns, eq(discoveryCandidates.runId, externalDiscoveryRuns.id))
@@ -90,12 +92,33 @@ export async function GET(req: Request) {
     // when a provider is not configured on a development environment.
   }
   const externalIds = rows.flatMap((row) => row.candidate.externalAnalysisRunId ? [row.candidate.externalAnalysisRunId] : []);
-  const externalRuns = externalIds.length
+  let externalRuns = externalIds.length
     ? await db.select().from(externalAgenticRuns).where(and(
       eq(externalAgenticRuns.ownerId, session.auth.userId),
       inArray(externalAgenticRuns.externalRunId, externalIds)
     ))
     : [];
+  const analysisProgress = new Map<string, { completed: number; total: number; currentStage: string }>();
+  const analysisSyncWarnings = new Map<string, string>();
+  await Promise.all(externalRuns.filter(run => ['queued', 'running'].includes(run.status)).map(async run => {
+    try {
+      const remote = await fetchExternalAgenticRun(run.externalRunId);
+      if (remote.progress) analysisProgress.set(run.externalRunId, remote.progress);
+      await db.update(externalAgenticRuns).set({
+        status: remote.status,
+        errorMessage: remote.errorMessage ?? null,
+        reportPdfUrl: remote.reportPdfUrl ?? run.reportPdfUrl,
+        completedAt: ['completed', 'failed'].includes(remote.status) ? new Date() : run.completedAt,
+      }).where(and(eq(externalAgenticRuns.id, run.id), ne(externalAgenticRuns.status, 'imported')));
+    } catch {
+      analysisSyncWarnings.set(run.externalRunId, 'Live analysis status could not be refreshed. The last saved status is shown; automatic refresh will retry.');
+    }
+  }));
+  if (externalRuns.some(run => ['queued', 'running'].includes(run.status))) {
+    externalRuns = await db.select().from(externalAgenticRuns).where(and(
+      eq(externalAgenticRuns.ownerId, session.auth.userId), inArray(externalAgenticRuns.externalRunId, externalIds)
+    ));
+  }
   const runByExternalId = new Map(externalRuns.map((run) => [run.externalRunId, run]));
   const runIds = externalRuns.map((run) => run.id);
   const analyses = runIds.length
@@ -155,11 +178,15 @@ export async function GET(req: Request) {
     return {
       ...row.candidate,
       latestPrice,
+      marketBriefProgress: marketBriefLive.get(row.candidate.id)?.progress ?? null,
+      marketBriefSyncWarning: marketBriefLive.get(row.candidate.id)?.syncWarning ?? null,
       evidenceScorecard: scoreDiscoveryEvidence(discovery, latestPrice),
       portfolioName: row.portfolioName,
       discoveryRequestedAt: row.discoveryRequestedAt,
       analysisRunStatus: run?.status ?? null,
       analysisRunError: run?.errorMessage ?? null,
+      analysisProgress: run ? analysisProgress.get(run.externalRunId) ?? null : null,
+      analysisSyncWarning: run ? analysisSyncWarnings.get(run.externalRunId) ?? null : null,
       reportUrl: run && (run.reportPdfUrl || run.status === 'completed' || run.status === 'imported')
         ? `/api/integrations/agentic/reports?externalRunId=${encodeURIComponent(run.externalRunId)}`
         : null,
@@ -171,7 +198,7 @@ export async function GET(req: Request) {
       dcfLockReason: dcfLocked ? LIMITED_DATA_DCF_LOCK_REASON : null,
     };
   });
-  return NextResponse.json({ candidates });
+  return NextResponse.json({ candidates }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function POST(req: Request) {

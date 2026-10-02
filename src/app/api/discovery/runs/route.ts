@@ -55,6 +55,7 @@ export async function GET(req: Request) {
   const id = new URL(req.url).searchParams.get('id');
   let runs = await list(session.auth.userId);
   const progress = new Map<string, { completed: number; total: number; currentStage: string }>();
+  const syncWarnings = new Map<string, string>();
   const active = runs.filter((run) =>
     (!id || run.id === id) && (run.status === 'dispatching' || run.status === 'queued' || run.status === 'running')
   );
@@ -65,14 +66,14 @@ export async function GET(req: Request) {
       if (remote.progress) progress.set(run.id, remote.progress);
       await synchronizeDiscoveryRun(run.id, session.auth.userId, remote);
     } catch {
-      // Keep the durable local record while the private service is temporarily unavailable.
+      syncWarnings.set(run.id, 'Live agent status could not be refreshed. The last saved status is shown; refresh will retry automatically.');
     }
   }));
   if (active.length) runs = await list(session.auth.userId);
   if (id && !runs.some((run) => run.id === id)) {
     return NextResponse.json({ error: 'Discovery run not found' }, { status: 404 });
   }
-  return NextResponse.json({ runs: (id ? runs.filter((run) => run.id === id) : runs).map(run => ({ ...run, progress: progress.get(run.id) })) });
+  return NextResponse.json({ runs: (id ? runs.filter((run) => run.id === id) : runs).map(run => ({ ...run, progress: progress.get(run.id), syncWarning: syncWarnings.get(run.id) })) }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function POST(req: Request) {
@@ -128,4 +129,3 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: (error as Error).message }, { status: 502 });
   }
 }
-
