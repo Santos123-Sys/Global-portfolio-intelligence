@@ -108,6 +108,15 @@ export default function InvestmentThesisPage() {
   }, [load]);
 
   useEffect(() => {
+    const refreshAfterHistoryRestore = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      void load().catch((cause) => setError((cause as Error).message));
+    };
+    window.addEventListener('pageshow', refreshAfterHistoryRestore);
+    return () => window.removeEventListener('pageshow', refreshAfterHistoryRestore);
+  }, [load]);
+
+  useEffect(() => {
     if (!pendingExtractionIds) { setRefreshError(null); return; }
     const controller = new AbortController(); let timer: ReturnType<typeof setTimeout>;
     const pendingIds = pendingExtractionIds.split('|');
@@ -175,6 +184,20 @@ export default function InvestmentThesisPage() {
   const staleDraft = !!criteriaDraft && (criteriaDraft.version !== nextVersion || baseVersionId !== (versions.find(v=>!v.supersededAt)?.id ?? null));
   const selected = extractions.find((item) => item.id === selectedId) ?? null;
   const hasDraft = criteriaDraft !== null;
+
+  useEffect(() => {
+    if (!selected?.confirmedAt || !criteriaDraft) return;
+    setSelectedId(null);
+    setCriteriaDraft(null);
+    setBaseVersionId(null);
+    setReviewNotes('');
+    if (ownerId) {
+      try { sessionStorage.removeItem(`thesis-draft:${ownerId}`); }
+      catch { setError('The approved browser draft could not be cleared. Refresh this page before editing another strategy.'); }
+    }
+    setSaveStatus('Approved draft cleared from this browser tab');
+    setTransitionNotice('This draft was already approved. The current approved strategy is shown above.');
+  }, [selected?.confirmedAt, selected?.id, criteriaDraft, ownerId]);
 
   useEffect(() => {
     if (selected?.status === 'completed' && selected.resultJson && !criteriaDraft) {
@@ -414,7 +437,18 @@ export default function InvestmentThesisPage() {
           <p className="analysis-eyebrow">{selected.sourceFileName}</p><h2 id="thesis-review-title">Review portfolio strategy</h2>
           <p role="status">{ownerId ? saveStatus : 'Draft is in memory; keep this page open until approval.'}</p>
           <fieldset disabled={busy} className="thesis-review-fields">
-          {staleDraft && <div role="alert" className="caveat"><p>The approved strategy changed while this document was being reviewed. Upload it again to review a version based on the latest strategy.</p></div>}
+          {staleDraft && <div role="alert" className="caveat">
+            <p>{isCreatorExtraction(selected.externalExtractionId)
+              ? 'The approved strategy changed while this Portfolio Creator draft was open. Return to Portfolio Creator and update from the active version before approval.'
+              : 'The approved strategy changed while this document was being reviewed. Review a fresh extraction against the latest active strategy before approval.'}</p>
+            <button type="button" className="secondary-button" onClick={() => {
+              setCriteriaDraft(null); setSelectedId(null); setBaseVersionId(null); setReviewNotes('');
+              if (ownerId) { try { sessionStorage.removeItem(`thesis-draft:${ownerId}`); } catch { setError('Draft recovery could not be cleared from this browser tab.'); } }
+              setTransitionNotice(isCreatorExtraction(selected.externalExtractionId)
+                ? 'The stale draft was closed. Portfolio Creator is ready to update from the current approved strategy.'
+                : 'The stale draft was closed. Review or import a fresh source against the current approved strategy.');
+            }}>{isCreatorExtraction(selected.externalExtractionId) ? 'Return to Portfolio Creator' : 'Close stale review'}</button>
+          </div>}
 
           {selected?.investorProfileJson && <InvestorProfileSummary profile={selected.investorProfileJson} />}
           {selected?.resultJson && (isCreatorExtraction(selected.externalExtractionId)
