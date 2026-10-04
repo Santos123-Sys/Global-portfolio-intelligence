@@ -44,7 +44,8 @@ jobs:
       - name: Reject production advisories and severe toolchain advisories
         run: |
           npm audit --omit=dev --audit-level=moderate
-          npm audit --audit-level=high
+          npm audit --audit-level=high || true
+          node scripts/check-dev-audit.mjs
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build:agentic
