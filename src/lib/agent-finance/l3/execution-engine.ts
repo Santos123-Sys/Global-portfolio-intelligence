@@ -29,22 +29,23 @@ export class ExecutionEngine {
     if(this.leaseOwner && !rows.length) throw new SessionInterrupted();
     await recordSessionEvent(this.sessionId,{eventType:'phase_started',summary:`Started ${phase} phase.`,authority:'autonomous',consequence:'low',reversible:true});
   }
-  async run(name: string, handler: (prior: Record<string, AgentOutput>) => Promise<AgentOutput>): Promise<AgentOutput> {
+  async run(name: string, handler: (prior: Record<string, AgentOutput>) => Promise<AgentOutput>, executionAgent: string = name): Promise<AgentOutput> {
     await this.assertLease();
     if(this.outputs[name]?.status==='completed') return this.outputs[name];
     const start = Date.now();
-    const inputs=selectPrior(name,this.outputs);
-    const [run] = await db.insert(agentRuns).values({ sessionId: this.sessionId, agentName: name, agentRole: name, inputPayload: inputs,configurationHash:this.configs[name]?.configurationHash }).returning({ id: agentRuns.id });
+    const config=this.configs[executionAgent];
+    const inputs=selectPrior(executionAgent,this.outputs);
+    const [run] = await db.insert(agentRuns).values({ sessionId: this.sessionId, agentName: name, agentRole: executionAgent, inputPayload: inputs,configurationHash:config?.configurationHash }).returning({ id: agentRuns.id });
     await recordSessionEvent(this.sessionId,{eventType:'tool_started',summary:`Started ${name.replaceAll('-',' ')}.`,agent:name,authority:'autonomous',consequence:'low',reversible:true});
     try {
       const incoming = await this.tool('research-director', 'deliver_message', {
-        from: 'research-director', to: name, messageType: 'request', payload: inputs,
+        from: 'research-director', to: executionAgent, messageType: 'request', payload: inputs,
         timestamp: new Date().toISOString(), sessionId: this.sessionId,
       }) as AgentMessage;
-      await recordSessionEvent(this.sessionId,{eventType:'handoff',summary:`Research director assigned ${name.replaceAll('-',' ')}.`,detail:'The agent received only the predecessor outputs allowed by its governed context policy.',agent:name,authority:'autonomous',consequence:'low',reversible:true});
+      await recordSessionEvent(this.sessionId,{eventType:'handoff',summary:`Research director assigned ${name.replaceAll('-',' ')}.`,detail:`The task runs as ${executionAgent.replaceAll('-',' ')} with only the governed predecessor outputs allowed by its context policy.`,agent:name,authority:'autonomous',consequence:'low',reversible:true});
       let output:AgentOutput | undefined;
       let errors:string[]=[];
-      for(let attempt=0;attempt<(this.configs[name]?.runtimePolicy.maxAttempts ?? 3);attempt++) {
+      for(let attempt=0;attempt<(config?.runtimePolicy.maxAttempts ?? 3);attempt++) {
         const prior=incoming.payload as Record<string,AgentOutput>;
         const feedback:AgentOutput={status:'blocked',data:{attempt,errors},reasoningChain:['Correct failed QA checks; retain missing evidence as insufficient data.'],confidenceScore:0,citations:[],limitations:errors};
         try {
@@ -54,12 +55,12 @@ export class ExecutionEngine {
         } catch(error) { if(error instanceof SessionInterrupted)throw error;errors=[error instanceof Error ? error.message : 'Invalid output']; }
         if(!errors.length && output) break;
         await recordSessionEvent(this.sessionId,{eventType:'retry',summary:`${name.replaceAll('-',' ')} needs another validation attempt.`,detail:errors.slice(0,4).join('; ').slice(0,4000),agent:name,authority:'notify',consequence:'medium',reversible:true});
-        await this.tool('quality-validator','deliver_message',{from:'quality-validator',to:name,messageType:'feedback',payload:{attempt:attempt+1,errors},timestamp:new Date().toISOString(),sessionId:this.sessionId});
+        await this.tool('quality-validator','deliver_message',{from:'quality-validator',to:executionAgent,messageType:'feedback',payload:{attempt:attempt+1,errors},timestamp:new Date().toISOString(),sessionId:this.sessionId});
       }
-      if(!output || errors.length) throw new Error(`QA rejected output after ${this.configs[name]?.runtimePolicy.maxAttempts ?? 3} attempts: ${errors.join('; ')}`);
+      if(!output || errors.length) throw new Error(`QA rejected output after ${config?.runtimePolicy.maxAttempts ?? 3} attempts: ${errors.join('; ')}`);
       await this.assertLease();
-      const message: AgentMessage = { from: name, to: 'research-director', messageType: 'response', payload: output, timestamp: new Date().toISOString(), sessionId: this.sessionId };
-      await this.tool(name, 'deliver_message', message);
+      const message: AgentMessage = { from: executionAgent, to: 'research-director', messageType: 'response', payload: output, timestamp: new Date().toISOString(), sessionId: this.sessionId };
+      await this.tool(executionAgent, 'deliver_message', message);
       const saved=await db.update(agentRuns).set({ outputPayload: output, reasoningChain: JSON.stringify(output.reasoningChain), confidenceScore: String(output.confidenceScore), executionTimeMs: Date.now() - start, status: output.status, completedAt: new Date() }).where(this.runFence(run.id)).returning({id:agentRuns.id});
       if(this.leaseOwner && !saved.length) throw new SessionInterrupted();
       this.outputs[name] = output;
