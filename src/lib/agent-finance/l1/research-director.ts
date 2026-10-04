@@ -17,6 +17,7 @@ import { SessionInterrupted } from '../l3/session-control';
 import { activeAgentSnapshot, type EffectiveAgentConfig } from '@/lib/agent-governance';
 import { processEvaluationQueue } from '@/lib/agent-evaluations';
 import { validateQuality } from '../l3/quality';
+import { dynamicResearchBudget, planDynamicResearchSwarm, runDynamicResearchSpecialist, summarizeDynamicResearch, type DynamicResearchPlan } from './dynamic-research-swarm';
 
 /** L1: queued PostgreSQL state is authoritative; atomic claim prevents duplicate execution. */
 export async function executeSession(sessionId: string,onHeartbeat?:()=>void): Promise<void> {
@@ -49,7 +50,7 @@ export async function executeSession(sessionId: string,onHeartbeat?:()=>void): P
       await engine.tool('research-director', 'fetch_analyst_estimates');
       await engine.tool('research-director', 'fetch_peer_data');
       await engine.tool('research-director', 'calculate_wacc');
-      return evidenceOutput({ plan: executionPlan(request.analysisType), ticker: request.ticker,authority:researchPlan(foundation.company,request.analysisType) }, ['Collect existing dated financial evidence, NewsAdapter-ingested articles and portfolio-linked documents.'], foundation.sources, [], 60);
+      return evidenceOutput({ plan: executionPlan(request.analysisType), ticker: request.ticker,authority:{...researchPlan(foundation.company,request.analysisType),dynamicResearch:{enabled:request.analysisType!=='dcf',maxParallel:dynamicResearchBudget(request.analysisType)}} }, ['Collect existing dated financial evidence, NewsAdapter-ingested articles and portfolio-linked documents before bounded research decomposition.'], foundation.sources, [], 60);
     });
     const financials=await engine.run('financial-statement-analyzer', async () => outputSchema.parse(await engine.tool('financial-statement-analyzer','analyze_financial_statements')));
     if(request.analysisType!=='dcf' && foundation.researchPolicy?.valueScorecard?.enabled && financials.status==='completed' && financials.dataQuality?.status==='review_required' && !foundation.financialReview) {
@@ -61,6 +62,18 @@ export async function executeSession(sessionId: string,onHeartbeat?:()=>void): P
       const packet=await engine.tool('market-industry-research','research_market_structure') as Record<string,unknown>;
       return analysisAgent('market-industry-research',foundation,{...prior,'market-research-input':evidenceOutput(packet,['Apply sector-specific industry modules to retained evidence.'],foundation.sources)},configs['market-industry-research']);
     });
+
+    let dynamicPlan:DynamicResearchPlan={version:'dynamic-research-v1',source:'fallback',maxParallel:0,researchAsOf:foundation.fiscalDate,tasks:[]};
+    if(request.analysisType!=='dcf') {
+      dynamicPlan=await planDynamicResearchSwarm(foundation,request.analysisType,configs['research-director']);
+      if(dynamicPlan.tasks.length) {
+        await recordSessionEvent(sessionId,{eventType:'plan_created',summary:`Research Director created ${dynamicPlan.tasks.length} parallel evidence task${dynamicPlan.tasks.length===1?'':'s'}.`,detail:`Bounded dynamic swarm (${dynamicPlan.source} plan): ${dynamicPlan.tasks.map(item=>item.label).join(' · ')}`.slice(0,4000),agent:'research-director',authority:'autonomous',consequence:'low',reversible:true});
+        await Promise.all(dynamicPlan.tasks.map(item=>engine.run(`dynamic-research-${item.id}`,prior=>runDynamicResearchSpecialist(item,foundation,prior,configs['dynamic-research-specialist']),'dynamic-research-specialist')));
+        const summary=summarizeDynamicResearch(dynamicPlan,engine.outputs);
+        await recordSessionEvent(sessionId,{eventType:'finding',summary:`Dynamic research swarm finished ${summary.completed}/${dynamicPlan.tasks.length} tasks.`,detail:`${summary.needsAttention} task${summary.needsAttention===1?'':'s'} need evidence review. Independent subagents do not approve conclusions; their outputs now feed the governed synthesis.`,agent:'research-director',authority:'notify',consequence:summary.needsAttention?'medium':'low',reversible:true});
+      }
+    }
+
     if (request.analysisType === 'dcf' || request.analysisType === 'combined') {
       await engine.phase('valuation');
       for (const name of dcfAgents) await engine.run(name, async prior => dcfAgent(name, { request, foundation, outputs: prior }, input => engine.tool(name, 'run_dcf', input)));
@@ -99,14 +112,18 @@ export async function executeSession(sessionId: string,onHeartbeat?:()=>void): P
         await db.insert(agentRuns).values({sessionId:session.id,agentName:`${name}:shadow`,agentRole:name,inputPayload:{configuration:shadow.configurationHash},configurationHash:shadow.configurationHash,outputPayload:result,status:'shadow',confidenceScore:String(result.confidenceScore),executionTimeMs:Date.now()-started,completedAt:new Date()});
       }catch(error){if(error instanceof SessionInterrupted)throw error;await engine.assertLease();await db.insert(agentRuns).values({sessionId:session.id,agentName:`${name}:shadow`,agentRole:name,inputPayload:{},configurationHash:shadow.configurationHash,status:'shadow_failed',completedAt:new Date()});}
     }
-    const analytical=Object.entries(engine.outputs).filter(([name])=>!['research-director','analysis-director','dcf-orchestrator'].includes(name)).map(([,output])=>output);
+    const dynamicResearch=summarizeDynamicResearch(dynamicPlan,engine.outputs);
+    const coreEntries=Object.entries(engine.outputs).filter(([name])=>!name.startsWith('dynamic-research-'));
+    const analytical=coreEntries.filter(([name])=>!['research-director','analysis-director','dcf-orchestrator'].includes(name)).map(([,output])=>output);
     const confidenceScore = analytical.length ? Math.min(...analytical.map(row => row.confidenceScore)) : 0;
+    const highPriorityDynamicGap=dynamicResearch.tasks.some(row=>row.priority==='high' && row.output && row.output.status!=='completed');
+    const coreValues=coreEntries.map(([,output])=>output);
     const finalOutput = { ticker: request.ticker, outputs: engine.outputs,
-      equityResearch:aggregateEquityResearch(foundation.company,foundation.fiscalDate,request,engine.outputs,foundation.researchLocale ?? foundation.researchPolicy?.locale),valueScorecard,
-      confidenceScore, reasoningChain: ['Synthesize validated specialist outputs without overwriting conflicting views.', 'Numerical results remain separate from model-written narratives and require human review.'],
+      equityResearch:aggregateEquityResearch(foundation.company,foundation.fiscalDate,request,engine.outputs,foundation.researchLocale ?? foundation.researchPolicy?.locale),dynamicResearch,valueScorecard,
+      confidenceScore, reasoningChain: ['Research Director decomposed decision-relevant evidence questions into bounded independent tasks before synthesis.', 'Synthesize validated specialist outputs without overwriting conflicting views.', 'Numerical results remain separate from model-written narratives and require human review.'],
       citations: [...new Set(values.flatMap(row => row.citations))], requiresHumanReview: true,
       limitations: [...new Set(values.flatMap(row => row.limitations))],
-      status: confidenceScore<60 || values.some(row => row.status !== 'completed') ? 'insufficient_data' : 'completed',
+      status: confidenceScore<60 || coreValues.some(row => row.status !== 'completed') || highPriorityDynamicGap ? 'insufficient_data' : 'completed',
     };
     await engine.tool('research-director', 'store_memory', { agentName: 'research-director', eventContent: finalOutput });
     if(lost) throw new Error('Session lease lost');

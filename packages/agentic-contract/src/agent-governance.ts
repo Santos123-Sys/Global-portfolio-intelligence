@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const GOVERNANCE_VERSION = 3;
+export const GOVERNANCE_VERSION = 4;
 export const runtimePolicySchema = z.object({
   model: z.string().trim().min(1).max(100).default('gpt-6-sol'),
   fallbackModel:z.string().trim().min(1).max(100).nullable().default(null),
@@ -40,7 +40,8 @@ const legacy = ['thesis_extraction','market_research','security_analysis','portf
 export interface AgentDefinition { id: string; layer: string; execution: 'legacy' | 'model' | 'deterministic'; objective: string; tools: string[]; }
 export const AGENT_REGISTRY: AgentDefinition[] = [
   ...legacy.map(id => ({id, layer:'Legacy pipeline', execution:'legacy' as const, objective:id.replaceAll('_',' '), tools:id==='market_research' ? ['structured_universe','web_search'] : [id==='thesis_extraction' ? 'thesis_document' : 'grounding_bundle']})),
-  {id:'research-director',layer:'L1 orchestration',execution:'deterministic',objective:'Collect owned evidence and coordinate the persisted workflow.',tools:['deliver_message','fetch_comprehensive_data','fetch_filings','fetch_news','fetch_analyst_estimates','fetch_peer_data','calculate_wacc','store_memory']},
+  {id:'research-director',layer:'L1 orchestration',execution:'deterministic',objective:'Collect owned evidence, create a bounded research plan and coordinate the persisted workflow.',tools:['deliver_message','fetch_comprehensive_data','fetch_filings','fetch_news','fetch_analyst_estimates','fetch_peer_data','calculate_wacc','store_memory']},
+  {id:'dynamic-research-specialist',layer:'Dynamic Research Swarm',execution:'model',objective:'Investigate one bounded research question independently against retained evidence, surfacing contradictions, uncertainties and missing inputs without changing deterministic calculations or making portfolio decisions.',tools:['deliver_message']},
   {id:'quality-validator',layer:'L3 validation',execution:'model',objective:'Verify source entailment, coverage, dates, units, currencies and contradictions independently of the authoring pass.',tools:['deliver_message','verify_claims']},
   ...dcf.map(id=>({id,layer:'DCF Swarm',execution:'deterministic' as const,objective:`Run the registered ${id} calculation with reviewed inputs; never use prompt text as financial parameters.`,tools:['deliver_message','run_dcf']})),
   {id:'analysis-director',layer:'Analysis Swarm',execution:'deterministic',objective:'Plan independent specialists and opposing cases.',tools:['deliver_message']},
