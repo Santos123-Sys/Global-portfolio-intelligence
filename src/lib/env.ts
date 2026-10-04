@@ -11,10 +11,11 @@ const databaseUrlSchema = z.string().url('DATABASE_URL must be a valid Postgres 
 const schema = z.object({
   DATABASE_URL: databaseUrlSchema,
   MARKET_DATA_API_KEY: z.string().min(1).optional(),
-  MARKET_DATA_PROVIDER: z.enum(['stub', 'stooq', 'twelvedata', 'eodhd', 'yahoo-search']).default('stub'),
+  FMP_API_KEY: z.string().min(1).optional(),
+  MARKET_DATA_PROVIDER: z.enum(['stub', 'stooq', 'twelvedata', 'fmp', 'yahoo-search']).default('stub'),
   /** Low-cost breadth provider. Market validation deliberately remains separate. */
-  DISCOVERY_PROVIDER: z.enum(['eodhd', 'finnhub']).default('eodhd'),
-  DISCOVERY_FALLBACK_PROVIDER: z.enum(['none', 'eodhd']).default('none'),
+  DISCOVERY_PROVIDER: z.enum(['fmp', 'finnhub']).default('fmp'),
+  DISCOVERY_FALLBACK_PROVIDER: z.enum(['none', 'fmp']).default('none'),
   /** Brazil-specific primary source for B3 listings, quotes and basic indicators. */
   BRAPI_API_KEY: z.string().min(1).optional(),
   FINNHUB_API_KEY: z.string().min(1).optional(),
@@ -23,11 +24,7 @@ const schema = z.object({
   DISCOVERY_RESEARCH_BUDGET: z.coerce.number().int().min(1).max(100).default(40),
   DISCOVERY_UNIVERSE_CACHE_HOURS: z.coerce.number().int().min(1).max(24 * 30).default(168),
   // Self-imposed ceilings the provider gateway enforces before making a call,
-  // not a measurement of what the vendor actually allows — docs/architecture.md
-  // already flags exact vendor rate limits as unverified from this codebase.
-  // Defaults are deliberately conservative; raise them once you have measured
-  // your real limit. A default too low costs a delay, one too high costs a
-  // lockout, so the conservative direction is the safe one to default to.
+  // not a measurement of what the vendor actually allows.
   MARKET_DATA_GATEWAY_CALLS_PER_MINUTE: z.coerce.number().int().positive().default(60),
   MARKET_DATA_GATEWAY_CALLS_PER_DAY: z.coerce.number().int().positive().default(2_000),
   MARKET_DATA_GATEWAY_PLAN_LIMIT_MEMORY_HOURS: z.coerce.number().int().positive().default(24),
@@ -56,11 +53,18 @@ const schema = z.object({
   AGENTIC_SYSTEM_API_KEY: z.string().min(32, 'AGENTIC_SYSTEM_API_KEY must contain at least 32 characters').optional(),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 }).superRefine((env, context) => {
-  if (env.MARKET_DATA_PROVIDER === 'eodhd' && !env.MARKET_DATA_API_KEY) {
+  if (env.MARKET_DATA_PROVIDER === 'fmp' && !env.FMP_API_KEY) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
-      path: ['MARKET_DATA_API_KEY'],
-      message: 'MARKET_DATA_API_KEY is required when MARKET_DATA_PROVIDER=eodhd',
+      path: ['FMP_API_KEY'],
+      message: 'FMP_API_KEY is required when MARKET_DATA_PROVIDER=fmp',
+    });
+  }
+  if ((env.DISCOVERY_PROVIDER === 'fmp' || env.DISCOVERY_FALLBACK_PROVIDER === 'fmp') && !env.FMP_API_KEY) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['FMP_API_KEY'],
+      message: 'FMP_API_KEY is required when Financial Modeling Prep is configured for discovery',
     });
   }
   if (env.DISCOVERY_PROVIDER === 'finnhub' && !env.FINNHUB_API_KEY) {
@@ -124,6 +128,7 @@ export function getEnv(): Env {
   const parsed = schema.safeParse({
     ...process.env,
     MARKET_DATA_API_KEY: optional(process.env.MARKET_DATA_API_KEY),
+    FMP_API_KEY: optional(process.env.FMP_API_KEY),
     FINNHUB_API_KEY: optional(process.env.FINNHUB_API_KEY),
     BRAPI_API_KEY: optional(process.env.BRAPI_API_KEY),
     WEB_SEARCH_API_KEY: optional(process.env.WEB_SEARCH_API_KEY),
@@ -140,9 +145,7 @@ export function getEnv(): Env {
     MFA_ENCRYPTION_KEY: optional(process.env.MFA_ENCRYPTION_KEY),
     PUBLIC_APP_URL: optional(process.env.PUBLIC_APP_URL),
   });
-  if (!parsed.success) {
-    throw validationFailure(parsed.error.issues);
-  }
+  if (!parsed.success) throw validationFailure(parsed.error.issues);
   cached = parsed.data;
   return cached;
 }
@@ -151,13 +154,9 @@ export function getEnv(): Env {
 export function assertCronAuthorized(req: Request): void {
   const env = getEnv();
   if (!env.CRON_SECRET) {
-    if (env.NODE_ENV === 'production') {
-      throw new Error('CRON_SECRET is required in production; cron routes are public without it');
-    }
+    if (env.NODE_ENV === 'production') throw new Error('CRON_SECRET is required in production; cron routes are public without it');
     return;
   }
   const auth = req.headers.get('authorization');
-  if (auth !== `Bearer ${env.CRON_SECRET}`) {
-    throw new Error('Unauthorized cron invocation');
-  }
+  if (auth !== `Bearer ${env.CRON_SECRET}`) throw new Error('Unauthorized cron invocation');
 }
