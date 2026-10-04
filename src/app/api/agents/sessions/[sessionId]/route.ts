@@ -29,12 +29,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ sessionI
   const partialOutputs=Object.fromEntries(runs.filter(run=>run.status==='completed').flatMap(run=>{const output=outputSchema.safeParse(run.outputPayload);return output.success ? [[run.agentName,output.data]] : [];}));
   const request=analyzeSchema.parse(session.requestPayload);
   const plan = executionPlan(request.analysisType);
+  const dynamicRuns=[...new Set(runs.filter(run=>run.agentName.startsWith('dynamic-research-')).map(run=>run.agentName))];
+  if(dynamicRuns.length) {
+    const insertion=Math.max(0,plan.indexOf('market-industry-research')+1);
+    plan.splice(insertion,0,...dynamicRuns);
+  }
   if(runs.some(run=>run.agentName==='value-scorecard-analyst')) plan.push('value-scorecard-analyst');
   const done = [...new Set(runs.filter(row => ['completed','failed','blocked','insufficient_data'].includes(row.status)).map(row => row.agentName))];
   const inspector=companyView?null:buildAgentActivityInspector({configurationSnapshot:session.configurationSnapshot,runs,traces,events});
   const {evidenceSnapshot,configurationSnapshot,leaseOwner,leaseExpiresAt,requestPayload,ownerId,...publicSession}=session;void evidenceSnapshot;void configurationSnapshot;void leaseOwner;void leaseExpiresAt;void requestPayload;void ownerId;
   const publicRuns=runs.map(run=>({id:run.id,agentName:run.agentName,status:run.status,startedAt:run.startedAt,completedAt:run.completedAt,executionTimeMs:run.executionTimeMs,configurationHash:run.configurationHash}));
-  const progress=session.status==='completed'?100:Math.min(99,Math.round(done.filter(name=>plan.includes(name)).length/plan.length*100));
+  const progress=session.status==='completed'?100:Math.min(99,Math.round(done.filter(name=>plan.includes(name)).length/Math.max(plan.length,1)*100));
   const activeRun=runs.filter(row=>row.status==='running').at(-1);
   const visibleEvents=companyView?events.slice(-6):events;
   const liveStatus=companyView?{phase:session.phase.replaceAll('_',' '),currentAgent:activeRun?.agentName.replaceAll('-',' ')??null,latestActivity:visibleEvents.at(-1)?.summary??null,updatedAt:session.updatedAt.toISOString(),progress}:null;
