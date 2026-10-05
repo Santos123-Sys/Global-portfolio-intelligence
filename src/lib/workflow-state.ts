@@ -1,4 +1,5 @@
 export type WorkflowStageState = 'complete' | 'working' | 'attention' | 'ready' | 'locked';
+export type WorkflowRoute = '/investment-thesis' | '/ai-stock-discovery' | '/research' | '/positions';
 
 export type WorkflowSnapshotInput = {
   hasApprovedStrategy: boolean;
@@ -14,7 +15,7 @@ export type InvestmentWorkflowState = {
   portfolio: WorkflowStageState;
   approvedStrategyVersion: number | null;
   nextAction: {
-    href: string;
+    href: WorkflowRoute;
     label: string;
     reason: string;
   };
