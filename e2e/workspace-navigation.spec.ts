@@ -41,7 +41,7 @@ for (const width of [390, 1440]) {
     await analysisLink.focus();
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/research$/);
-    await expect(page.getByRole('heading', { name: 'Research & Analysis Inbox' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Research Workspace' })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Investment workflow' }).getByRole('link', { name: 'Analysis & valuation' })).toHaveAttribute('aria-current', 'step');
   });
 }
