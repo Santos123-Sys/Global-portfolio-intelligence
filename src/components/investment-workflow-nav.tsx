@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useLanguage } from '@/lib/i18n';
+import type { InvestmentWorkflowState, WorkflowStageState } from '@/lib/workflow-state';
 
 const labels = {
   en: ['Investment workflow', 'Portfolio strategy', 'Discover & review', 'Analysis & valuation', 'Portfolio & risk'],
@@ -19,81 +20,61 @@ const steps = [
   { id: 'portfolio', href: '/positions', matches: ['/positions', '/allocation', '/risk', '/governance'] },
 ] as const;
 
-type StageState = 'complete' | 'working' | 'current' | 'next' | 'locked';
+type StageDisplayState = WorkflowStageState | 'current';
 
-type WorkflowSnapshot = {
-  hasApprovedStrategy: boolean;
-  discoveryState: 'none' | 'working' | 'complete';
-  hasResearch: boolean;
-};
-
-const emptySnapshot: WorkflowSnapshot = {
-  hasApprovedStrategy: false,
-  discoveryState: 'none',
-  hasResearch: false,
-};
-
-function stageLabel(state: StageState): string {
+function stageLabel(state: StageDisplayState): string {
   if (state === 'complete') return 'Complete';
   if (state === 'working') return 'Working';
-  if (state === 'current') return 'Current';
+  if (state === 'attention') return 'Attention';
+  if (state === 'ready') return 'Ready';
   if (state === 'locked') return 'Waiting';
-  return 'Next';
+  return 'Current';
+}
+
+function stageState(workflow: InvestmentWorkflowState | null, id: typeof steps[number]['id']): WorkflowStageState | null {
+  if (!workflow) return null;
+  if (id === 'strategy') return workflow.strategy;
+  if (id === 'discovery') return workflow.discovery;
+  if (id === 'research') return workflow.research;
+  return workflow.portfolio;
 }
 
 export function InvestmentWorkflowNav() {
   const pathname = usePathname();
   const { language } = useLanguage();
-  const [snapshot, setSnapshot] = useState<WorkflowSnapshot>(emptySnapshot);
+  const [workflow, setWorkflow] = useState<InvestmentWorkflowState | null>(null);
   const active = steps.findIndex(step => step.matches.some(path => path.endsWith('/') ? pathname.startsWith(path) : pathname === path));
 
   useEffect(() => {
     if (active === -1) return;
     const controller = new AbortController();
-    Promise.allSettled([
-      fetch('/api/thesis', { signal: controller.signal, cache: 'no-store' }).then(async response => response.ok ? response.json() : null),
-      fetch('/api/discovery/runs', { signal: controller.signal, cache: 'no-store' }).then(async response => response.ok ? response.json() : null),
-      fetch('/api/analysis', { signal: controller.signal, cache: 'no-store' }).then(async response => response.ok ? response.json() : null),
-    ]).then(([thesisResult, discoveryResult, researchResult]) => {
-      if (controller.signal.aborted) return;
-      const thesis = thesisResult.status === 'fulfilled' ? thesisResult.value as { versions?: Array<{ supersededAt: string | null }> } | null : null;
-      const discovery = discoveryResult.status === 'fulfilled' ? discoveryResult.value as { runs?: Array<{ status: string }> } | null : null;
-      const research = researchResult.status === 'fulfilled' ? researchResult.value as { analyses?: unknown[] } | null : null;
-      const runs = discovery?.runs ?? [];
-      setSnapshot({
-        hasApprovedStrategy: Boolean(thesis?.versions?.some(version => !version.supersededAt)),
-        discoveryState: runs.some(run => ['dispatching', 'queued', 'running'].includes(run.status))
-          ? 'working'
-          : runs.some(run => run.status === 'completed') ? 'complete' : 'none',
-        hasResearch: Boolean(research?.analyses?.length),
-      });
-    }).catch(() => undefined);
+    fetch('/api/workflow/status', { signal: controller.signal, cache: 'no-store' })
+      .then(async response => response.ok ? response.json() : null)
+      .then((body: { workflow?: InvestmentWorkflowState } | null) => {
+        if (!controller.signal.aborted && body?.workflow) setWorkflow(body.workflow);
+      })
+      .catch(() => undefined);
     return () => controller.abort();
-  }, [active]);
+  }, [active, pathname]);
 
-  const stageStates = useMemo<StageState[]>(() => {
-    if (active === -1) return ['next', 'locked', 'locked', 'locked'];
-    return steps.map((step, index) => {
-      if (step.id === 'strategy' && snapshot.hasApprovedStrategy) return 'complete';
-      if (step.id === 'discovery' && snapshot.discoveryState === 'working') return 'working';
-      if (step.id === 'discovery' && snapshot.discoveryState === 'complete') return 'complete';
-      if (step.id === 'research' && snapshot.hasResearch) return 'complete';
-      if (index === active) return 'current';
-      if (index < active) return 'complete';
-      if (index === active + 1) return 'next';
-      return 'locked';
-    });
-  }, [active, snapshot]);
+  const states = useMemo<StageDisplayState[]>(() => steps.map((step, index) => {
+    const resolved = stageState(workflow, step.id);
+    if (index === active && (!resolved || resolved === 'ready')) return 'current';
+    if (resolved) return resolved;
+    if (index < active) return 'complete';
+    if (index === active) return 'current';
+    return index === active + 1 ? 'ready' : 'locked';
+  }), [active, workflow]);
 
   if (active === -1) return null;
   const copy = labels[language];
 
   return <nav className="investment-workflow-nav" aria-label={copy[0]}>
-    <ol>{steps.map((step, index) => <li key={step.href} data-stage-state={stageStates[index]}>
+    <ol>{steps.map((step, index) => <li key={step.href} data-stage-state={states[index]}>
       <Link href={step.href} aria-current={active === index ? 'step' : undefined}>
-        <span className="workflow-step-number" aria-hidden="true">{stageStates[index] === 'complete' ? '✓' : index + 1}</span>
+        <span className="workflow-step-number" aria-hidden="true">{states[index] === 'complete' ? '✓' : index + 1}</span>
         <span>{copy[index + 1]}</span>
-        <small>{stageLabel(stageStates[index])}</small>
+        <small>{stageLabel(states[index])}</small>
       </Link>
     </li>)}</ol>
   </nav>;
