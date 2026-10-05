@@ -79,7 +79,8 @@ for (const width of [390, 1440]) {
     await page.getByRole('button', { name: 'Generate strategy PDF and review' }).click();
     expect((await download).suggestedFilename()).toContain('investment-thesis.pdf');
     await expect(page.getByRole('heading', { name: 'Review portfolio strategy' })).toBeVisible();
-    await expect(page.getByText('Ready for your approval', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Ready', exact: true })).toBeVisible();
+    await expect(page.getByText('The mandate is structured and ready to govern Discovery.')).toBeVisible();
     const reviewNote = page.getByLabel('Review note (required)');
     if (await reviewNote.isVisible()) await reviewNote.fill('Reviewed the confirmed profile, equity sleeve, B3 market and liquidity context before approval.');
     const approve = page.getByRole('button', { name: 'Approve strategy and start research' });
