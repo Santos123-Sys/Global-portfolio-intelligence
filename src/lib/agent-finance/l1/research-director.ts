@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { agentAnalysisSessions, agentDebates, agentRuns } from '@/lib/db/agent-schema';
 import { analyzeSchema, dcfAgents, analysisAgents, evidenceOutput, executionPlan, outputSchema } from '../contracts';
 import { loadFoundation,sourceEvidence } from '../l4/foundation';
+import { acquireExternalResearch } from '../l4/external-research';
 import { createLiveRegistry } from '../l3/live-registry';
 import { ExecutionEngine } from '../l3/execution-engine';
 import { dcfAgent } from './dcf-swarm';
@@ -42,13 +43,26 @@ export async function executeSession(sessionId: string,onHeartbeat?:()=>void): P
     }
     const configs=session.configurationSnapshot as Record<string,EffectiveAgentConfig> ?? await activeAgentSnapshot(session.ownerId,session.id);
     await db.update(agentAnalysisSessions).set({configurationSnapshot:configs}).where(owned);
-    const foundation = session.evidenceSnapshot as Foundation ?? await loadFoundation(session.ownerId, session.securityId, request);
+
+    let foundation=session.evidenceSnapshot as Foundation | null;
+    if(!foundation) {
+      foundation=await loadFoundation(session.ownerId, session.securityId, request);
+      const external=await acquireExternalResearch(foundation,request.analysisType);
+      foundation={...foundation,externalResearch:external.evidence,dataGaps:[...foundation.dataGaps,...external.gaps]};
+    } else if(!Array.isArray(foundation.externalResearch)) {
+      // Backward compatibility for sessions snapshotted before Platform V2.
+      foundation={...foundation,externalResearch:[]};
+    }
     if(lost) throw new Error('Session lease lost');
     await db.update(agentAnalysisSessions).set({evidenceSnapshot:foundation}).where(owned);
     const engine = new ExecutionEngine(session.id, createLiveRegistry(foundation, session.ownerId, session.id,configs),sourceEvidence(foundation),token,configs);
     const completed=await db.select().from(agentRuns).where(and(eq(agentRuns.sessionId,sessionId),eq(agentRuns.status,'completed')));
     for(const run of completed) if(run.outputPayload) engine.outputs[run.agentName]=run.outputPayload as import('../contracts').AgentOutput;
     await engine.phase('research');
+    if(foundation.externalResearch.length) {
+      const categories=[...new Set(foundation.externalResearch.map(row=>row.category))];
+      await recordSessionEvent(sessionId,{eventType:'finding',summary:`Research Director added ${foundation.externalResearch.length} live evidence source${foundation.externalResearch.length===1?'':'s'} to the session snapshot.`,detail:`Bounded external acquisition completed before specialist analysis. Categories: ${categories.join(', ')}. Search snippets remain evidence leads and are subject to the same citation and claim-verification gates as retained documents.`,agent:'research-director',authority:'notify',consequence:'low',reversible:true});
+    }
     await engine.run('research-director', async () => {
       await engine.tool('research-director', 'fetch_comprehensive_data');
       await engine.tool('research-director', 'fetch_filings');
@@ -56,7 +70,8 @@ export async function executeSession(sessionId: string,onHeartbeat?:()=>void): P
       await engine.tool('research-director', 'fetch_analyst_estimates');
       await engine.tool('research-director', 'fetch_peer_data');
       await engine.tool('research-director', 'calculate_wacc');
-      return evidenceOutput({ plan: executionPlan(request.analysisType), ticker: request.ticker,authority:{...researchPlan(foundation.company,request.analysisType),dynamicResearch:{enabled:request.analysisType!=='dcf',maxParallel:dynamicResearchBudget(request.analysisType)}} }, ['Collect existing dated financial evidence, NewsAdapter-ingested articles and portfolio-linked documents before bounded research decomposition.'], foundation.sources, [], 60);
+      const citations=[...new Set([...foundation.sources,...foundation.externalResearch.map(row=>row.url)])];
+      return evidenceOutput({ plan: executionPlan(request.analysisType), ticker: request.ticker,externalEvidence:{count:foundation.externalResearch.length,categories:[...new Set(foundation.externalResearch.map(row=>row.category))]},authority:{...researchPlan(foundation.company,request.analysisType),dynamicResearch:{enabled:request.analysisType!=='dcf',maxParallel:dynamicResearchBudget(request.analysisType)}} }, ['Freeze retained financial evidence and bounded live source discovery into one attributable session snapshot before research decomposition.'], citations, [], 60);
     });
     const financials=await engine.run('financial-statement-analyzer', async () => outputSchema.parse(await engine.tool('financial-statement-analyzer','analyze_financial_statements')));
     if(request.analysisType!=='dcf' && foundation.researchPolicy?.valueScorecard?.enabled && financials.status==='completed' && financials.dataQuality?.status==='review_required' && !foundation.financialReview) {
@@ -128,7 +143,7 @@ export async function executeSession(sessionId: string,onHeartbeat?:()=>void): P
     const coreValues=coreEntries.map(([,output])=>output);
     const finalOutput = { ticker: request.ticker, outputs: engine.outputs,
       equityResearch:aggregateEquityResearch(foundation.company,foundation.fiscalDate,request,engine.outputs,foundation.researchLocale ?? foundation.researchPolicy?.locale),dynamicResearch,valueScorecard,
-      confidenceScore, reasoningChain: ['Research Director decomposed decision-relevant evidence questions into bounded independent tasks before synthesis.', 'Synthesize validated specialist outputs without overwriting conflicting views.', 'Numerical results remain separate from model-written narratives and require human review.'],
+      confidenceScore, reasoningChain: ['Research Director froze retained and bounded live evidence before decomposing decision-relevant questions.', 'Synthesize validated specialist outputs without overwriting conflicting views.', 'Numerical results remain separate from model-written narratives and require human review.'],
       citations: [...new Set(values.flatMap(row => row.citations))], requiresHumanReview: true,
       limitations: [...new Set(values.flatMap(row => row.limitations))],
       status: confidenceScore<60 || coreValues.some(row => row.status !== 'completed') || highPriorityDynamicGap ? 'insufficient_data' : 'completed',
