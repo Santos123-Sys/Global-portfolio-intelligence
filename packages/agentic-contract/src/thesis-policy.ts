@@ -8,12 +8,35 @@ export const ValueScorecardPolicy = z.object({
     .refine(value=>Math.abs(Object.values(value).reduce((sum,weight)=>sum+weight,0)-1)<.0001,'Scorecard weights must sum to 1'),
   minimumEvidenceCoverage: z.number().min(.5).max(1).default(.8),
 }).strict();
+
+/**
+ * Non-numeric predicates are explicit, source-verifiable facts. Attribute mode
+ * uses provider/security-master fields; evidence mode additionally requires
+ * source lineage and can enforce freshness. The system never invents a
+ * predicate from prose.
+ */
+export const ThesisPredicate = z.object({
+  mode: z.enum(['attribute', 'evidence']),
+  field: text,
+  operator: z.enum(['eq', 'neq']),
+  value: text,
+  sourceRequirement: z.enum(['provider', 'official']).optional(),
+  maxAgeDays: z.number().int().positive().max(3650).optional(),
+}).strict().superRefine((predicate, context) => {
+  if (predicate.mode === 'evidence' && !predicate.sourceRequirement) {
+    context.addIssue({ code: 'custom', path: ['sourceRequirement'], message: 'Evidence predicates require a source requirement' });
+  }
+  if (predicate.mode === 'attribute' && (predicate.sourceRequirement || predicate.maxAgeDays)) {
+    context.addIssue({ code: 'custom', path: ['mode'], message: 'Attribute predicates cannot declare evidence-source requirements' });
+  }
+});
+
 export const ThesisRule = z
   .object({
     statement: text,
     kind: z.enum(['hard', 'preference', 'context']),
     category: z.enum(['selection', 'macro', 'sector', 'risk', 'valuation']),
-    // A predicate is supplied by the investor, never inferred from qualitative prose.
+    // A numeric predicate is supplied by the investor, never inferred from qualitative prose.
     metric: z
       .object({
         field: text,
@@ -24,8 +47,14 @@ export const ThesisRule = z
       })
       .strict()
       .optional(),
+    // Explicit categorical/evidence predicate for facts such as legal status.
+    predicate: ThesisPredicate.optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((rule, context) => {
+    if (rule.metric && rule.predicate) context.addIssue({ code: 'custom', path: ['predicate'], message: 'Use either a numeric metric or a categorical/evidence predicate, not both' });
+    if (rule.kind !== 'hard' && rule.predicate?.mode === 'evidence') context.addIssue({ code: 'custom', path: ['predicate'], message: 'Evidence-gated eligibility predicates are reserved for hard rules' });
+  });
 export const ThesisPolicy = z
   .object({
     name: text.optional(),
@@ -54,6 +83,7 @@ export const ThesisPolicy = z
   .strict();
 export type ThesisPolicy = z.infer<typeof ThesisPolicy>;
 export type ThesisRule = z.infer<typeof ThesisRule>;
+export type ThesisPredicate = z.infer<typeof ThesisPredicate>;
 
 export function emptyThesisPolicy(): ThesisPolicy {
   return {

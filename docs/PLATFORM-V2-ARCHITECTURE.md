@@ -10,12 +10,13 @@ The existing financial swarm is retained because its strongest properties are al
 
 ## Benchmark patterns used
 
-The rebuild borrows architecture patterns rather than code from the following public projects:
+The rebuild borrows architecture patterns rather than code from the following projects:
 
-- OpenBB Platform and Workspace — adapter-first financial data integration and a workspace-oriented product surface. https://github.com/OpenBB-finance/OpenBB
-- LangChain Open Deep Research — supervisor-led research decomposition, configurable tools and bounded specialist work. https://github.com/langchain-ai/open_deep_research
-- TradingAgents — specialist financial agents with structured debate rather than a single opaque model call. https://github.com/TauricResearch/TradingAgents
-- Microsoft Magentic-UI — human co-planning, action guards, explicit review and transparent agent activity. https://github.com/microsoft/magentic-ui
+- OpenBB Platform and Workspace — adapter-first financial data integration and a workspace-oriented product surface.
+- LangChain Open Deep Research — supervisor-led research decomposition, configurable tools and bounded specialist work.
+- TradingAgents — specialist financial agents with structured debate rather than a single opaque model call.
+- Microsoft Magentic-UI — human co-planning, action guards, explicit review and transparent agent activity.
+- Gilberto Legal Agentic System — sequential domain clusters, manager-level synthesis, explicit adversarial review and rerouting feedback only to the cluster that owns the disputed decision. Global Portfolio Intelligence applies that control pattern to investment constraints; it does not copy Gilberto's legal-domain agents or legal risk semantics.
 
 What is deliberately *not* copied: autonomous trading, unconstrained agent spawning, hidden model consensus, provider-specific domain code, or UI progress that is not backed by persisted execution state.
 
@@ -30,6 +31,7 @@ Domain API / application services
             |
 Canonical intelligence runtime
   Research Director
+      -> constraint decision pipeline
       -> bounded task scheduler
       -> dynamic research specialists
       -> deterministic DCF / statement analytics
@@ -78,6 +80,40 @@ Every material research claim should retain source, publication date, market/per
 
 Agents can research, calculate, compare, challenge and recommend. They cannot mark a thesis approved, change portfolio weights or execute a trade. Approval, acceptance and portfolio actions remain explicit user operations with audit history.
 
+### 7. Constraints have one owner and one enforcement meaning
+
+Portfolio context, security eligibility and ranking preferences must not share one generic prose-warning channel. Inspired by Gilberto's cluster/manager architecture, thesis interpretation now follows a sequential constraint decision pipeline:
+
+```text
+Mandate / Allocation Manager
+  investor profile, equity-scope deviation, liquidity horizon, review cadence
+        ↓
+Universe Manager
+  listing market, security type, domicile, sector and industry gates
+        ↓
+Evidence Eligibility Manager
+  source-backed categorical/legal/status facts and numeric hard predicates
+        ↓
+Ranking Manager
+  qualitative growth/quality preferences that rank but never exclude
+        ↓
+Adversarial Constraint Auditor
+  contradictions, missing evidence, duplicated rules and cross-domain tensions
+        ↓
+Research Director
+  accepts the validated constraint state and starts security research
+```
+
+Each investor statement belongs to exactly one domain. Structured fields are authoritative when available; legacy prose is retained only when it cannot safely be classified without user judgment. This eliminates duplicate warnings and prevents context such as a 100% equity deviation from accidentally behaving like a security-level filter.
+
+Hard eligibility can be expressed in three ways:
+
+1. structured universe fields, such as `listingMarkets=BVMF` or `sectorsExcluded=Retail`;
+2. deterministic numeric metrics with field, operator, value, unit and period;
+3. categorical/evidence predicates. Evidence predicates additionally require source lineage and may enforce freshness. Missing evidence yields `unverified`, never an implicit pass.
+
+For example, excluding companies in judicial recovery is represented as an evidence gate on `judicial_recovery_status = none`, requiring official/regulatory lineage and a bounded evidence age. The system must not infer that status from silence or generic company prose.
+
 ## Experience architecture
 
 The prior interface exposed too many peer-level destinations in a wide navigation bar and duplicated the investment workflow beneath it. Platform V2 treats the product as a workstation:
@@ -98,17 +134,28 @@ The information hierarchy is now:
 4. Portfolio — positions, allocation and risk.
 5. Control — governance, research operations, settings and administration.
 
+Strategy review should show blocking corrections first, then actionable constraint/evidence items, then non-blocking context. Internal validator phrases are implementation diagnostics, not the primary UX. Resolved structured constraints should disappear from the warning surface rather than being shown again as legacy prose.
+
 ## Commercial-readiness path
 
 The codebase is not yet a commercial SaaS solely because the UI looks professional. Commercialization requires platform controls in addition to product functionality. Recommended sequence:
 
-### Foundation (this change)
+### Foundation
 
 - canonical research runtime;
 - governed scheduling and staggered provider calls;
 - model transport boundary;
 - workstation visual shell and Research Workspace;
 - architecture contract documented.
+
+### Constraint and decision integrity
+
+- clustered constraint ownership;
+- deterministic universe gates;
+- source-backed evidence predicates;
+- adversarial constraint audit before research dispatch;
+- canonicalization of legacy creator/extraction prose into structured rules only when semantics are explicit;
+- fail-closed behavior for missing hard-rule evidence.
 
 ### Platform hardening
 

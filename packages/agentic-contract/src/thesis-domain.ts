@@ -5,8 +5,10 @@ type Mandate = ThesisCriteria['portfolios'][number];
 const key = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
 const sectorKey = (s: string) => ({ tech: 'information technology', technology: 'information technology', financial: 'financials', 'financial services': 'financials' }[key(s)] ?? key(s));
 const universePaths: Record<string, string> = { 'Listing market': 'listingMarkets', Domicile: 'domicileCountries', 'Operating geography': 'operatingCountries', 'Revenue exposure': 'revenueCountries', 'Security type': 'securityTypes', 'Sector inclusion': 'sectorsIncluded', 'Sector exclusion': 'sectorsExcluded', 'Industry inclusion': 'industriesIncluded', 'Industry exclusion': 'industriesExcluded' };
+export type ThesisEvaluationCluster = 'mandate' | 'universe' | 'evidence' | 'ranking' | 'audit';
 export interface ThesisIssue {
   severity: 'blocking' | 'warning' | 'info';
+  cluster: ThesisEvaluationCluster;
   location: string;
   statement: string;
   reason: string;
@@ -15,6 +17,24 @@ export interface ThesisIssue {
 }
 const vague =
   /\b(quality|strong balance sheet|high growth|reasonable valuation|dominant|brazilian company|swiss company|defensive|good management)\b/i;
+const b3Listing = /\b(b3|bvmf)\b/i;
+const retail = /\bretail\b/i;
+const judicialRecovery = /judicial recovery|recupera(?:c|ç)(?:a|ã)o judicial/i;
+const portfolioContext = /^(investor profile:|strategy scope:|liquidity context:|profiling framework|risk posture:|review cadence:|100% equity scope|fixed income and other asset classes)/i;
+const sameStatement = (a: string, b: string) => key(a) === key(b);
+
+function hasExplicitRule(p: Mandate, statement: string) {
+  return p.policy?.rules.some(rule => sameStatement(rule.statement, statement)) ?? false;
+}
+
+function legacyConstraintIsStructured(p: Mandate, statement: string) {
+  const policy = p.policy;
+  if (!policy) return false;
+  if (b3Listing.test(statement) && policy.universe.listingMarkets.includes('BVMF')) return true;
+  if (retail.test(statement) && policy.universe.sectorsExcluded.some(value => sectorKey(value) === 'retail')) return true;
+  if (judicialRecovery.test(statement) && policy.rules.some(rule => rule.kind === 'hard' && rule.predicate?.field === 'judicial_recovery_status')) return true;
+  return hasExplicitRule(p, statement);
+}
 
 export function reviewStructuredThesis(
   criteria: ThesisCriteria,
@@ -27,39 +47,71 @@ export function reviewStructuredThesis(
     reason: string,
     interpretation: string,
     proxy?: string,
+    cluster: ThesisEvaluationCluster = 'audit',
   ) =>
     issues.push({
       severity,
+      cluster,
       location,
       statement,
       reason,
       interpretation,
       proxy,
     });
+
+  // Portfolio-wide context is evaluated once. It is not repeated as a security
+  // eligibility warning for every sleeve.
+  for (const statement of criteria.globalConstraints) {
+    if (portfolioContext.test(statement)) {
+      add(
+        'info',
+        'portfolio-wide',
+        statement,
+        'Portfolio construction context.',
+        'Retained for mandate governance and human review; it does not screen individual securities.',
+        undefined,
+        'mandate',
+      );
+    } else {
+      add(
+        'warning',
+        'portfolio-wide',
+        statement,
+        'Portfolio-wide prose has no explicit enforcement classification.',
+        'Classify it as mandate context or move a security-level restriction into the relevant structured universe/evidence rule.',
+        undefined,
+        'mandate',
+      );
+    }
+  }
+
   for (const p of criteria.portfolios) {
     const policy = p.policy;
     for (const statement of [
       ...p.inclusionCriteria,
       ...Object.entries(p.targetMetrics ?? {}).map(([k, v]) => `${k}: ${v}`),
     ]) {
+      if (legacyConstraintIsStructured(p, statement)) continue;
       add(
         'warning',
         p.role,
         statement,
-        'Legacy prose has no explicit rule classification.',
-        'Retained for qualitative review; it is not a deterministic numeric filter. Move it into a classified rule to define its effect.',
+        'Unclassified selection prose.',
+        'Move this into a structured preference, universe restriction or explicit predicate so its effect is unambiguous.',
+        undefined,
+        'ranking',
       );
     }
-    for (const statement of [
-      ...p.exclusionCriteria,
-      ...criteria.globalConstraints,
-    ]) {
+    for (const statement of p.exclusionCriteria) {
+      if (legacyConstraintIsStructured(p, statement)) continue;
       add(
         'warning',
         p.role,
         statement,
-        'This prose constraint cannot be verified deterministically.',
-        'Discovery must assess the stated restriction from evidence and disclose uncertainty. Use structured universe fields or a metric rule for a deterministic gate.',
+        'Unclassified exclusion prose.',
+        'A security cannot be rejected from prose alone. Move this into a structured universe restriction or an evidence/metric predicate.',
+        undefined,
+        'evidence',
       );
     }
     if (!policy) {
@@ -69,6 +121,8 @@ export function reviewStructuredThesis(
         p.objective,
         'No explicit structured universe.',
         'Only the configured role market is searched: Swiss Quality → XSWX; Brazilian Growth → BVMF. Domicile and revenue are not inferred.',
+        undefined,
+        'universe',
       );
       continue;
     }
@@ -85,6 +139,8 @@ export function reviewStructuredThesis(
         'Universe',
         'Define at least one geography dimension.',
         'Currency does not define geography.',
+        undefined,
+        'universe',
       );
     for (const field of [
       'domicileCountries',
@@ -99,6 +155,8 @@ export function reviewStructuredThesis(
             v,
             `${field} requires uppercase ISO alpha-2 codes.`,
             'Use BR, CH, US, etc.',
+            undefined,
+            'universe',
           );
     for (const v of u.listingMarkets)
       if (!/^[A-Z0-9]{4}$/.test(v))
@@ -108,6 +166,8 @@ export function reviewStructuredThesis(
           v,
           'Listing market requires a four-character MIC.',
           'Use BVMF for B3 or XSWX for SIX.',
+          undefined,
+          'universe',
         );
     const supported =
       p.role === 'swiss_quality'
@@ -126,6 +186,8 @@ export function reviewStructuredThesis(
         u.listingMarkets.join(', '),
         'The configured Discovery market cannot satisfy this listing restriction.',
         'Thesis can be saved; Discovery will produce no eligible names until market coverage changes.',
+        undefined,
+        'universe',
       );
     if (
       policy.targetHoldings &&
@@ -138,6 +200,8 @@ export function reviewStructuredThesis(
         `${policy.targetHoldings} target / ${policy.maximumHoldings} maximum`,
         'Target holdings exceeds maximum holdings.',
         'Reduce the target or increase the mandate maximum. Discovery shortlist size is separate from holdings.',
+        undefined,
+        'mandate',
       );
     for (const [included, excluded, label] of [
       [u.sectorsIncluded, u.sectorsExcluded, 'Sector'],
@@ -151,6 +215,8 @@ export function reviewStructuredThesis(
             v,
             `${label} is both required and excluded.`,
             'Remove one of the conflicting rules.',
+            undefined,
+            'audit',
           );
     }
     const lower = new Map<string, number>();
@@ -163,26 +229,29 @@ export function reviewStructuredThesis(
           lower.set(k, Math.max(lower.get(k) ?? -Infinity, m.value));
         else upper.set(k, Math.min(upper.get(k) ?? Infinity, m.value));
       }
-      if (r.kind === 'hard' && !r.metric)
+      if (r.kind === 'hard' && !r.metric && !r.predicate)
         add(
           'warning',
           p.role,
           r.statement,
-          'Hard qualitative rule has no machine-verifiable predicate.',
-          'Discovery cannot certify eligibility for this rule; add a predicate or explicitly change its classification.',
+          'Hard rule is missing an enforceable predicate.',
+          'Add a numeric metric, provider attribute, or evidence predicate. Until then Discovery cannot certify eligibility.',
+          undefined,
+          'evidence',
         );
-      if (!r.metric && vague.test(r.statement))
+      if (!r.metric && !r.predicate && vague.test(r.statement))
         add(
-          'warning',
+          r.kind === 'hard' ? 'warning' : 'info',
           p.role,
           r.statement,
           'Qualitative term has no stated measurement basis.',
           r.kind === 'context'
             ? 'Context only; no screening effect.'
             : r.kind === 'preference'
-              ? 'Qualitative preference; no invented threshold.'
+              ? 'Ranking preference only; the system does not invent a threshold.'
               : 'Unverified hard rule; does not establish eligibility.',
           'Consider ROIC, FCF conversion, leverage, margins, or revenue/earnings stability with an explicit unit and period.',
+          r.kind === 'context' ? 'mandate' : r.kind === 'preference' ? 'ranking' : 'evidence',
         );
     }
     for (const [k, min] of lower)
@@ -193,6 +262,8 @@ export function reviewStructuredThesis(
           k,
           'Minimum exceeds maximum for the same metric, unit and period.',
           'Correct one of the bounds.',
+          undefined,
+          'audit',
         );
     const prose = [
       p.objective,
@@ -210,6 +281,8 @@ export function reviewStructuredThesis(
         'Growth and valuation',
         'These preferences may sharply narrow the opportunity set, but are not logically incompatible.',
         'Review trade-offs; no automatic rejection.',
+        undefined,
+        'audit',
       );
     if (/long.term/i.test(prose) && /short.term catalyst/i.test(prose))
       add(
@@ -218,6 +291,8 @@ export function reviewStructuredThesis(
         'Horizon and catalyst',
         'Check whether a short-term event is essential to a long-term mandate.',
         'A catalyst can complement a long-term thesis; clarify dependency.',
+        undefined,
+        'audit',
       );
     if (!policy.rules.some((r) => r.category === 'risk'))
       add(
@@ -226,36 +301,52 @@ export function reviewStructuredThesis(
         'Risk framework',
         'No explicit risk rules.',
         'Consider leverage, liquidity and concentration; no default limits imposed.',
+        undefined,
+        'audit',
       );
   }
   return issues;
 }
 
 export function thesisDiscoveryPlan(criteria: ThesisCriteria) {
-  return criteria.portfolios.map((p) => ({
-    role: p.role,
-    name: p.policy?.name ?? p.role.replaceAll('_', ' '),
-    reportingCurrency: p.currency,
-    objective: p.objective,
-    strategy: p.policy?.strategy, horizon: p.policy?.horizon, benchmark: p.policy?.benchmark,
-    targetHoldings: p.policy?.targetHoldings, maximumHoldings: p.policy?.maximumHoldings,
-    searchMarkets:
-      p.role === 'swiss_quality'
-        ? ['XSWX']
-        : p.role === 'brazilian_growth'
-          ? ['BVMF']
-          : [],
-    universe: p.policy?.universe ?? null,
-    hardConstraints: p.policy?.rules.filter((r) => r.kind === 'hard') ?? [],
-    preferences: p.policy?.rules.filter((r) => r.kind === 'preference') ?? [],
-    contextualAssumptions:
-      p.policy?.rules.filter((r) => r.kind === 'context') ?? [],
-    legacyPreferences: p.inclusionCriteria,
-    exclusions: p.exclusionCriteria,
-    globalConstraints: criteria.globalConstraints,
-    evidencePolicy:
-      'Structured hard rules require verified matching data. Missing data means unverified, never eligible. Preferences and contextual assumptions never exclude.',
-  }));
+  return criteria.portfolios.map((p) => {
+    const policy = p.policy;
+    const universeItems = policy ? Object.entries(policy.universe).flatMap(([field, values]) => values.map(value => `${field}: ${value}`)) : [];
+    const evidenceItems = policy?.rules.filter(rule => rule.kind === 'hard' && rule.predicate?.mode === 'evidence').map(rule => rule.statement) ?? [];
+    const attributeItems = policy?.rules.filter(rule => rule.kind === 'hard' && rule.predicate?.mode === 'attribute').map(rule => rule.statement) ?? [];
+    const preferenceItems = policy?.rules.filter(rule => rule.kind === 'preference').map(rule => rule.statement) ?? [];
+    const contextItems = policy?.rules.filter(rule => rule.kind === 'context').map(rule => rule.statement) ?? [];
+    return {
+      role: p.role,
+      name: policy?.name ?? p.role.replaceAll('_', ' '),
+      reportingCurrency: p.currency,
+      objective: p.objective,
+      strategy: policy?.strategy, horizon: policy?.horizon, benchmark: policy?.benchmark,
+      targetHoldings: policy?.targetHoldings, maximumHoldings: policy?.maximumHoldings,
+      searchMarkets:
+        p.role === 'swiss_quality'
+          ? ['XSWX']
+          : p.role === 'brazilian_growth'
+            ? ['BVMF']
+            : [],
+      universe: policy?.universe ?? null,
+      hardConstraints: policy?.rules.filter((r) => r.kind === 'hard') ?? [],
+      preferences: policy?.rules.filter((r) => r.kind === 'preference') ?? [],
+      contextualAssumptions: contextItems.length ? policy!.rules.filter((r) => r.kind === 'context') : [],
+      legacyPreferences: p.inclusionCriteria,
+      exclusions: p.exclusionCriteria,
+      globalConstraints: criteria.globalConstraints,
+      evaluationClusters: [
+        { id: 'mandate' as const, authority: 'context_only' as const, items: [...criteria.globalConstraints, ...contextItems] },
+        { id: 'universe' as const, authority: 'deterministic_gate' as const, items: [...universeItems, ...attributeItems] },
+        { id: 'evidence' as const, authority: 'evidence_gate' as const, items: evidenceItems },
+        { id: 'ranking' as const, authority: 'ranking_only' as const, items: preferenceItems },
+        { id: 'audit' as const, authority: 'adversarial_review' as const, items: ['Check contradictions, missing evidence and cross-rule tensions before synthesis'] },
+      ],
+      evidencePolicy:
+        'Universe and explicit attribute rules are deterministic gates. Evidence predicates require source-backed facts; missing evidence means unverified, never eligible. Preferences rank but never exclude. Mandate context never screens a security.',
+    };
+  });
 }
 
 /** Only explicit provider attributes establish geography; generic country/currency cannot. */
@@ -266,15 +357,15 @@ export function evaluateThesisEligibility(
   const violated: string[] = [];
   const unverified: string[] = [];
   const rules: z.infer<typeof EligibilityRuleResult>[] = [];
-  const result = (criterion: string, thesisPath: string, status: z.infer<typeof EligibilityRuleResult>['status'], reason: string) => {
+  const result = (criterion: string, thesisPath: string, status: z.infer<typeof EligibilityRuleResult>['status'], reason: string, sourceOverride?: unknown, observedOverride?: unknown) => {
     const attr = record.attributes;
-    const source = criterion === 'Domicile' ? attr.issuer_identity_source_url : undefined;
-    const date = criterion === 'Domicile' ? attr.issuer_identity_observed_at : undefined;
+    const source = sourceOverride ?? (criterion === 'Domicile' ? attr.issuer_identity_source_url : undefined);
+    const date = observedOverride ?? (criterion === 'Domicile' ? attr.issuer_identity_observed_at : undefined);
     let sourceUrl = record.sourceUrl;
     if (typeof source === 'string') {
       try { if (['http:', 'https:'].includes(new URL(source).protocol)) sourceUrl = source; } catch { /* retain record provenance */ }
     }
-    const observedAt = typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date)) ? `${date}T00:00:00.000Z` : record.observedAt;
+    const observedAt = typeof date === 'string' && Number.isFinite(Date.parse(date)) ? new Date(date).toISOString() : record.observedAt;
     rules.push({ criterion, thesisPath, status, reason, sourceUrl, observedAt });
   };
   const policy = p.policy;
@@ -316,26 +407,56 @@ export function evaluateThesisEligibility(
   check('Industry inclusion', u.industriesIncluded, record.industry);
   check('Industry exclusion', u.industriesExcluded, record.industry, true);
   for (const r of policy.rules.filter((r) => r.kind === 'hard')) {
+    const index = policy.rules.indexOf(r);
+    const path = `${p.role}.policy.rules[${index}]`;
     const m = r.metric;
-    if (!m) {
+    if (m) {
+      const value = a[m.field];
+      if (
+        typeof value !== 'number' ||
+        !Number.isFinite(value) ||
+        a[`${m.field}_unit`] !== m.unit ||
+        a[`${m.field}_period`] !== m.period
+      ) {
+        unverified.push(`${r.statement}: metric, unit or period unavailable`);
+        result(r.statement, path, 'UNKNOWN', 'Metric, unit or period unavailable');
+        continue;
+      }
+      const failed = m.operator === 'gte' ? value < m.value : value > m.value;
+      if (failed) violated.push(r.statement);
+      result(r.statement, path, failed ? 'FAIL' : 'PASS', `${m.field}: ${value} ${m.unit} (${m.period}); ${m.operator} ${m.value}`);
+      continue;
+    }
+    const predicate = r.predicate;
+    if (!predicate) {
       unverified.push(r.statement);
-      result(r.statement, `${p.role}.policy.rules[${policy.rules.indexOf(r)}]`, 'UNKNOWN', 'No measurable predicate');
+      result(r.statement, path, 'UNKNOWN', 'No enforceable predicate');
       continue;
     }
-    const value = a[m.field];
-    if (
-      typeof value !== 'number' ||
-      !Number.isFinite(value) ||
-      a[`${m.field}_unit`] !== m.unit ||
-      a[`${m.field}_period`] !== m.period
-    ) {
-      unverified.push(`${r.statement}: metric, unit or period unavailable`);
-      result(r.statement, `${p.role}.policy.rules[${policy.rules.indexOf(r)}]`, 'UNKNOWN', 'Metric, unit or period unavailable');
+    const actual = a[predicate.field];
+    if (actual === null || actual === undefined || !['string', 'number', 'boolean'].includes(typeof actual)) {
+      unverified.push(`${r.statement}: ${predicate.field} evidence unavailable`);
+      result(r.statement, path, 'UNKNOWN', `${predicate.field} evidence unavailable`);
       continue;
     }
-    const failed = m.operator === 'gte' ? value < m.value : value > m.value;
+    const source = a[`${predicate.field}_source_url`];
+    const observed = a[`${predicate.field}_observed_at`];
+    const sourceKind = a[`${predicate.field}_source_kind`];
+    if (predicate.mode === 'evidence') {
+      const sourceOk = typeof source === 'string' && /^https?:\/\//i.test(source);
+      const officialOk = predicate.sourceRequirement !== 'official' || (typeof sourceKind === 'string' && ['official', 'regulatory', 'court', 'exchange'].includes(key(sourceKind)));
+      const observedMs = typeof observed === 'string' ? Date.parse(observed) : NaN;
+      const freshOk = !predicate.maxAgeDays || (Number.isFinite(observedMs) && Date.now() - observedMs <= predicate.maxAgeDays * 86_400_000);
+      if (!sourceOk || !officialOk || !freshOk) {
+        unverified.push(`${r.statement}: source lineage or freshness requirement not satisfied`);
+        result(r.statement, path, 'UNKNOWN', 'Source lineage or freshness requirement not satisfied', source, observed);
+        continue;
+      }
+    }
+    const matches = key(String(actual)) === key(predicate.value);
+    const failed = predicate.operator === 'eq' ? !matches : matches;
     if (failed) violated.push(r.statement);
-    result(r.statement, `${p.role}.policy.rules[${policy.rules.indexOf(r)}]`, failed ? 'FAIL' : 'PASS', `${m.field}: ${value} ${m.unit} (${m.period}); ${m.operator} ${m.value}`);
+    result(r.statement, path, failed ? 'FAIL' : 'PASS', `${predicate.field}: ${String(actual)}; ${predicate.operator} ${predicate.value}`, source, observed);
   }
   return {
     status: violated.length

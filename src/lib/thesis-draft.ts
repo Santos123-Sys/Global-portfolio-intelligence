@@ -3,24 +3,36 @@ import {
   ThesisCriteria,
   ThesisPortfolioCriteria,
   ThesisPolicy,
-  ThesisRule,
 } from '@portfolio-intelligence/agentic-contract';
-// Drafts deliberately allow incomplete text. Approval still uses the strict contract.
-const draftRule = ThesisRule.extend({
+
+// Drafts deliberately allow incomplete text and predicate fields. Approval still
+// uses the strict/refined agentic contract, so a partially edited rule cannot
+// become canonical merely because it can be recovered from session storage.
+const draftMetric = z.object({
+  field: z.string(),
+  operator: z.enum(['gte', 'lte']),
+  value: z.number().nullable().transform((v) => v ?? NaN),
+  unit: z.string(),
+  period: z.string(),
+}).optional();
+
+const draftPredicate = z.object({
+  mode: z.enum(['attribute', 'evidence']),
+  field: z.string(),
+  operator: z.enum(['eq', 'neq']),
+  value: z.string(),
+  sourceRequirement: z.enum(['provider', 'official']).optional(),
+  maxAgeDays: z.number().optional(),
+}).optional();
+
+const draftRule = z.object({
   statement: z.string(),
-  metric: z
-    .object({
-      field: z.string(),
-      operator: z.enum(['gte', 'lte']),
-      value: z
-        .number()
-        .nullable()
-        .transform((v) => v ?? NaN),
-      unit: z.string(),
-      period: z.string(),
-    })
-    .optional(),
-});
+  kind: z.enum(['hard', 'preference', 'context']),
+  category: z.enum(['selection', 'macro', 'sector', 'risk', 'valuation']),
+  metric: draftMetric,
+  predicate: draftPredicate,
+}).strict();
+
 const draftPolicy = ThesisPolicy.extend({
   name: z.string().optional(),
   strategy: z.string().optional(),
@@ -41,6 +53,7 @@ const draftPolicy = ThesisPolicy.extend({
   }),
   rules: z.array(draftRule),
 });
+
 export const ThesisDraft = z
   .object({
     schemaVersion: z.literal(1),

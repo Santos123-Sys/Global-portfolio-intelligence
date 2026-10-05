@@ -71,7 +71,7 @@ describe('structured thesis policy', () => {
         (i) =>
           i.statement === 'High quality' &&
           !!i.proxy &&
-          i.interpretation.includes('no invented threshold'),
+          i.interpretation.includes('does not invent a threshold'),
       ),
     ).toBe(true);
     expect(evaluateThesisEligibility(t.portfolios[0], security()).status).toBe(
@@ -201,6 +201,22 @@ describe('structured thesis policy', () => {
       { statement: 'Falling rates', kind: 'context', category: 'macro' },
     ];
     expect(evaluateThesisEligibility(p, security()).status).toBe('eligible');
+  });
+  it('requires source-backed fresh evidence for judicial-recovery eligibility', () => {
+    const t = thesis(), p = t.portfolios[0];
+    p.policy!.rules = [{
+      statement: 'Exclude companies currently under judicial recovery proceedings',
+      kind: 'hard',
+      category: 'risk',
+      predicate: { mode: 'evidence', field: 'judicial_recovery_status', operator: 'eq', value: 'none', sourceRequirement: 'official', maxAgeDays: 90 },
+    }];
+    expect(evaluateThesisEligibility(p, security()).status).toBe('unverified');
+    expect(evaluateThesisEligibility(p, security({ attributes: {
+      judicial_recovery_status: 'active', judicial_recovery_status_source_url: 'https://official.example/status', judicial_recovery_status_source_kind: 'official', judicial_recovery_status_observed_at: new Date().toISOString(),
+    } })).status).toBe('ineligible');
+    expect(evaluateThesisEligibility(p, security({ attributes: {
+      judicial_recovery_status: 'none', judicial_recovery_status_source_url: 'https://official.example/status', judicial_recovery_status_source_kind: 'official', judicial_recovery_status_observed_at: new Date().toISOString(),
+    } })).status).toBe('eligible');
   });
   it('retains historical schemas and identifies modifications without mutating originals', () => {
     const old = thesis();

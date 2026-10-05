@@ -1,11 +1,95 @@
-import { reviewStructuredThesis, ThesisPolicy, type ThesisCriteria } from '@portfolio-intelligence/agentic-contract';
+import { reviewStructuredThesis, ThesisPolicy, emptyThesisPolicy, type ThesisCriteria, type ThesisRule } from '@portfolio-intelligence/agentic-contract';
 import { normalizeThesisCriteriaCurrencies } from './thesis-currency';
 
 const cleanList = (values: string[]) => values.map(value => value.trim()).filter(Boolean);
 const comparisonKey = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+const matchesB3Listing = (value: string) => /listed equities.*\b(b3|bvmf)\b|\b(b3|bvmf)\b.*listed equities/i.test(value);
+const matchesGrowthPreference = (value: string) => /early-stage growth companies with high growth potential/i.test(value);
+const matchesRetailExclusion = (value: string) => /(?:exclude\s+)?(?:all\s+)?(?:companies|equities)?.*\bretail sector\b|\bretail sector (?:companies|equities)\b/i.test(value);
+const matchesJudicialRecovery = (value: string) => /judicial recovery|recupera(?:c|ç)(?:a|ã)o judicial/i.test(value);
+
+function ensureUnique(values: string[], value: string, normalize = comparisonKey) {
+  return values.some(existing => normalize(existing) === normalize(value)) ? values : [...values, value];
+}
+
+/**
+ * Known Portfolio Creator concepts are migrated into the enforcement domain
+ * that owns them. This is intentionally narrow: arbitrary prose is never
+ * converted into a hard rule by keyword guessing.
+ */
+function canonicalizeKnownMandate(portfolio: ThesisCriteria['portfolios'][number]) {
+  const isBrazil = portfolio.role === 'brazilian_growth';
+  if (!isBrazil) return portfolio;
+  const allLegacy = [...portfolio.inclusionCriteria, ...portfolio.exclusionCriteria, ...(portfolio.policy?.rules.map(rule => rule.statement) ?? [])];
+  const needsPolicy = allLegacy.some(value => matchesB3Listing(value) || matchesGrowthPreference(value) || matchesRetailExclusion(value) || matchesJudicialRecovery(value));
+  if (!needsPolicy) return portfolio;
+
+  const policy = portfolio.policy ? structuredClone(portfolio.policy) : emptyThesisPolicy();
+  const inclusionCriteria = portfolio.inclusionCriteria.filter(value => !matchesB3Listing(value) && !matchesGrowthPreference(value));
+  const exclusionCriteria = portfolio.exclusionCriteria.filter(value => !matchesRetailExclusion(value) && !matchesJudicialRecovery(value));
+
+  if (portfolio.inclusionCriteria.some(matchesB3Listing)) {
+    policy.universe.listingMarkets = ensureUnique(policy.universe.listingMarkets, 'BVMF', value => value.toUpperCase());
+  }
+  if (portfolio.exclusionCriteria.some(matchesRetailExclusion) || policy.rules.some(rule => matchesRetailExclusion(rule.statement))) {
+    policy.universe.sectorsExcluded = ensureUnique(policy.universe.sectorsExcluded, 'Retail');
+  }
+
+  const rules: ThesisRule[] = [];
+  let hasGrowth = false;
+  let hasJudicial = false;
+  for (const rule of policy.rules) {
+    if (matchesRetailExclusion(rule.statement) && rule.kind === 'hard' && !rule.metric && !rule.predicate) continue;
+    if (matchesGrowthPreference(rule.statement)) {
+      hasGrowth = true;
+      rules.push({ ...rule, kind: 'preference', category: 'selection', metric: undefined, predicate: undefined });
+      continue;
+    }
+    if (matchesJudicialRecovery(rule.statement) && rule.kind === 'hard') {
+      hasJudicial = true;
+      rules.push({
+        ...rule,
+        kind: 'hard',
+        category: 'risk',
+        metric: undefined,
+        predicate: {
+          mode: 'evidence',
+          field: 'judicial_recovery_status',
+          operator: 'eq',
+          value: 'none',
+          sourceRequirement: 'official',
+          maxAgeDays: 90,
+        },
+      });
+      continue;
+    }
+    rules.push(rule);
+  }
+
+  if (portfolio.inclusionCriteria.some(matchesGrowthPreference) && !hasGrowth) {
+    rules.push({ statement: 'Early-stage growth companies with high growth potential', kind: 'preference', category: 'selection' });
+  }
+  if (portfolio.exclusionCriteria.some(matchesJudicialRecovery) && !hasJudicial) {
+    rules.push({
+      statement: 'Exclude companies currently under judicial recovery proceedings',
+      kind: 'hard',
+      category: 'risk',
+      predicate: {
+        mode: 'evidence',
+        field: 'judicial_recovery_status',
+        operator: 'eq',
+        value: 'none',
+        sourceRequirement: 'official',
+        maxAgeDays: 90,
+      },
+    });
+  }
+
+  return { ...portfolio, inclusionCriteria, exclusionCriteria, policy: { ...policy, rules } };
+}
 
 export function prepareThesisCriteria(criteria: ThesisCriteria): ThesisCriteria {
-  return normalizeThesisCriteriaCurrencies({
+  const normalized = normalizeThesisCriteriaCurrencies({
     ...criteria,
     globalConstraints: cleanList(criteria.globalConstraints),
     portfolios: criteria.portfolios.map(portfolio => ({
@@ -18,7 +102,16 @@ export function prepareThesisCriteria(criteria: ThesisCriteria): ThesisCriteria 
       targetMetrics: portfolio.targetMetrics && Object.fromEntries(Object.entries(portfolio.targetMetrics).map(([key, value]) => [key, value.trim()])),
     })),
   });
+  return { ...normalized, portfolios: normalized.portfolios.map(canonicalizeKnownMandate) };
 }
+
+const clusterLabel = {
+  mandate: 'Mandate',
+  universe: 'Universe',
+  evidence: 'Evidence gate',
+  ranking: 'Ranking',
+  audit: 'Constraint audit',
+} as const;
 
 /** Deterministic checks identify explicit conflicts, not the meaning of arbitrary prose. */
 export function assessThesisReview(input: ThesisCriteria) {
@@ -45,15 +138,21 @@ export function assessThesisReview(input: ThesisCriteria) {
     for (const item of portfolio.inclusionCriteria) {
       if (excluded.has(comparisonKey(item))) errors.push(`${label}: “${item}” appears in both inclusion and exclusion criteria.`);
     }
-    if (!portfolio.inclusionCriteria.length && !portfolio.policy?.rules.some(rule => rule.kind !== 'context')) warnings.push(`${label}: no explicit selection criteria. Discovery may be too broad.`);
-    if (!portfolio.exclusionCriteria.length) warnings.push(`${label}: no explicit exclusions recorded.`);
+    const hasUniverseCriteria = portfolio.policy ? Object.values(portfolio.policy.universe).some(values => values.length > 0) : false;
+    if (!portfolio.inclusionCriteria.length && !portfolio.policy?.rules.some(rule => rule.kind !== 'context') && !hasUniverseCriteria) warnings.push(`${label}: no explicit selection criteria. Discovery may be too broad.`);
     if (!expected) warnings.push(`${label}: automatic equity discovery is not configured for this destination.`);
     for (const [key, value] of Object.entries(portfolio.targetMetrics ?? {})) {
       if (!key.trim() || !value) errors.push(`${label}: target metrics need both a name and a value with its intended units or basis.`);
     }
   }
-  if (!criteria.globalConstraints.length) warnings.push('No portfolio-wide constraints recorded. Review time horizon, liquidity needs, risk limits and review cadence.');
-  warnings.push(...issues.filter(issue => issue.severity === 'warning').map(issue => `${issue.location}: ${issue.reason}`));
-  return { criteria, errors, warnings: [...new Set(warnings)], issues, needsAcknowledgment: issues.some(issue => issue.severity === 'warning') };
+  warnings.push(...issues.filter(issue => issue.severity === 'warning').map(issue => `${clusterLabel[issue.cluster]} · ${issue.location} — ${issue.statement}: ${issue.interpretation}`));
+  return {
+    criteria,
+    errors,
+    warnings: [...new Set(warnings)],
+    issues,
+    actionableIssues: issues.filter(issue => issue.severity === 'warning'),
+    contextIssues: issues.filter(issue => issue.severity === 'info'),
+    needsAcknowledgment: issues.some(issue => issue.severity === 'warning'),
+  };
 }
-
