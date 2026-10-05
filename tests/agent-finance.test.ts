@@ -9,7 +9,7 @@ import type { Foundation } from '../src/lib/agent-finance/l4/foundation';
 const foundation: Foundation = {
   company: { id: '00000000-0000-4000-8000-000000000001', ticker: 'TEST', companyName: 'Example', exchange: 'B3', currency: 'BRL', sector: null, industry: null, country: 'BR', isin: null },
   facts: { operating_income: 100, depreciation_and_amortization: 10, capital_expenditure: 20, change_in_non_cash_working_capital: 5, revenue: 500, net_income: 50, total_assets: 1000, total_equity: 500, total_debt: 200, cash_and_equivalents: 50, shares_outstanding: 100 },
-  sources: ['https://issuer.example/filing'], fiscalDate: '2025-12-31', observations: [], documents: [], prices: [],history:[],wacc:null,terminalGrowth:undefined,peers:[],estimates:[],dataGaps:[],thesisContext:null,holdings:[],
+  sources: ['https://issuer.example/filing'], fiscalDate: '2025-12-31', observations: [], documents: [], externalResearch: [], prices: [],history:[],wacc:null,terminalGrowth:undefined,peers:[],estimates:[],dataGaps:[],thesisContext:null,holdings:[],
 };
 const request = analyzeSchema.parse({ ticker: 'TEST', analysisType: 'dcf', userOverrides: { discountRate: .12, assumptions: { annualGrowthRate: .05, terminalGrowthRate: .02, taxRate: .25 } } });
 Object.assign(foundation.facts,{non_cash_working_capital:100,interest_expense:10});

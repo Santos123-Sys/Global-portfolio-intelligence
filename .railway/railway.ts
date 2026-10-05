@@ -9,7 +9,7 @@ import {
   service,
 } from 'railway/iac';
 
-const repository = 'Santos123-Sys/portfolio-intelligence';
+const repository = 'Santos123-Sys/Global-portfolio-intelligence';
 const productionBranch = 'main';
 
 export default defineRailway((context) => {
@@ -130,10 +130,22 @@ export default defineRailway((context) => {
     env: {
       NODE_ENV: 'production',
       AGENTIC_DATABASE_URL: agenticDatabase.env.DATABASE_URL,
+      // The bundled canonical finance runtime polls the dashboard analysis-session
+      // tables. Without this reference worker.ts deliberately leaves that runtime
+      // disabled even though it was compiled into the worker image.
+      FINANCE_DATABASE_URL: dashboardDatabase.env.DATABASE_URL,
       AGENTIC_SYSTEM_API_KEY: agenticApi.env.AGENTIC_SYSTEM_API_KEY,
       OPENAI_API_KEY: context.shared.OPENAI_API_KEY,
       OPENAI_MODEL: 'gpt-5.6',
       OPENAI_REASONING_EFFORT: 'medium',
+      // Optional Responses-compatible model gateway. If unset, the canonical
+      // finance runtime continues to use OPENAI_API_KEY and OpenAI directly.
+      MODEL_API_KEY: preserve(),
+      MODEL_API_BASE_URL: preserve(),
+      // Provider reliability policy: research breadth is independent from
+      // simultaneous model calls. These values can be tuned without code changes.
+      AGENT_MAX_CONCURRENCY: '3',
+      AGENT_STAGGER_MS: '900',
       DASHBOARD_IMPORT_URL:
         'http://${{portfolio-intelligence.RAILWAY_PRIVATE_DOMAIN}}:${{portfolio-intelligence.PORT}}/api/integrations/agentic/import',
       AGENTIC_INTERNAL_BASE_URL:

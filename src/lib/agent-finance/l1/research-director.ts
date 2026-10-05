@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { agentAnalysisSessions, agentDebates, agentRuns } from '@/lib/db/agent-schema';
 import { analyzeSchema, dcfAgents, analysisAgents, evidenceOutput, executionPlan, outputSchema } from '../contracts';
 import { loadFoundation,sourceEvidence } from '../l4/foundation';
+import { acquireExternalResearch } from '../l4/external-research';
 import { createLiveRegistry } from '../l3/live-registry';
 import { ExecutionEngine } from '../l3/execution-engine';
 import { dcfAgent } from './dcf-swarm';
@@ -18,6 +19,12 @@ import { activeAgentSnapshot, type EffectiveAgentConfig } from '@/lib/agent-gove
 import { processEvaluationQueue } from '@/lib/agent-evaluations';
 import { validateQuality } from '../l3/quality';
 import { dynamicResearchBudget, planDynamicResearchSwarm, runDynamicResearchSpecialist, summarizeDynamicResearch, type DynamicResearchPlan } from './dynamic-research-swarm';
+import { resolveTaskSchedulerOptions, runScheduled } from '../l3/task-scheduler';
+
+function throwRejected(results: ReadonlyArray<PromiseSettledResult<unknown>>): void {
+  const rejected=results.find(result=>result.status==='rejected');
+  if(rejected?.status==='rejected') throw rejected.reason;
+}
 
 /** L1: queued PostgreSQL state is authoritative; atomic claim prevents duplicate execution. */
 export async function executeSession(sessionId: string,onHeartbeat?:()=>void): Promise<void> {
@@ -36,13 +43,26 @@ export async function executeSession(sessionId: string,onHeartbeat?:()=>void): P
     }
     const configs=session.configurationSnapshot as Record<string,EffectiveAgentConfig> ?? await activeAgentSnapshot(session.ownerId,session.id);
     await db.update(agentAnalysisSessions).set({configurationSnapshot:configs}).where(owned);
-    const foundation = session.evidenceSnapshot as Foundation ?? await loadFoundation(session.ownerId, session.securityId, request);
+
+    let foundation=session.evidenceSnapshot as Foundation | null;
+    if(!foundation) {
+      foundation=await loadFoundation(session.ownerId, session.securityId, request);
+      const external=await acquireExternalResearch(foundation,request.analysisType);
+      foundation={...foundation,externalResearch:external.evidence,dataGaps:[...foundation.dataGaps,...external.gaps]};
+    } else if(!Array.isArray(foundation.externalResearch)) {
+      // Backward compatibility for sessions snapshotted before Platform V2.
+      foundation={...foundation,externalResearch:[]};
+    }
     if(lost) throw new Error('Session lease lost');
     await db.update(agentAnalysisSessions).set({evidenceSnapshot:foundation}).where(owned);
     const engine = new ExecutionEngine(session.id, createLiveRegistry(foundation, session.ownerId, session.id,configs),sourceEvidence(foundation),token,configs);
     const completed=await db.select().from(agentRuns).where(and(eq(agentRuns.sessionId,sessionId),eq(agentRuns.status,'completed')));
     for(const run of completed) if(run.outputPayload) engine.outputs[run.agentName]=run.outputPayload as import('../contracts').AgentOutput;
     await engine.phase('research');
+    if(foundation.externalResearch.length) {
+      const categories=[...new Set(foundation.externalResearch.map(row=>row.category))];
+      await recordSessionEvent(sessionId,{eventType:'finding',summary:`Research Director added ${foundation.externalResearch.length} live evidence source${foundation.externalResearch.length===1?'':'s'} to the session snapshot.`,detail:`Bounded external acquisition completed before specialist analysis. Categories: ${categories.join(', ')}. Search snippets remain evidence leads and are subject to the same citation and claim-verification gates as retained documents.`,agent:'research-director',authority:'notify',consequence:'low',reversible:true});
+    }
     await engine.run('research-director', async () => {
       await engine.tool('research-director', 'fetch_comprehensive_data');
       await engine.tool('research-director', 'fetch_filings');
@@ -50,7 +70,8 @@ export async function executeSession(sessionId: string,onHeartbeat?:()=>void): P
       await engine.tool('research-director', 'fetch_analyst_estimates');
       await engine.tool('research-director', 'fetch_peer_data');
       await engine.tool('research-director', 'calculate_wacc');
-      return evidenceOutput({ plan: executionPlan(request.analysisType), ticker: request.ticker,authority:{...researchPlan(foundation.company,request.analysisType),dynamicResearch:{enabled:request.analysisType!=='dcf',maxParallel:dynamicResearchBudget(request.analysisType)}} }, ['Collect existing dated financial evidence, NewsAdapter-ingested articles and portfolio-linked documents before bounded research decomposition.'], foundation.sources, [], 60);
+      const citations=[...new Set([...foundation.sources,...foundation.externalResearch.map(row=>row.url)])];
+      return evidenceOutput({ plan: executionPlan(request.analysisType), ticker: request.ticker,externalEvidence:{count:foundation.externalResearch.length,categories:[...new Set(foundation.externalResearch.map(row=>row.category))]},authority:{...researchPlan(foundation.company,request.analysisType),dynamicResearch:{enabled:request.analysisType!=='dcf',maxParallel:dynamicResearchBudget(request.analysisType)}} }, ['Freeze retained financial evidence and bounded live source discovery into one attributable session snapshot before research decomposition.'], citations, [], 60);
     });
     const financials=await engine.run('financial-statement-analyzer', async () => outputSchema.parse(await engine.tool('financial-statement-analyzer','analyze_financial_statements')));
     if(request.analysisType!=='dcf' && foundation.researchPolicy?.valueScorecard?.enabled && financials.status==='completed' && financials.dataQuality?.status==='review_required' && !foundation.financialReview) {
@@ -67,8 +88,10 @@ export async function executeSession(sessionId: string,onHeartbeat?:()=>void): P
     if(request.analysisType!=='dcf') {
       dynamicPlan=await planDynamicResearchSwarm(foundation,request.analysisType,configs['research-director']);
       if(dynamicPlan.tasks.length) {
-        await recordSessionEvent(sessionId,{eventType:'plan_created',summary:`Research Director created ${dynamicPlan.tasks.length} parallel evidence task${dynamicPlan.tasks.length===1?'':'s'}.`,detail:`Bounded dynamic swarm (${dynamicPlan.source} plan): ${dynamicPlan.tasks.map(item=>item.label).join(' · ')}`.slice(0,4000),agent:'research-director',authority:'autonomous',consequence:'low',reversible:true});
-        await Promise.all(dynamicPlan.tasks.map(item=>engine.run(`dynamic-research-${item.id}`,prior=>runDynamicResearchSpecialist(item,foundation,prior,configs['dynamic-research-specialist']),'dynamic-research-specialist')));
+        const scheduler=resolveTaskSchedulerOptions({concurrency:Math.min(dynamicPlan.maxParallel || 1,resolveTaskSchedulerOptions().concurrency)});
+        await recordSessionEvent(sessionId,{eventType:'plan_created',summary:`Research Director created ${dynamicPlan.tasks.length} evidence task${dynamicPlan.tasks.length===1?'':'s'}.`,detail:`Bounded dynamic swarm (${dynamicPlan.source} plan): ${dynamicPlan.tasks.map(item=>item.label).join(' · ')}. Runtime cap ${scheduler.concurrency}; task starts staggered by ${scheduler.staggerMs}ms.`.slice(0,4000),agent:'research-director',authority:'autonomous',consequence:'low',reversible:true});
+        const dynamicRuns=await runScheduled(dynamicPlan.tasks.map(item=>()=>engine.run(`dynamic-research-${item.id}`,prior=>runDynamicResearchSpecialist(item,foundation,prior,configs['dynamic-research-specialist']),'dynamic-research-specialist')),{concurrency:scheduler.concurrency,staggerMs:scheduler.staggerMs});
+        throwRejected(dynamicRuns);
         const summary=summarizeDynamicResearch(dynamicPlan,engine.outputs);
         await recordSessionEvent(sessionId,{eventType:'finding',summary:`Dynamic research swarm finished ${summary.completed}/${dynamicPlan.tasks.length} tasks.`,detail:`${summary.needsAttention} task${summary.needsAttention===1?'':'s'} need evidence review. Independent subagents do not approve conclusions; their outputs now feed the governed synthesis.`,agent:'research-director',authority:'notify',consequence:summary.needsAttention?'medium':'low',reversible:true});
       }
@@ -81,11 +104,11 @@ export async function executeSession(sessionId: string,onHeartbeat?:()=>void): P
     if (request.analysisType !== 'dcf') {
       await engine.phase('analysis');
       await engine.run('analysis-director', prior => analysisAgent('analysis-director', foundation, prior,configs['analysis-director']));
-      const specialists=await Promise.allSettled(analysisAgents.slice(1, 6).map(name => engine.run(name, prior => analysisAgent(name, foundation, prior,configs[name]))));
-      const interrupted=specialists.find(result=>result.status==='rejected'); if(interrupted?.status==='rejected') throw interrupted.reason;
+      const specialists=await runScheduled(analysisAgents.slice(1, 6).map(name => () => engine.run(name, prior => analysisAgent(name, foundation, prior,configs[name]))));
+      throwRejected(specialists);
       if (request.analysisType !== 'quick') {
-        const debate=await Promise.allSettled(['bull-agent', 'bear-agent'].map(name => engine.run(name, prior => analysisAgent(name, foundation, prior,configs[name]))));
-        const interrupted=debate.find(result=>result.status==='rejected'); if(interrupted?.status==='rejected') throw interrupted.reason;
+        const debate=await runScheduled(['bull-agent', 'bear-agent'].map(name => () => engine.run(name, prior => analysisAgent(name, foundation, prior,configs[name]))),{concurrency:2});
+        throwRejected(debate);
         const judge = await engine.run('judge-agent', prior => analysisAgent('judge-agent', foundation, prior,configs['judge-agent']));
         await engine.assertLease();
         await db.insert(agentDebates).values({ sessionId, bullArgument: JSON.stringify(engine.outputs['bull-agent']), bearArgument: JSON.stringify(engine.outputs['bear-agent']), judgeReasoning: judge.reasoningChain.join('\n'), finalScore: judge.data });
@@ -120,7 +143,7 @@ export async function executeSession(sessionId: string,onHeartbeat?:()=>void): P
     const coreValues=coreEntries.map(([,output])=>output);
     const finalOutput = { ticker: request.ticker, outputs: engine.outputs,
       equityResearch:aggregateEquityResearch(foundation.company,foundation.fiscalDate,request,engine.outputs,foundation.researchLocale ?? foundation.researchPolicy?.locale),dynamicResearch,valueScorecard,
-      confidenceScore, reasoningChain: ['Research Director decomposed decision-relevant evidence questions into bounded independent tasks before synthesis.', 'Synthesize validated specialist outputs without overwriting conflicting views.', 'Numerical results remain separate from model-written narratives and require human review.'],
+      confidenceScore, reasoningChain: ['Research Director froze retained and bounded live evidence before decomposing decision-relevant questions.', 'Synthesize validated specialist outputs without overwriting conflicting views.', 'Numerical results remain separate from model-written narratives and require human review.'],
       citations: [...new Set(values.flatMap(row => row.citations))], requiresHumanReview: true,
       limitations: [...new Set(values.flatMap(row => row.limitations))],
       status: confidenceScore<60 || coreValues.some(row => row.status !== 'completed') || highPriorityDynamicGap ? 'insufficient_data' : 'completed',

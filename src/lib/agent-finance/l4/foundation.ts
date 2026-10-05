@@ -14,6 +14,7 @@ import { thesisResearchPolicy } from './research-modules';
 import { portfolios } from '@/lib/db/schema';
 import { MarketBrief } from '@portfolio-intelligence/agentic-contract';
 import { resolveResearchProfile } from '../research-policy';
+import type { ExternalResearchEvidence } from './external-research';
 
 /** L4: existing evidence stores and provider-ingested observations; no new scraper or provider bypass. */
 export async function loadFoundation(ownerId: string, securityId: string, request?: AnalyzeRequest) {
@@ -79,6 +80,7 @@ export async function loadFoundation(ownerId: string, securityId: string, reques
     observations: observations.map(row => ({ metric: row.metricName, value: row.valueNumeric ?? row.valueText, currency: row.currency, date: row.observationDate, source: row.sourceUrl, provider: row.provider })),
     prices: prices.reverse().map(row => ({ date: row.priceDate, close: Number(row.close), currency: row.currency,source:row.source,volume:row.volume!=null ? Number(row.volume) : null })),
     documents: documents.map(row => ({ id: row.id, title: row.title, type: row.folderType, source: row.url ?? `document:${row.id}`, publishedAt: row.publishedDate?.toISOString() ?? null, excerpt: row.contentText?.slice(0, 4000) ?? '' })),
+    externalResearch: [] as ExternalResearchEvidence[],
   };
 }
 export type Foundation = Awaited<ReturnType<typeof loadFoundation>> & {financialReview?:{reviewedAt:string;periods:Array<{date:string;days:number;sourceQuality:'primary'|'official_api'|'licensed_data'|'secondary'|'unknown'}>}};
@@ -96,6 +98,7 @@ export function sourceEvidence(data:Foundation):Record<string,string> {
   }));
   data.documents.forEach(row=>add(row.source,row.excerpt));
   data.marketBrief?.evidenceRegister.forEach(row=>add(row.url,row.excerpt));
+  data.externalResearch.forEach(row=>add(row.url,JSON.stringify({title:row.title,snippet:row.snippet,provider:row.provider,query:row.query,category:row.category,retrievedAt:row.retrievedAt,publishedAt:row.publishedAt})));
   data.peers.forEach(row=>add(row.sourceUrl,JSON.stringify(row)));
   data.estimates.forEach(row=>add(row.source,JSON.stringify(row)));
   data.wacc?.sources.forEach(source=>add(source,JSON.stringify(data.wacc)));

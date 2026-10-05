@@ -25,13 +25,18 @@ function classify(row: AnalysisRow, byId: Map<string, AnalysisRow>): Exclude<Inb
   return 'new';
 }
 
-const filters: Array<{ id: InboxFilter; label: string }> = [
-  { id: 'all', label: 'All research' },
-  { id: 'candidates', label: 'Candidates' },
-  { id: 'new', label: 'New' },
-  { id: 'changed', label: 'Changed' },
-  { id: 'violated', label: 'Thesis violations' },
+const filters: Array<{ id: InboxFilter; label: string; description: string }> = [
+  { id: 'all', label: 'Current research', description: 'Latest accepted report for each company.' },
+  { id: 'candidates', label: 'Candidates', description: 'Companies still in the investment-decision funnel.' },
+  { id: 'new', label: 'New', description: 'First accepted research version.' },
+  { id: 'changed', label: 'Changed', description: 'Research that supersedes an earlier version.' },
+  { id: 'violated', label: 'Thesis violations', description: 'Reports with explicit thesis breakers.' },
 ];
+
+function formatDate(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Unknown date' : date.toLocaleString();
+}
 
 export function ResearchInbox() {
   const [rows, setRows] = useState<AnalysisRow[]>([]);
@@ -74,37 +79,64 @@ export function ResearchInbox() {
     }).sort((a, b) => new Date(b.analysisTimestamp).getTime() - new Date(a.analysisTimestamp).getTime());
   }, [byId, currentRows, filter, includeHistory, query, rows]);
 
-  return <main>
+  const candidateCount = currentRows.filter(row => row.portfolioCandidate).length;
+  const violationCount = currentRows.filter(row => (row.thesisBreakers?.length ?? 0) > 0).length;
+  const changedCount = currentRows.filter(row => classify(row, byId) === 'changed').length;
+
+  return <main className="research-workbench">
     <section className="dashboard-hero animate-fade-in">
-      <h1 className="text-glow">Research &amp; Analysis Inbox</h1>
-      <p className="hero-lead">Read current company analyses. Review its financial statements, DCF and peers in the company dashboard; return to Discovery to record candidate decisions.</p>
-      <div className="dashboard-hero-actions" aria-label="Research summary">
-        <div className="stat-chip animate-scale-in delay-100"><span>Analyses</span><span className="stat-value">{currentRows.length}</span></div>
-        <div className="stat-chip animate-scale-in delay-200"><span>Visible</span><span className="stat-value">{visible.length}</span></div>
-        <div className="stat-chip animate-scale-in delay-300"><span>Thesis violations</span><span className="stat-value">{currentRows.filter((row) => (row.thesisBreakers?.length ?? 0) > 0).length}</span></div>
+      <p className="analysis-eyebrow">Intelligence workspace</p>
+      <h1 className="text-glow">Research Workspace</h1>
+      <p className="hero-lead">A governed view of accepted company research, thesis changes and evidence-backed investment conclusions. Start new work in Discovery; inspect active agent runs and provider health in Research Operations.</p>
+      <div className="research-hero-actions">
+        <Link className="action-button inline-action" href="/ai-stock-discovery">Discover companies</Link>
+        <Link className="secondary-button inline-action" href="/research-operations">Research operations</Link>
       </div>
     </section>
-    <aside className="card workflow-next-action"><strong>Review before investing</strong><p>Open a company to assess its thesis fit, valuation and risks. Record actual holdings in Positions after your investment decision.</p><div className="workflow-actions"><Link className="text-link" href="/ai-stock-discovery#candidate-review">Review candidate decisions</Link><Link className="text-link" href="/positions">Open Positions</Link></div></aside>
-    <div className="filter-bar" role="group" aria-label="Filter research">
-      {filters.map((item) => <button key={item.id} type="button" className={`portfolio-tab${filter === item.id ? ' active' : ''}`} aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{item.label}</button>)}
-    </div>
-    <label className="research-inbox-search" htmlFor="research-inbox-query">Search company, ticker or summary
-      <input id="research-inbox-query" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Company, ticker or research text" />
-    </label>
-    <label className="research-history-toggle"><input type="checkbox" checked={includeHistory} onChange={event => setIncludeHistory(event.target.checked)} /> Include superseded analysis versions</label>
-    {loading ? <p className="note" role="status">Loading research…</p>
-      : error ? <div className="login-error" role="alert"><p>{error}</p><button className="secondary-button" type="button" onClick={() => void load()}>Retry loading research</button></div>
-      : visible.length === 0 ? <div className="card"><p className="note">{query || filter !== 'all' ? 'No research matches these filters.' : 'No research analyses stored yet.'}</p><Link className="action-button inline-action" href="/ai-stock-discovery">Open Discovery</Link></div>
-      : <div className="grid research-inbox-list">{visible.map((row) => {
-        const kind = classify(row, byId);
-        const badge = kind === 'violated' ? 'THESIS VIOLATION' : kind.toUpperCase();
-        return <article className={`card glow-card feed-item ${kind}`} key={row.id}>
-          <div className="section-heading"><div><p className="analysis-eyebrow">{row.portfolioCandidate ? 'Candidate' : row.portfolioRole}</p><h2>{row.companyName} <span className="cur">{row.ticker}</span></h2></div><span className={`badge ${kind === 'violated' ? 'breach' : kind === 'changed' ? 'watch' : 'ok'}`}>{badge}</span></div>
-          <p className="note">Investment score {row.investmentScore}/100 · thesis alignment {row.thesisAlignmentScore}/100 · {new Date(row.analysisTimestamp).toLocaleString()}</p>
-          {kind === 'violated' && <p className="caveat"><strong>Thesis breakers:</strong> {(row.thesisBreakers ?? []).join(' · ')}</p>}
-          <p>{row.fundamentalSummary ?? 'No summary was stored for this analysis.'}</p>
-          <div className="research-inbox-actions"><Link className="text-link" href={`/security/${encodeURIComponent(row.ticker)}`}>Open company dashboard</Link><Link className="text-link" href="/ai-stock-discovery#candidate-review">Review candidates and decisions in Discovery</Link></div>
-        </article>;
-      })}</div>}
+
+    <section className="research-kpis" aria-label="Research portfolio summary">
+      <div className="research-kpi"><span>Current reports</span><strong>{currentRows.length}</strong></div>
+      <div className="research-kpi"><span>Candidate companies</span><strong>{candidateCount}</strong></div>
+      <div className="research-kpi"><span>Changed theses</span><strong>{changedCount}</strong></div>
+      <div className="research-kpi"><span>Thesis violations</span><strong>{violationCount}</strong></div>
+    </section>
+
+    <section className="research-workspace-grid">
+      <aside className="research-control-rail card" aria-label="Research filters">
+        <div><h2>Research view</h2><p className="note">Filter the current decision record without changing any investment state.</p></div>
+        <div className="research-filter-stack" role="group" aria-label="Filter research">
+          {filters.map((item) => <button key={item.id} type="button" className={`research-filter-button${filter === item.id ? ' active' : ''}`} aria-pressed={filter === item.id} title={item.description} onClick={() => setFilter(item.id)}>{item.label}</button>)}
+        </div>
+        <label className="research-inbox-search" htmlFor="research-inbox-query">Search research
+          <input id="research-inbox-query" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Company, ticker or report text" />
+        </label>
+        <label className="research-history-toggle"><input type="checkbox" checked={includeHistory} onChange={event => setIncludeHistory(event.target.checked)} /> Include superseded report versions</label>
+        <p className="note">Accepted research is a reviewed artifact, not an autonomous trade instruction. Portfolio changes remain human-controlled.</p>
+      </aside>
+
+      <div className="research-ledger">
+        <div className="research-ledger-header"><div><h2>{filters.find(item => item.id === filter)?.label ?? 'Current research'}</h2><p className="note">{visible.length} report{visible.length === 1 ? '' : 's'} visible</p></div><Link className="text-link" href="/positions">Open portfolio</Link></div>
+        {loading ? <div className="card"><p className="note" role="status">Loading research workspace…</p></div>
+          : error ? <div className="card login-error" role="alert"><p>{error}</p><button className="secondary-button" type="button" onClick={() => void load()}>Retry loading research</button></div>
+          : visible.length === 0 ? <div className="card"><h2>No reports in this view</h2><p className="note">{query || filter !== 'all' ? 'Adjust the filters or search query.' : 'No accepted research analyses are stored yet.'}</p><Link className="action-button inline-action" href="/ai-stock-discovery">Start with Discovery</Link></div>
+          : visible.map((row) => {
+            const kind = classify(row, byId);
+            const badge = kind === 'violated' ? 'THESIS VIOLATION' : kind.toUpperCase();
+            return <article className={`research-report-card ${kind}`} key={row.id}>
+              <div className="research-report-main">
+                <div className="research-report-heading"><h3>{row.companyName} <span className="cur">{row.ticker}</span></h3><span className={`badge ${kind === 'violated' ? 'breach' : kind === 'changed' ? 'watch' : 'ok'}`}>{badge}</span>{row.portfolioCandidate && <span className="badge ok">CANDIDATE</span>}</div>
+                <div className="research-report-meta"><span>{row.portfolioRole}</span><span>{formatDate(row.analysisTimestamp)}</span></div>
+                {kind === 'violated' && <p className="caveat"><strong>Thesis breakers:</strong> {(row.thesisBreakers ?? []).join(' · ')}</p>}
+                <p className="research-report-summary">{row.fundamentalSummary ?? 'No narrative summary was stored for this analysis.'}</p>
+                <div className="research-report-actions"><Link className="text-link" href={`/security/${encodeURIComponent(row.ticker)}`}>Open company research</Link><Link className="text-link" href="/ai-stock-discovery#candidate-review">Review investment decision</Link></div>
+              </div>
+              <div className="research-score-panel" aria-label={`${row.ticker} research scores`}>
+                <div className="research-score"><span>Investment</span><strong>{row.investmentScore}/100</strong></div>
+                <div className="research-score"><span>Thesis fit</span><strong>{row.thesisAlignmentScore}/100</strong></div>
+              </div>
+            </article>;
+          })}
+      </div>
+    </section>
   </main>;
 }

@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
 import './globals.css';
+import './platform-v2.css';
+import './agent-console-v2.css';
 import { AppShell } from '@/components/app-shell';
 
 export const metadata: Metadata = {
@@ -15,12 +17,8 @@ export const metadata: Metadata = {
 /**
  * Without this the browser assumes a desktop-width layout and scales the whole
  * page down on a phone: text becomes unreadable, and every tap target shrinks
- * below the size a thumb can hit. It was absent, which made every other
- * touch-sizing rule in globals.css moot on the device that needed them.
- *
- * maximumScale and userScalable are deliberately left at their defaults —
- * blocking zoom is a common companion to this tag and an accessibility
- * failure; a reader who needs to magnify a number must be able to.
+ * below the size a thumb can hit. maximumScale and userScalable are deliberately
+ * left at their defaults so readers can still zoom financial detail.
  */
 export const viewport: Viewport = {
   width: 'device-width',
