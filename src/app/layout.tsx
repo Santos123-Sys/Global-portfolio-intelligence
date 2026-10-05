@@ -6,6 +6,7 @@ import './agent-console-v2.css';
 import './commercial-v3.css';
 import './commercial-v3-overrides.css';
 import './commercial-v3-progress.css';
+import './commercial-v3-command.css';
 import { AppShell } from '@/components/app-shell';
 
 export const metadata: Metadata = {
