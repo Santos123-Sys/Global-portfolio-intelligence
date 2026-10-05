@@ -7,6 +7,7 @@ import { assessThesisReview } from '@/lib/thesis-review';
 
 export function ThesisCriteriaEditor({ criteria, onChange }: { criteria: ThesisCriteria; onChange: (criteria: ThesisCriteria) => void }) {
   const review = assessThesisReview(criteria);
+  const requiresCorrection = review.errors.length > 0 || review.actionableIssues.length > 0;
 
   function update(index: number, patch: Partial<ThesisCriteria['portfolios'][number]>) {
     onChange({ ...criteria, portfolios: criteria.portfolios.map((value, position) => position === index ? { ...value, ...patch } : value) });
@@ -15,8 +16,8 @@ export function ThesisCriteriaEditor({ criteria, onChange }: { criteria: ThesisC
   return <div className="setup-form strategy-editor-v3">
     <StrategyReviewConsole review={review} criteria={review.criteria} />
 
-    <details className="strategy-editor-details">
-      <summary>Edit structured mandate</summary>
+    <details className="strategy-editor-details" open={requiresCorrection ? true : undefined}>
+      <summary>{requiresCorrection ? 'Correct structured mandate' : 'Edit structured mandate'}</summary>
       <div className="strategy-editor-form">
         {criteria.portfolios.map((portfolio, index) => <fieldset key={index} className="thesis-mandate">
           <legend>Mandate {index + 1}</legend>
