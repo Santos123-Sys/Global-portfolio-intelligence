@@ -39,9 +39,13 @@ describe('Research Director external evidence acquisition', () => {
     vi.stubEnv('WEB_SEARCH_PROVIDER', 'brave');
     vi.stubEnv('WEB_SEARCH_API_KEY', 'test-key');
     vi.stubEnv('AGENT_STAGGER_MS', '0');
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+    const payload = {
       web: { results: [{ title: 'Issuer update', url: 'https://example.com/research', description: 'Evidence snippet for the issuer.' }] },
-    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    };
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
 
     const result = await acquireExternalResearch(foundation(), 'combined');
     expect(fetchMock).toHaveBeenCalledTimes(4);
