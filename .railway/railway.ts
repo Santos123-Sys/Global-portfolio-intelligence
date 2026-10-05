@@ -130,6 +130,10 @@ export default defineRailway((context) => {
     env: {
       NODE_ENV: 'production',
       AGENTIC_DATABASE_URL: agenticDatabase.env.DATABASE_URL,
+      // The bundled canonical finance runtime polls the dashboard analysis-session
+      // tables. Without this reference worker.ts deliberately leaves that runtime
+      // disabled even though it was compiled into the worker image.
+      FINANCE_DATABASE_URL: dashboardDatabase.env.DATABASE_URL,
       AGENTIC_SYSTEM_API_KEY: agenticApi.env.AGENTIC_SYSTEM_API_KEY,
       OPENAI_API_KEY: context.shared.OPENAI_API_KEY,
       OPENAI_MODEL: 'gpt-5.6',
