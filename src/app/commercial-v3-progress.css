@@ -1,0 +1,39 @@
+.investment-workflow-nav a {
+  position: relative;
+}
+
+.investment-workflow-nav a > small {
+  margin-left: auto;
+  color: var(--v3-subtle);
+  font-size: 0.63rem;
+  text-transform: uppercase;
+  letter-spacing: 0.055em;
+  font-weight: 800;
+}
+
+.investment-workflow-nav li[data-stage-state='complete'] a {
+  border-color: color-mix(in srgb, var(--v3-success) 24%, var(--v3-border));
+}
+
+.investment-workflow-nav li[data-stage-state='complete'] .workflow-step-number,
+.investment-workflow-nav li[data-stage-state='complete'] a > small {
+  color: var(--v3-success);
+}
+
+.investment-workflow-nav li[data-stage-state='working'] a {
+  border-color: color-mix(in srgb, var(--v3-warning) 35%, var(--v3-border));
+  background: var(--v3-warning-soft);
+}
+
+.investment-workflow-nav li[data-stage-state='working'] .workflow-step-number,
+.investment-workflow-nav li[data-stage-state='working'] a > small {
+  color: var(--v3-warning);
+}
+
+.investment-workflow-nav li[data-stage-state='locked'] a {
+  opacity: 0.62;
+}
+
+.investment-workflow-nav li[data-stage-state='current'] a > small {
+  color: var(--v3-accent-strong);
+}
