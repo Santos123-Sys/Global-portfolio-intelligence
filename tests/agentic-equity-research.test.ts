@@ -132,7 +132,7 @@ describe('authority, interruption and user visibility',()=>{
     const route=readFileSync('src/app/api/agents/sessions/[sessionId]/control/route.ts','utf8');
     for(const text of ['authenticateRequest(req)','assertSameOrigin(req)','eq(agentAnalysisSessions.ownerId,auth.auth.userId)','analysisScopes','pg_advisory_xact_lock','eq(agentAnalysisSessions.status,session.status)']) expect(route).toContain(text);
     const component=readFileSync('src/components/dashboard/agent-run-status.tsx','utf8');
-    for(const text of ['Pause research','Resume research','Cancel research','Return briefing','Current step','Key findings','Risks and opposing evidence','Evidence limitations']) expect(component).toContain(text);
+    for(const text of ['Pause research','Resume research','Cancel research','Return briefing','Current activity','Key findings','Risks and opposing evidence','Evidence limitations']) expect(component).toContain(text);
     const analysis=readFileSync('src/components/dashboard/agent-analysis.tsx','utf8');
     for(const text of ['Review research plan','Confirm plan and start research','No work started yet','Research language','Standalone research; no thesis-linked acceptance','Optional value scorecard']) expect(analysis).toContain(text);
   });
