@@ -34,15 +34,17 @@ describe('agentic HTTP API', () => {
     expect((await fetch(`${baseUrl}/v1/analysis-runs`)).status).toBe(401);
   });
 
-  it('starts authenticated runs with unique immutable IDs and HTTP 202', async () => {
-    const responses = await Promise.all([1, 2].map(() => fetch(`${baseUrl}/v1/analysis-runs`, authenticated({
+  it('rejects creation of legacy analysis runs without persisting a job', async () => {
+    const response = await fetch(`${baseUrl}/v1/analysis-runs`, authenticated({
       method: 'POST',
       body: JSON.stringify(runRequest),
-    }))));
-    expect(responses.every((response) => response.status === 202)).toBe(true);
-    const bodies = await Promise.all(responses.map((response) => response.json())) as Array<{ externalRunId: string; status: string }>;
-    expect(bodies[0].status).toBe('queued');
-    expect(bodies[0].externalRunId).not.toBe(bodies[1].externalRunId);
+    }));
+    expect(response.status).toBe(410);
+    expect(await response.json()).toMatchObject({
+      error: 'legacy_analysis_orchestration_retired',
+      canonicalPath: '/api/agents/analyze',
+    });
+    expect(repository.jobs.size).toBe(0);
   });
 
   it('atomically reuses Discovery dispatch IDs and rejects changed payloads', async () => {
@@ -60,54 +62,31 @@ describe('agentic HTTP API', () => {
     expect(repository.jobs.size).toBe(1);
   });
 
-  it('rejects incoherent run coverage before persistence', async () => {
-    const response = await fetch(`${baseUrl}/v1/analysis-runs`, authenticated({
-      method: 'POST',
-      body: JSON.stringify({ ...runRequest, groundingBundles: [] }),
-    }));
-    expect(response.status).toBe(400);
-    expect(repository.jobs.size).toBe(0);
-  });
-
-  it('requires JSON, permits passive initial PDF views, and rejects active PDF content before persistence', async () => {
-    const wrongType = await fetch(`${baseUrl}/v1/analysis-runs`, authenticated({
+  it('requires JSON for active preparatory endpoints, permits passive initial PDF views, and rejects active PDF content', async () => {
+    const wrongType = await fetch(`${baseUrl}/v1/thesis-extractions`, authenticated({
       method: 'POST',
       headers: { 'content-type': 'text/plain' },
-      body: JSON.stringify(runRequest),
+      body: JSON.stringify({}),
     }));
     expect(wrongType.status).toBe(415);
 
     const passivePdf = Buffer.from('%PDF-1.4\n/OpenAction [1 0 R /XYZ null null 0]\n%%EOF').toString('base64');
     const passiveResponse = await fetch(`${baseUrl}/v1/thesis-extractions`, authenticated({
       method: 'POST',
-      body: JSON.stringify({
-        document: {
-          version: 1,
-          fileName: 'office-export.pdf',
-          mimeType: 'application/pdf',
-          contentBase64: passivePdf,
-        },
-      }),
+      body: JSON.stringify({ document: { version: 1, fileName: 'office-export.pdf', mimeType: 'application/pdf', contentBase64: passivePdf } }),
     }));
     expect(passiveResponse.status).toBe(202);
 
     const activePdf = Buffer.from('%PDF-1.4\n/OpenAction << /S /JavaScript /JS (alert(1)) >>\n%%EOF').toString('base64');
     const activeResponse = await fetch(`${baseUrl}/v1/thesis-extractions`, authenticated({
       method: 'POST',
-      body: JSON.stringify({
-        document: {
-          version: 1,
-          fileName: 'active.pdf',
-          mimeType: 'application/pdf',
-          contentBase64: activePdf,
-        },
-      }),
+      body: JSON.stringify({ document: { version: 1, fileName: 'active.pdf', mimeType: 'application/pdf', contentBase64: activePdf } }),
     }));
     expect(activeResponse.status).toBe(400);
     expect(repository.jobs.size).toBe(1);
   });
 
-  it('returns failed state and requeues the same logical run for retry', async () => {
+  it('keeps historical failed analysis state readable but refuses legacy retry', async () => {
     const created = await repository.create('analysis_run', 'agent-run-fixed', runRequest, 4);
     await repository.fail(created.id, 'analysis', 'Security analysis failed safely');
     const failed = await fetch(`${baseUrl}/v1/analysis-runs/agent-run-fixed`, authenticated());
@@ -117,11 +96,12 @@ describe('agentic HTTP API', () => {
       errorMessage: 'Security analysis failed safely',
     });
     const retried = await fetch(`${baseUrl}/v1/analysis-runs/agent-run-fixed/retry`, authenticated({ method: 'POST' }));
-    expect(retried.status).toBe(202);
-    expect(await retried.json()).toMatchObject({ externalRunId: 'agent-run-fixed', status: 'queued' });
+    expect(retried.status).toBe(410);
+    expect(await retried.json()).toMatchObject({ error: 'legacy_analysis_orchestration_retired' });
+    expect((await repository.findByExternalId('agent-run-fixed'))?.status).toBe('failed');
   });
 
-  it('returns a completed manifest and streams the stored PDF', async () => {
+  it('keeps completed historical manifests and reports readable', async () => {
     const created = await repository.create('analysis_run', 'agent-run-complete', runRequest, 4);
     await repository.completeAnalysis(created.id, manifest, hashManifest(manifest), {
       objectKey: 'reports/agent-run-complete.pdf',
@@ -139,17 +119,9 @@ describe('agentic HTTP API', () => {
     const source = 'Swiss quality companies only.';
     const response = await fetch(`${baseUrl}/v1/thesis-extractions`, authenticated({
       method: 'POST',
-      body: JSON.stringify({
-        document: {
-          version: 2,
-          fileName: 'thesis.txt',
-          mimeType: 'text/plain',
-          contentBase64: Buffer.from(source).toString('base64'),
-        },
-      }),
+      body: JSON.stringify({ document: { version: 2, fileName: 'thesis.txt', mimeType: 'text/plain', contentBase64: Buffer.from(source).toString('base64') } }),
     }));
     expect(response.status).toBe(202);
     expect(JSON.stringify(await response.json())).not.toContain(source);
   });
 });
-
