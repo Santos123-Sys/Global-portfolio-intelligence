@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { PortfolioProvider } from '@/lib/portfolio-context';
 import { Header } from './header';
 import { InvestmentWorkflowNav } from './investment-workflow-nav';
+import { WorkflowNextAction } from './workflow-next-action';
 import { ErrorBoundary } from './error-boundary';
 import { usePathname } from 'next/navigation';
 import { LanguageProvider, useLanguage } from '@/lib/i18n';
@@ -27,6 +28,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Header />
           <section className="content" id="workspace-content" tabIndex={-1}>
             <InvestmentWorkflowNav />
+            <WorkflowNextAction />
             <ErrorBoundary>{children}</ErrorBoundary>
           </section>
           <GoogleCloudTranslateContent />
