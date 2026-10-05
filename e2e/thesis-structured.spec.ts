@@ -49,7 +49,17 @@ for (const width of [390, 1440]) {
     await page.getByLabel('Choose strategy document').setInputFiles({ name: 'strategy.txt', mimeType: 'text/plain', buffer: Buffer.from('Long-term Brazilian growth strategy; B3 primary listings.') });
     expect((await extractionResponse).ok()).toBe(true);
     await expect(page.getByRole('heading', { name: 'Review portfolio strategy' })).toBeVisible({ timeout: 15000 });
+
+    // A valid generated strategy keeps the raw structured editor collapsed by default.
+    // Open it explicitly before asserting editable fields so this test exercises the
+    // intended progressive-disclosure contract instead of racing review classification.
+    const mandateEditor = page.locator('details.strategy-editor-details');
+    await expect(mandateEditor).toBeVisible();
+    if (!(await mandateEditor.evaluate(element => (element as HTMLDetailsElement).open))) {
+      await mandateEditor.locator('summary').click();
+    }
     await expect(page.getByLabel('Base currency for mandate 1')).toHaveValue('BRL');
+
     const note = page.getByLabel('Review note (required)');
     if (await note.isVisible()) await note.fill('Reviewed the generated policy and confirmed the intended B3 market coverage.');
     await expect(page.getByRole('button', { name: 'Approve strategy and start research' })).toBeEnabled();
