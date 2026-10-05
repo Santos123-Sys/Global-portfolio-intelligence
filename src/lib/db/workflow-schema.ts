@@ -140,7 +140,10 @@ export const discoveryCandidates = pgTable(
     marketBriefRequestJson: jsonb('market_brief_request_json'),
     marketBriefJson: jsonb('market_brief_json'),
     marketBriefErrorMessage: text('market_brief_error_message'),
+    /** Historical generic-agent run id. New research uses analysisSessionId. */
     externalAnalysisRunId: text('external_analysis_run_id'),
+    /** Canonical Research Director session. Kept as a plain UUID to avoid a schema-module cycle. */
+    analysisSessionId: uuid('analysis_session_id'),
     analysisErrorMessage: text('analysis_error_message'),
     analysisId: uuid('analysis_id').references(() => aiAnalyses.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -150,6 +153,7 @@ export const discoveryCandidates = pgTable(
     runSecurityIdx: uniqueIndex('discovery_candidates_run_security_idx')
       .on(t.runId, t.portfolioId, t.exchange, t.ticker),
     ownerWorkflowIdx: index('discovery_candidates_owner_workflow_idx').on(t.ownerId, t.workflowStatus, t.createdAt),
+    analysisSessionIdx: index('discovery_candidates_analysis_session_idx').on(t.analysisSessionId),
   })
 );
 

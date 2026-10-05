@@ -1,23 +1,19 @@
 import {
-  AgenticRunRequest,
   DiscoveryRunRequest,
   MarketBriefRequest,
   ThesisExtractionRequest,
-  validateRunRequestCoherence,
-  type AnalysisOutput,
-  type ReportSynthesisOutput,
 } from '@portfolio-intelligence/agentic-contract';
-import { buildManifest, hashManifest } from './manifest.js';
 import { AgenticPipelineError, OpenAIAgenticPipeline } from './openai-pipeline.js';
-import { renderReportPdf } from './pdf.js';
-import type { ReportStorage } from './storage.js';
 import type { AgenticJob, JobRepository } from './types.js';
 
 export interface ProcessingDependencies {
   repository: JobRepository;
-  pipeline: Pick<OpenAIAgenticPipeline, 'extractThesis' | 'discoverSecurities' | 'researchMarket' | 'analyzeSecurity' | 'synthesizePortfolio'>;
-  storage: Pick<ReportStorage, 'put'>;
-  renderPdf?: typeof renderReportPdf;
+  /**
+   * The generic service is intentionally restricted to preparatory research.
+   * Security analysis, valuation, debate and synthesis belong exclusively to
+   * the canonical Research Director finance runtime.
+   */
+  pipeline: Pick<OpenAIAgenticPipeline, 'extractThesis' | 'discoverSecurities' | 'researchMarket'>;
 }
 
 export async function processJob(job: AgenticJob, deps: ProcessingDependencies): Promise<void> {
@@ -35,7 +31,10 @@ export async function processJob(job: AgenticJob, deps: ProcessingDependencies):
       const request = DiscoveryRunRequest.safeParse(job.payload);
       if (!request.success) throw new AgenticPipelineError('analysis', 'Stored discovery payload failed contract validation');
       await deps.repository.updateProgress(job.id, 0, 1, 'market_discovery', job.attemptCount);
-      const result = await deps.pipeline.discoverSecurities(request.data, (completed, total, stage) => deps.repository.updateProgress(job.id, completed, total, stage, job.attemptCount));
+      const result = await deps.pipeline.discoverSecurities(
+        request.data,
+        (completed, total, stage) => deps.repository.updateProgress(job.id, completed, total, stage, job.attemptCount)
+      );
       await deps.repository.completeDiscovery(job.id, result, job.attemptCount);
       return;
     }
@@ -45,91 +44,31 @@ export async function processJob(job: AgenticJob, deps: ProcessingDependencies):
       if (!request.success) throw new AgenticPipelineError('market_brief', 'Stored market brief payload failed contract validation');
       await deps.repository.updateProgress(job.id, 0, 5, 'market_brief_sources', job.attemptCount);
       const result = await deps.pipeline.researchMarket(request.data, async (stage) => {
-        const completed = stage === 'market_brief_synthesis' ? 4 : Math.max(0, ['maritaca_data_ocean', 'brapi_financial_indicators', 'sec_edgar_filings', 'independent_web_research'].indexOf(stage));
+        const completed = stage === 'market_brief_synthesis'
+          ? 4
+          : Math.max(0, ['maritaca_data_ocean', 'brapi_financial_indicators', 'sec_edgar_filings', 'independent_web_research'].indexOf(stage));
         await deps.repository.updateProgress(job.id, completed, 5, stage, job.attemptCount);
       });
       await deps.repository.completeMarketBrief(job.id, result, job.attemptCount);
       return;
     }
 
-    const request = AgenticRunRequest.safeParse(job.payload);
-    if (!request.success) throw new AgenticPipelineError('analysis', 'Stored run payload failed contract validation');
-    validateRunRequestCoherence(request.data);
-
-    const total = request.data.securities.length + request.data.portfolios.length + 2;
-    let completed = 0;
-    const results: Array<{
-      portfolioId: string;
-      analyses: AnalysisOutput[];
-      synthesis: ReportSynthesisOutput;
-    }> = [];
-
-    for (const portfolio of request.data.portfolios) {
-      const securities = request.data.securities.filter((security) => security.portfolioId === portfolio.id);
-      if (securities.length === 0) {
-        throw new AgenticPipelineError('analysis', `Portfolio ${portfolio.id} has no requested securities`);
-      }
-      const analyses: AnalysisOutput[] = [];
-      const bundles = [];
-      for (const security of securities) {
-        await deps.repository.updateProgress(job.id, completed, total, `security_analysis:${security.ticker}`, job.attemptCount);
-        const grounding = request.data.groundingBundles.find(({ portfolioId, bundle }) =>
-          portfolioId === portfolio.id && bundle.ticker === security.ticker && bundle.exchange === security.exchange
-        );
-        if (!grounding) throw new AgenticPipelineError('analysis', `Grounding bundle missing for ${security.ticker}`);
-        analyses.push(await deps.pipeline.analyzeSecurity(
-          grounding.bundle,
-          request.data.thesis.criteria,
-          request.data.agentConfigs?.find((config) => config.agentKind === 'security_analysis')
-        ));
-        bundles.push(grounding.bundle);
-        completed += 1;
-      }
-
-      await deps.repository.updateProgress(job.id, completed, total, `portfolio_synthesis:${portfolio.id}`, job.attemptCount);
-      const synthesis = await deps.pipeline.synthesizePortfolio(
-        portfolio,
-        analyses,
-        bundles,
-        request.data.agentConfigs?.find((config) => config.agentKind === 'portfolio_synthesis')
-      );
-      results.push({ portfolioId: portfolio.id, analyses, synthesis });
-      completed += 1;
-    }
-
-    await deps.repository.updateProgress(job.id, completed, total, 'manifest_validation', job.attemptCount);
-    const manifest = buildManifest(request.data, results);
-    completed += 1;
-
-    await deps.repository.updateProgress(job.id, completed, total, 'report_render', job.attemptCount);
-    let pdf: Buffer;
-    try {
-      pdf = await (deps.renderPdf ?? renderReportPdf)(manifest, job.externalId);
-    } catch {
-      throw new ProcessingStageError('render', 'PDF report rendering failed; the job can be retried safely');
-    }
-
-    let report;
-    try {
-      report = await deps.storage.put(job.externalId, pdf);
-    } catch {
-      throw new ProcessingStageError('upload', 'PDF artifact upload failed; the job can be retried safely');
-    }
-    await deps.repository.completeAnalysis(job.id, manifest, hashManifest(manifest), report, job.attemptCount);
+    // Historical analysis_run rows remain readable, but can never execute again.
+    // This is a fail-closed invariant: only agent_analysis_sessions may initiate
+    // security research, valuation, bull/bear debate and final synthesis.
+    await deps.repository.fail(
+      job.id,
+      'analysis',
+      'Legacy security-analysis orchestration is retired. Start a canonical Research Director session instead.',
+      job.attemptCount
+    );
   } catch (error) {
-    const stage = error instanceof AgenticPipelineError || error instanceof ProcessingStageError
+    const stage = error instanceof AgenticPipelineError
       ? error.stage
       : job.kind === 'thesis_extraction' ? 'extraction' : job.kind === 'market_brief' ? 'market_brief' : 'analysis';
-    const safeMessage = error instanceof AgenticPipelineError || error instanceof ProcessingStageError
+    const safeMessage = error instanceof AgenticPipelineError
       ? error.message
-      : 'Agentic job failed unexpectedly; no security was silently omitted';
+      : 'Agentic preparatory job failed unexpectedly; no research output was silently accepted';
     await deps.repository.fail(job.id, stage, safeMessage, job.attemptCount);
-  }
-}
-
-class ProcessingStageError extends Error {
-  constructor(readonly stage: 'render' | 'upload', message: string) {
-    super(message);
-    this.name = 'ProcessingStageError';
   }
 }

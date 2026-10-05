@@ -2,7 +2,6 @@ import { DispatchConflictError } from './types.js';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import {
-  AgenticRunRequest,
   DiscoveryRunRequest,
   MarketBriefRequest,
   type MarketBriefStatus,
@@ -10,7 +9,6 @@ import {
   MAX_THESIS_PDF_BYTES,
   MAX_THESIS_TEXT_BYTES,
   ThesisExtractionRequest,
-  validateRunRequestCoherence,
   type ExternalRunStatus,
   type DiscoveryRunStatus,
   type ThesisDocument,
@@ -54,9 +52,7 @@ async function readJson(request: IncomingMessage, limit = 16 * 1024 * 1024): Pro
     throw new HttpError(415, 'Content-Type must be application/json');
   }
   const declaredLength = Number(request.headers['content-length']);
-  if (Number.isFinite(declaredLength) && declaredLength > limit) {
-    throw new HttpError(413, 'Request body is too large');
-  }
+  if (Number.isFinite(declaredLength) && declaredLength > limit) throw new HttpError(413, 'Request body is too large');
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of request) {
@@ -74,23 +70,16 @@ async function readJson(request: IncomingMessage, limit = 16 * 1024 * 1024): Pro
 }
 
 function validateThesisDocumentContent(document: ThesisDocument): void {
-  if (
-    document.contentBase64.length > MAX_THESIS_BASE64_CHARACTERS ||
-    !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(document.contentBase64)
-  ) {
+  if (document.contentBase64.length > MAX_THESIS_BASE64_CHARACTERS || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(document.contentBase64)) {
     throw new HttpError(400, 'Thesis document encoding is invalid');
   }
   const content = Buffer.from(document.contentBase64, 'base64');
-  if (!content.length || content.toString('base64') !== document.contentBase64) {
-    throw new HttpError(400, 'Thesis document encoding is invalid');
-  }
+  if (!content.length || content.toString('base64') !== document.contentBase64) throw new HttpError(400, 'Thesis document encoding is invalid');
   if (document.mimeType === 'application/pdf') {
     if (content.length > MAX_THESIS_PDF_BYTES) throw new HttpError(413, 'PDF documents must not exceed 10 MB');
     if (content.subarray(0, 5).toString('ascii') !== '%PDF-') throw new HttpError(400, 'PDF signature is invalid');
     const trailer = content.subarray(Math.max(0, content.length - 4096)).toString('latin1');
     if (!trailer.includes('%%EOF')) throw new HttpError(400, 'PDF document is incomplete');
-    // A passive /OpenAction destination is emitted by common office exporters
-    // to set the opening page or zoom. It is not an executable action.
     if (/\/(?:JavaScript|JS|Launch|URI|GoToR|SubmitForm|ImportData|ResetForm|EmbeddedFile|Filespec|RichMedia|XFA|AA|Encrypt)\b/i.test(content.toString('latin1'))) {
       throw new HttpError(400, 'PDFs with executable actions, embedded files, forms, or encryption are not accepted');
     }
@@ -106,43 +95,20 @@ function validateThesisDocumentContent(document: ThesisDocument): void {
 }
 
 function reportUrl(baseUrl: string | undefined, externalId: string): string | undefined {
-  return baseUrl
-    ? new URL(`/v1/analysis-runs/${encodeURIComponent(externalId)}/report`, baseUrl).toString()
-    : undefined;
+  return baseUrl ? new URL(`/v1/analysis-runs/${encodeURIComponent(externalId)}/report`, baseUrl).toString() : undefined;
 }
 
 function runStatus(job: AgenticJob, baseUrl?: string): ExternalRunStatus {
-  const common = {
-    externalRunId: job.externalId,
-    status: job.status,
-    updatedAt: job.updatedAt.toISOString(),
-  } as const;
-  if (job.status === 'queued' || job.status === 'running') {
-    return {
-      ...common,
-      progress: {
-        completed: job.progressCompleted,
-        total: job.progressTotal,
-        currentStage: job.currentStage,
-      },
-    };
-  }
-  if (job.status === 'failed') {
-    return { ...common, errorMessage: job.errorMessage ?? 'Agentic analysis failed' };
-  }
-  if (!job.result || !('portfolios' in job.result)) {
-    throw new HttpError(500, 'Completed run is missing its manifest');
-  }
+  const common = { externalRunId: job.externalId, status: job.status, updatedAt: job.updatedAt.toISOString() } as const;
+  if (job.status === 'queued' || job.status === 'running') return { ...common, progress: { completed: job.progressCompleted, total: job.progressTotal, currentStage: job.currentStage } };
+  if (job.status === 'failed') return { ...common, errorMessage: job.errorMessage ?? 'Agentic analysis failed' };
+  if (!job.result || !('portfolios' in job.result)) throw new HttpError(500, 'Completed run is missing its manifest');
   const url = job.reportObjectKey || job.reportPdf ? reportUrl(baseUrl, job.externalId) : undefined;
   return { ...common, manifest: job.result, ...(url ? { reportPdfUrl: url } : {}) };
 }
 
 function extractionStatus(job: AgenticJob): ThesisExtractionStatus {
-  const common = {
-    externalExtractionId: job.externalId,
-    status: job.status,
-    updatedAt: job.updatedAt.toISOString(),
-  } as const;
+  const common = { externalExtractionId: job.externalId, status: job.status, updatedAt: job.updatedAt.toISOString() } as const;
   if (job.status === 'failed') return { ...common, errorMessage: job.errorMessage ?? 'Thesis extraction failed' };
   if (job.status === 'completed') {
     if (!job.result || !('criteria' in job.result)) throw new HttpError(500, 'Completed extraction is missing its result');
@@ -152,28 +118,13 @@ function extractionStatus(job: AgenticJob): ThesisExtractionStatus {
 }
 
 function discoveryStatus(job: AgenticJob): DiscoveryRunStatus {
-  const common = {
-    externalDiscoveryId: job.externalId,
-    status: job.status,
-    updatedAt: job.updatedAt.toISOString(),
-  } as const;
-  if (job.status === 'failed') {
-    return { ...common, errorMessage: job.errorMessage ?? 'Market discovery failed' };
-  }
+  const common = { externalDiscoveryId: job.externalId, status: job.status, updatedAt: job.updatedAt.toISOString() } as const;
+  if (job.status === 'failed') return { ...common, errorMessage: job.errorMessage ?? 'Market discovery failed' };
   if (job.status === 'completed') {
-    if (!job.result || !('marketMandates' in job.result)) {
-      throw new HttpError(500, 'Completed discovery is missing its result');
-    }
+    if (!job.result || !('marketMandates' in job.result)) throw new HttpError(500, 'Completed discovery is missing its result');
     return { ...common, result: job.result };
   }
-  return {
-    ...common,
-    progress: {
-      completed: job.progressCompleted,
-      total: job.progressTotal,
-      currentStage: job.currentStage,
-    },
-  };
+  return { ...common, progress: { completed: job.progressCompleted, total: job.progressTotal, currentStage: job.currentStage } };
 }
 
 function marketBriefStatus(job: AgenticJob): MarketBriefStatus {
@@ -187,44 +138,28 @@ function marketBriefStatus(job: AgenticJob): MarketBriefStatus {
 }
 
 class HttpError extends Error {
-  constructor(readonly status: number, message: string) {
-    super(message);
-  }
+  constructor(readonly status: number, message: string) { super(message); }
 }
+
+const LEGACY_ANALYSIS_RETIRED = 'Legacy analysis orchestration is retired. Use the canonical Research Director session API.';
 
 export function createAgenticHttpServer(deps: HttpServerDependencies) {
   return createServer(async (request, response) => {
     try {
       const url = new URL(request.url ?? '/', 'http://agentic.local');
       if (url.pathname === '/health' && request.method === 'GET') {
-        await Promise.race([
-          deps.repository.ping(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3_000)),
-        ]);
+        await Promise.race([deps.repository.ping(), new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3_000))]);
         return sendJson(response, 200, { status: 'ok' });
       }
-
       if (!url.pathname.startsWith('/v1/')) throw new HttpError(404, 'Not found');
       if (!authorized(request, deps.apiKey)) throw new HttpError(401, 'Bearer authentication required');
 
       if (url.pathname === '/v1/analysis-runs' && request.method === 'POST') {
-        const parsed = AgenticRunRequest.safeParse(await readJson(request));
-        if (!parsed.success) throw new HttpError(400, 'Analysis run request failed contract validation');
-        try {
-          validateRunRequestCoherence(parsed.data);
-        } catch (error) {
-          throw new HttpError(400, error instanceof Error ? error.message : 'Analysis run request is incoherent');
-        }
-        const externalId = createExternalId('run');
-        const total = parsed.data.securities.length + parsed.data.portfolios.length + 2;
-        const job = await deps.repository.create('analysis_run', externalId, parsed.data, total);
-        return sendJson(response, 202, runStatus(job, deps.internalBaseUrl));
+        return sendJson(response, 410, { error: 'legacy_analysis_orchestration_retired', message: LEGACY_ANALYSIS_RETIRED, canonicalPath: '/api/agents/analyze' });
       }
 
       if (url.pathname === '/v1/thesis-extractions' && request.method === 'POST') {
-        const parsed = ThesisExtractionRequest.safeParse(
-          await readJson(request, MAX_THESIS_BASE64_CHARACTERS + 16 * 1024)
-        );
+        const parsed = ThesisExtractionRequest.safeParse(await readJson(request, MAX_THESIS_BASE64_CHARACTERS + 16 * 1024));
         if (!parsed.success) throw new HttpError(400, 'Thesis extraction request failed contract validation');
         validateThesisDocumentContent(parsed.data.document);
         const externalId = createExternalId('extraction');
@@ -255,24 +190,15 @@ export function createAgenticHttpServer(deps: HttpServerDependencies) {
         if (job.status !== 'completed') throw new HttpError(409, 'Report is not ready');
         const pdf = job.reportPdf ?? (job.reportObjectKey ? await deps.storage.get(job.reportObjectKey) : null);
         if (!pdf || pdf.subarray(0, 5).toString('ascii') !== '%PDF-') throw new HttpError(500, 'Stored report is not a valid PDF');
-        response.writeHead(200, {
-          'content-type': 'application/pdf',
-          'content-length': pdf.length,
-          'content-disposition': `inline; filename="${job.externalId}.pdf"`,
-          'cache-control': 'private, max-age=300',
-          'x-content-type-options': 'nosniff',
-        });
-        response.end(pdf);
-        return;
+        response.writeHead(200, { 'content-type': 'application/pdf', 'content-length': pdf.length, 'content-disposition': `inline; filename="${job.externalId}.pdf"`, 'cache-control': 'private, max-age=300', 'x-content-type-options': 'nosniff' });
+        response.end(pdf); return;
       }
 
       const runRetry = url.pathname.match(/^\/v1\/analysis-runs\/([^/]+)\/retry$/);
       if (runRetry && request.method === 'POST') {
         const existing = await deps.repository.findByExternalId(decodeURIComponent(runRetry[1]));
         if (!existing || existing.kind !== 'analysis_run') throw new HttpError(404, 'Analysis run not found');
-        const retried = await deps.repository.retry(existing.id);
-        if (!retried) throw new HttpError(409, 'Only failed runs can be retried');
-        return sendJson(response, 202, runStatus(retried, deps.internalBaseUrl));
+        return sendJson(response, 410, { error: 'legacy_analysis_orchestration_retired', message: LEGACY_ANALYSIS_RETIRED, canonicalPath: '/api/agents/analyze' });
       }
 
       const extractionRetry = url.pathname.match(/^\/v1\/thesis-extractions\/([^/]+)\/retry$/);

@@ -183,6 +183,13 @@
       "when": 1790928887214,
       "tag": "0025_busy_gideon",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791209100000,
+      "tag": "0026_canonical_research_orchestrator",
+      "breakpoints": true
     }
   ]
 }

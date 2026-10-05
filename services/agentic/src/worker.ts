@@ -4,12 +4,12 @@ import { getWorkerConfig, stageReasoningEffort, workerHealthBudgets } from './co
 import { OpenAIAgenticPipeline } from './openai-pipeline.js';
 import { PostgresJobRepository } from './postgres-repository.js';
 import { processJob } from './process-job.js';
-import { ReportStorage } from './storage.js';
 import { createWorkerHealthServer, type WorkerHeartbeat, type WorkerState } from './worker-health.js';
 import { keepJobLeaseAlive } from './worker-lease.js';
 
 const config = getWorkerConfig();
 const repository = new PostgresJobRepository(config.AGENTIC_DATABASE_URL);
+/** Generic pipeline is now used only for extraction, discovery and market briefs. */
 const pipeline = new OpenAIAgenticPipeline(
   config.OPENAI_API_KEY,
   config.OPENAI_MODEL,
@@ -19,8 +19,8 @@ const pipeline = new OpenAIAgenticPipeline(
   { maritacaApiKey: config.MARITACA_API_KEY, maritacaModel: config.MARITACA_DATA_MODEL,
     brapiApiKey: config.BRAPI_API_KEY, secUserAgent: config.SEC_USER_AGENT }
 );
-const storage = new ReportStorage(config);
 const workerId = `worker-${randomUUID()}`;
+/** The bundled finance runtime is the sole security-analysis orchestrator. */
 const financeRuntime=config.FINANCE_DATABASE_URL ? (async()=>{
   process.env.DATABASE_URL=config.FINANCE_DATABASE_URL;
   return import('./finance-runtime.js');
@@ -103,7 +103,7 @@ async function run(): Promise<void> {
         lastPollAt = Date.now();
       });
       try {
-        await processJob(job, { repository, pipeline, storage });
+        await processJob(job, { repository, pipeline });
       } finally {
         await lease.stop();
         if (lease.lost) {

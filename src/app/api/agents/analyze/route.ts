@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server';
-import { and, eq, inArray, sql } from 'drizzle-orm';
 import { authenticateRequest } from '@/lib/api-auth';
-import { db } from '@/lib/db';
-import { agentAnalysisSessions, agentSessionEvents } from '@/lib/db/agent-schema';
 import { dashboardData } from '@/lib/company-intelligence';
 import { analyzeSchema } from '@/lib/agent-finance/contracts';
 import { assertSameOrigin } from '@/lib/auth';
 import { analysisScopes } from '@/lib/agent-finance/l3/review';
+import { AnalysisQueueCapacityError, queueAnalysisSession } from '@/lib/agent-finance/queue-session';
 
 export const runtime = 'nodejs';
 export const maxDuration = 600;
+
 export async function POST(req: Request) {
   const auth = await authenticateRequest(req); if (!auth.ok) return auth.response;
   try { assertSameOrigin(req); } catch { return NextResponse.json({error:'Cross-origin mutation rejected'},{status:403}); }
@@ -22,15 +21,12 @@ export async function POST(req: Request) {
   if((parsed.data.portfolioId || parsed.data.thesisVersionId) && !scope) return NextResponse.json({error:'Select an active owned thesis linked to this security'},{status:409});
   if(scopes.length>1 && !scope) return NextResponse.json({error:'Select the portfolio and thesis for this analysis'},{status:409});
   if(scope) Object.assign(parsed.data,{portfolioId:scope.portfolioId,thesisVersionId:scope.thesisVersionId});
-  const row = await db.transaction(async tx => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${auth.auth.userId}, 0))`);
-    const active = await tx.select({ id: agentAnalysisSessions.id }).from(agentAnalysisSessions).where(and(eq(agentAnalysisSessions.ownerId, auth.auth.userId), inArray(agentAnalysisSessions.status, ['queued', 'running']))).limit(3);
-    if (active.length >= 3) return null;
-    const [created] = await tx.insert(agentAnalysisSessions).values({ ownerId: auth.auth.userId, securityId: data.securityId, sessionType: parsed.data.analysisType, requestPayload: parsed.data }).returning();
-    await tx.insert(agentSessionEvents).values({sessionId:created.id,eventType:'plan_created',summary:'Research queued: collect evidence, check statements, evaluate industry and review conclusions.',detail:'Research only. No orders, weight changes or automatic report acceptance. Pause and cancellation retain completed records.',authority:'autonomous',consequence:'low',reversible:1});
-    return created;
-  });
-  if (!row) return NextResponse.json({ error: 'Three analyses are already active; wait before starting another.' }, { status: 429 });
-  // Railway worker claims queued sessions from the dashboard database. Requests never own execution.
-  return NextResponse.json({ sessionId: row.id, status: row.status, estimatedCompletionSeconds: null }, { status: 202 });
+  try {
+    const row = await queueAnalysisSession({ ownerId: auth.auth.userId, securityId: data.securityId, request: parsed.data, origin: 'direct' });
+    // Railway worker claims queued sessions from the dashboard database. Requests never own execution.
+    return NextResponse.json({ sessionId: row.id, status: row.status, estimatedCompletionSeconds: null }, { status: 202 });
+  } catch (error) {
+    if (error instanceof AnalysisQueueCapacityError) return NextResponse.json({ error: error.message }, { status: 429 });
+    throw error;
+  }
 }
