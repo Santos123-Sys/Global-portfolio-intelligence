@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
 import './globals.css';
 import './platform-v2.css';
+import './agent-console-v2.css';
 import { AppShell } from '@/components/app-shell';
 
 export const metadata: Metadata = {
