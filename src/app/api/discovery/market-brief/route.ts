@@ -2,7 +2,8 @@ import { after, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { assertSameOrigin } from '@/lib/auth';
 import { authenticateRequest } from '@/lib/api-auth';
-import { approveMarketBriefForFinancialAnalysis, failCandidateAnalysisPreparation, retryCandidateMarketBrief, startApprovedCandidateAnalysis } from '@/lib/discovery-workflow';
+import { queueApprovedCandidateResearch } from '@/lib/canonical-candidate-analysis';
+import { approveMarketBriefForFinancialAnalysis, failCandidateAnalysisPreparation, retryCandidateMarketBrief } from '@/lib/discovery-workflow';
 
 export const runtime = 'nodejs';
 const actionSchema = z.object({ candidateId: z.string().uuid(), action: z.enum(['approve_and_analyze', 'retry']) }).strict();
@@ -20,12 +21,12 @@ export async function POST(request: Request) {
     }
     await approveMarketBriefForFinancialAnalysis(session.auth.userId, parsed.data.candidateId);
     after(async () => {
-      try { await startApprovedCandidateAnalysis(session.auth.userId, parsed.data.candidateId); }
+      try { await queueApprovedCandidateResearch(session.auth.userId, parsed.data.candidateId); }
       catch (error) {
         try { await failCandidateAnalysisPreparation(session.auth.userId, parsed.data.candidateId, error); } catch { /* the durable candidate state remains visible */ }
       }
     });
-    return NextResponse.json({ status: 'analysis_preparing' }, { status: 202 });
+    return NextResponse.json({ status: 'analysis_preparing', orchestrator: 'research_director' }, { status: 202 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Market brief action failed' }, { status: 409 });
   }
