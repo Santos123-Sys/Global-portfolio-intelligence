@@ -93,9 +93,11 @@ export async function queueApprovedCandidateResearch(ownerId: string, candidateI
     dataAsOf,
   });
 
+  // Candidate approval authorizes research, not automatic valuation. Deterministic
+  // valuation remains a separate human-reviewed workbench step.
   const request = analyzeSchema.parse({
     ticker: security.ticker,
-    analysisType: 'combined',
+    analysisType: 'fundamental',
     portfolioId: row.candidate.portfolioId,
     thesisVersionId: row.thesisVersionId,
   });
