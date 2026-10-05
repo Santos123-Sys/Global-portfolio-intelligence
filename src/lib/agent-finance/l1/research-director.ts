@@ -18,6 +18,12 @@ import { activeAgentSnapshot, type EffectiveAgentConfig } from '@/lib/agent-gove
 import { processEvaluationQueue } from '@/lib/agent-evaluations';
 import { validateQuality } from '../l3/quality';
 import { dynamicResearchBudget, planDynamicResearchSwarm, runDynamicResearchSpecialist, summarizeDynamicResearch, type DynamicResearchPlan } from './dynamic-research-swarm';
+import { resolveTaskSchedulerOptions, runScheduled } from '../l3/task-scheduler';
+
+function throwRejected(results: ReadonlyArray<PromiseSettledResult<unknown>>): void {
+  const rejected=results.find(result=>result.status==='rejected');
+  if(rejected?.status==='rejected') throw rejected.reason;
+}
 
 /** L1: queued PostgreSQL state is authoritative; atomic claim prevents duplicate execution. */
 export async function executeSession(sessionId: string,onHeartbeat?:()=>void): Promise<void> {
@@ -67,8 +73,10 @@ export async function executeSession(sessionId: string,onHeartbeat?:()=>void): P
     if(request.analysisType!=='dcf') {
       dynamicPlan=await planDynamicResearchSwarm(foundation,request.analysisType,configs['research-director']);
       if(dynamicPlan.tasks.length) {
-        await recordSessionEvent(sessionId,{eventType:'plan_created',summary:`Research Director created ${dynamicPlan.tasks.length} parallel evidence task${dynamicPlan.tasks.length===1?'':'s'}.`,detail:`Bounded dynamic swarm (${dynamicPlan.source} plan): ${dynamicPlan.tasks.map(item=>item.label).join(' · ')}`.slice(0,4000),agent:'research-director',authority:'autonomous',consequence:'low',reversible:true});
-        await Promise.all(dynamicPlan.tasks.map(item=>engine.run(`dynamic-research-${item.id}`,prior=>runDynamicResearchSpecialist(item,foundation,prior,configs['dynamic-research-specialist']),'dynamic-research-specialist')));
+        const scheduler=resolveTaskSchedulerOptions({concurrency:Math.min(dynamicPlan.maxParallel || 1,resolveTaskSchedulerOptions().concurrency)});
+        await recordSessionEvent(sessionId,{eventType:'plan_created',summary:`Research Director created ${dynamicPlan.tasks.length} evidence task${dynamicPlan.tasks.length===1?'':'s'}.`,detail:`Bounded dynamic swarm (${dynamicPlan.source} plan): ${dynamicPlan.tasks.map(item=>item.label).join(' · ')}. Runtime cap ${scheduler.concurrency}; task starts staggered by ${scheduler.staggerMs}ms.`.slice(0,4000),agent:'research-director',authority:'autonomous',consequence:'low',reversible:true});
+        const dynamicRuns=await runScheduled(dynamicPlan.tasks.map(item=>()=>engine.run(`dynamic-research-${item.id}`,prior=>runDynamicResearchSpecialist(item,foundation,prior,configs['dynamic-research-specialist']),'dynamic-research-specialist')),{concurrency:scheduler.concurrency,staggerMs:scheduler.staggerMs});
+        throwRejected(dynamicRuns);
         const summary=summarizeDynamicResearch(dynamicPlan,engine.outputs);
         await recordSessionEvent(sessionId,{eventType:'finding',summary:`Dynamic research swarm finished ${summary.completed}/${dynamicPlan.tasks.length} tasks.`,detail:`${summary.needsAttention} task${summary.needsAttention===1?'':'s'} need evidence review. Independent subagents do not approve conclusions; their outputs now feed the governed synthesis.`,agent:'research-director',authority:'notify',consequence:summary.needsAttention?'medium':'low',reversible:true});
       }
@@ -81,11 +89,11 @@ export async function executeSession(sessionId: string,onHeartbeat?:()=>void): P
     if (request.analysisType !== 'dcf') {
       await engine.phase('analysis');
       await engine.run('analysis-director', prior => analysisAgent('analysis-director', foundation, prior,configs['analysis-director']));
-      const specialists=await Promise.allSettled(analysisAgents.slice(1, 6).map(name => engine.run(name, prior => analysisAgent(name, foundation, prior,configs[name]))));
-      const interrupted=specialists.find(result=>result.status==='rejected'); if(interrupted?.status==='rejected') throw interrupted.reason;
+      const specialists=await runScheduled(analysisAgents.slice(1, 6).map(name => () => engine.run(name, prior => analysisAgent(name, foundation, prior,configs[name]))));
+      throwRejected(specialists);
       if (request.analysisType !== 'quick') {
-        const debate=await Promise.allSettled(['bull-agent', 'bear-agent'].map(name => engine.run(name, prior => analysisAgent(name, foundation, prior,configs[name]))));
-        const interrupted=debate.find(result=>result.status==='rejected'); if(interrupted?.status==='rejected') throw interrupted.reason;
+        const debate=await runScheduled(['bull-agent', 'bear-agent'].map(name => () => engine.run(name, prior => analysisAgent(name, foundation, prior,configs[name]))),{concurrency:2});
+        throwRejected(debate);
         const judge = await engine.run('judge-agent', prior => analysisAgent('judge-agent', foundation, prior,configs['judge-agent']));
         await engine.assertLease();
         await db.insert(agentDebates).values({ sessionId, bullArgument: JSON.stringify(engine.outputs['bull-agent']), bearArgument: JSON.stringify(engine.outputs['bear-agent']), judgeReasoning: judge.reasoningChain.join('\n'), finalScore: judge.data });

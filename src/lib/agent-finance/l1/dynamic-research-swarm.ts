@@ -3,6 +3,7 @@ import { PROTECTED_AGENT_POLICY, rolePolicy } from '@portfolio-intelligence/agen
 import type { EffectiveAgentConfig } from '@/lib/agent-governance';
 import { evidenceOutput, type AgentOutput, type AnalyzeRequest } from '../contracts';
 import { generateAgentOutput } from '../l2/model-router';
+import { hasModelRuntime, requestModelResponse } from '../l2/model-runtime';
 import { sourceEvidence, type Foundation } from '../l4/foundation';
 import { inferResearchMarket } from '../research-policy';
 
@@ -130,24 +131,19 @@ export async function planDynamicResearchSwarm(foundation: Foundation, analysisT
   const maxTasks = dynamicResearchBudget(analysisType);
   const fallback = fallbackTasks(foundation, analysisType, maxTasks);
   if (!maxTasks) return dynamicResearchPlanSchema.parse({ version: 'dynamic-research-v1', source: 'fallback', maxParallel: 0, researchAsOf: foundation.fiscalDate, tasks: [] });
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return dynamicResearchPlanSchema.parse({ version: 'dynamic-research-v1', source: 'fallback', maxParallel: maxTasks, researchAsOf: foundation.fiscalDate, tasks: fallback });
+  if (!hasModelRuntime()) return dynamicResearchPlanSchema.parse({ version: 'dynamic-research-v1', source: 'fallback', maxParallel: maxTasks, researchAsOf: foundation.fiscalDate, tasks: fallback });
   const policy = config?.runtimePolicy;
   try {
     const market = inferResearchMarket(foundation.company);
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        model: policy?.model ?? process.env.OPENAI_MODEL ?? 'gpt-6-sol', reasoning: { effort: policy?.reasoningEffort ?? 'medium' },
-        input: [
-          { role: 'system', content: `${config?.protectedPolicy ?? PROTECTED_AGENT_POLICY}\nYou are the Research Director's decomposition planner. Create bounded, independent research subtasks for parallel execution. Do not make investment conclusions, factual claims, valuations or trading recommendations. Avoid duplicate tasks and spurious parallelism. Use the sector, thesis, evidence inventory and known gaps to select only tasks that can materially improve the research. Include at least one explicit risk/countercase task for deep research. Return task definitions only.` },
-          { role: 'user', content: JSON.stringify({ ticker: foundation.company.ticker, sector: foundation.company.sector, market, currency: foundation.company.currency, analysisType, maxTasks, thesis: foundation.thesisContext, dataGaps: foundation.dataGaps.slice(0, 12), peerCount: foundation.peers.length, estimateCount: foundation.estimates.length, documents: foundation.documents.map(row => ({ title: row.title, type: row.type, publishedAt: row.publishedAt })).slice(0, 25), marketBriefAvailable: !!foundation.marketBrief }) },
-        ],
-        text: { format: { type: 'json_schema', name: 'dynamic_research_plan', strict: true, schema: PLAN_JSON_SCHEMA } },
-        max_output_tokens: Math.min(policy?.maxOutputTokens ?? 4000, 2500),
-      }),
-      signal: AbortSignal.timeout(Math.min(policy?.timeoutMs ?? 60_000, 60_000)), cache: 'no-store',
-    });
+    const response = await requestModelResponse({
+      model: policy?.model ?? process.env.OPENAI_MODEL ?? 'gpt-6-sol', reasoning: { effort: policy?.reasoningEffort ?? 'medium' },
+      input: [
+        { role: 'system', content: `${config?.protectedPolicy ?? PROTECTED_AGENT_POLICY}\nYou are the Research Director's decomposition planner. Create bounded, independent research subtasks for parallel execution. Do not make investment conclusions, factual claims, valuations or trading recommendations. Avoid duplicate tasks and spurious parallelism. Use the sector, thesis, evidence inventory and known gaps to select only tasks that can materially improve the research. Include at least one explicit risk/countercase task for deep research. Return task definitions only.` },
+        { role: 'user', content: JSON.stringify({ ticker: foundation.company.ticker, sector: foundation.company.sector, market, currency: foundation.company.currency, analysisType, maxTasks, thesis: foundation.thesisContext, dataGaps: foundation.dataGaps.slice(0, 12), peerCount: foundation.peers.length, estimateCount: foundation.estimates.length, documents: foundation.documents.map(row => ({ title: row.title, type: row.type, publishedAt: row.publishedAt })).slice(0, 25), marketBriefAvailable: !!foundation.marketBrief }) },
+      ],
+      text: { format: { type: 'json_schema', name: 'dynamic_research_plan', strict: true, schema: PLAN_JSON_SCHEMA } },
+      max_output_tokens: Math.min(policy?.maxOutputTokens ?? 4000, 2500),
+    }, Math.min(policy?.timeoutMs ?? 60_000, 60_000));
     if (!response.ok) throw new Error(`Planner request failed (${response.status})`);
     const body = await response.json() as { output?: Array<{ content?: Array<{ type: string; text?: string }> }> };
     const text = body.output?.flatMap(row => row.content ?? []).filter(row => row.type === 'output_text').map(row => row.text ?? '').join('');
