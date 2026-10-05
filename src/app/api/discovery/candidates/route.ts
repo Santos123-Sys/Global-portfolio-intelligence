@@ -6,6 +6,7 @@ import { DiscoveryCandidate } from '@portfolio-intelligence/agentic-contract';
 import { assertSameOrigin } from '@/lib/auth';
 import { authenticateRequest } from '@/lib/api-auth';
 import { db } from '@/lib/db';
+import { agentAnalysisSessions } from '@/lib/db/agent-schema';
 import { fetchExternalAgenticRun } from '@/lib/integrations/agentic-client';
 import { getPriceProvider } from '@/lib/connectors';
 import { loadDiscoveryLatestPrices } from '@/lib/discovery-market-data';
@@ -44,13 +45,66 @@ const decisionSchema = z.object({
 
 const runIdSchema = z.string().uuid();
 
+type CanonicalOutput = {
+  confidenceScore?: number;
+  citations?: string[];
+  limitations?: string[];
+  outputs?: Record<string, { data?: unknown }>;
+};
+
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+function strings(value: unknown): string[] | null {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : null;
+}
+function score(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+function canonicalAnalysis(output: unknown) {
+  const final = record(output) as CanonicalOutput;
+  const outputs = final.outputs ?? {};
+  const judge = record(outputs['judge-agent']?.data);
+  const fundamental = record(outputs['fundamental-analyst']?.data);
+  const findings = strings(fundamental.findings) ?? [];
+  return {
+    investmentScore: score(judge.investmentScore) ?? 0,
+    thesisAlignmentScore: score(judge.thesisAlignmentScore) ?? 0,
+    qualityScore: score(judge.qualityScore),
+    growthScore: score(judge.growthScore),
+    riskScore: score(judge.riskScore),
+    dividendScore: null,
+    confidenceScore: typeof final.confidenceScore === 'number' ? final.confidenceScore : 0,
+    fundamentalSummary: findings.length ? findings.join(' ') : null,
+    investmentThesis: (strings(judge.findings) ?? []).join(' ') || null,
+    keyCatalysts: strings(judge.keyCatalysts),
+    keyRisks: strings(judge.keyRisks),
+    thesisBreakers: strings(judge.evidencedThesisBreakers),
+    marketAnalysis: null,
+    researchFramework: null,
+    groundedIn: Array.isArray(final.citations) ? final.citations : [],
+    informationGaps: Array.isArray(final.limitations) ? final.limitations : [],
+    canonicalSession: true,
+  };
+}
+function canonicalProgress(session: { status: string; phase: string }) {
+  if (!['queued', 'running', 'awaiting_approval'].includes(session.status)) return null;
+  const stages = ['research', 'valuation', 'analysis', 'complete'];
+  const index = Math.max(0, stages.indexOf(session.phase));
+  return { completed: index, total: stages.length, currentStage: session.status === 'awaiting_approval' ? 'human_review_required' : session.phase };
+}
+function canonicalDisplayStatus(status: string) {
+  if (status === 'awaiting_approval') return 'running';
+  if (status === 'cancelled') return 'failed';
+  return status;
+}
+
 export async function GET(req: Request) {
   const session = await authenticateRequest(req);
   if (!session.ok) return session.response;
   const parsedRunId = runIdSchema.safeParse(new URL(req.url).searchParams.get('runId'));
-  if (!parsedRunId.success) {
-    return NextResponse.json({ error: 'A valid discovery runId is required' }, { status: 400 });
-  }
+  if (!parsedRunId.success) return NextResponse.json({ error: 'A valid discovery runId is required' }, { status: 400 });
+
   let rows = await db.select({
     candidate: discoveryCandidates,
     portfolioName: portfolios.name,
@@ -62,42 +116,40 @@ export async function GET(req: Request) {
     .where(and(
       eq(discoveryCandidates.ownerId, session.auth.userId),
       eq(discoveryCandidates.runId, parsedRunId.data),
-      // Rejected ideas remain available in Research history for auditability,
-      // but should not pollute the active human-review surface.
       ne(discoveryCandidates.decision, 'rejected'),
       isNull(thesisVersions.excludedAt)
-    ))
-    .orderBy(desc(discoveryCandidates.createdAt));
+    )).orderBy(desc(discoveryCandidates.createdAt));
+
   const marketBriefLive = new Map<string, { progress?: { completed: number; total: number; currentStage: string }; syncWarning?: string }>();
   if (rows.some(({ candidate }) => ['dispatching', 'queued', 'running'].includes(candidate.marketBriefStatus))) {
     await Promise.all(rows.filter(({ candidate }) => ['dispatching', 'queued', 'running'].includes(candidate.marketBriefStatus))
-      .map(({ candidate }) => synchronizeCandidateMarketBrief(session.auth.userId, candidate.id, status => marketBriefLive.set(candidate.id, status)).catch(() => { marketBriefLive.set(candidate.id, { syncWarning: 'Market-research status could not be refreshed. Automatic refresh will retry.' }); })));
+      .map(({ candidate }) => synchronizeCandidateMarketBrief(session.auth.userId, candidate.id, status => marketBriefLive.set(candidate.id, status)).catch(() => {
+        marketBriefLive.set(candidate.id, { syncWarning: 'Market-research status could not be refreshed. Automatic refresh will retry.' });
+      })));
     rows = await db.select({ candidate: discoveryCandidates, portfolioName: portfolios.name, discoveryRequestedAt: externalDiscoveryRuns.requestedAt })
       .from(discoveryCandidates).innerJoin(portfolios, eq(discoveryCandidates.portfolioId, portfolios.id))
       .innerJoin(externalDiscoveryRuns, eq(discoveryCandidates.runId, externalDiscoveryRuns.id))
       .innerJoin(thesisVersions, eq(externalDiscoveryRuns.thesisVersionId, thesisVersions.id))
-      .where(and(eq(discoveryCandidates.ownerId, session.auth.userId), eq(discoveryCandidates.runId, parsedRunId.data),
-        ne(discoveryCandidates.decision, 'rejected'), isNull(thesisVersions.excludedAt)))
+      .where(and(eq(discoveryCandidates.ownerId, session.auth.userId), eq(discoveryCandidates.runId, parsedRunId.data), ne(discoveryCandidates.decision, 'rejected'), isNull(thesisVersions.excludedAt)))
       .orderBy(desc(discoveryCandidates.createdAt));
   }
+
   let latestPrices = new Map();
   try {
-    latestPrices = await loadDiscoveryLatestPrices(rows.map((row) => ({
-      id: row.candidate.id,
-      ticker: row.candidate.ticker,
-      exchange: row.candidate.exchange,
-    })), getPriceProvider());
-  } catch {
-    // Price enrichment is best-effort; the discovery shortlist remains usable
-    // when a provider is not configured on a development environment.
-  }
-  const externalIds = rows.flatMap((row) => row.candidate.externalAnalysisRunId ? [row.candidate.externalAnalysisRunId] : []);
-  let externalRuns = externalIds.length
-    ? await db.select().from(externalAgenticRuns).where(and(
-      eq(externalAgenticRuns.ownerId, session.auth.userId),
-      inArray(externalAgenticRuns.externalRunId, externalIds)
-    ))
-    : [];
+    latestPrices = await loadDiscoveryLatestPrices(rows.map((row) => ({ id: row.candidate.id, ticker: row.candidate.ticker, exchange: row.candidate.exchange })), getPriceProvider());
+  } catch { /* best-effort price enrichment */ }
+
+  const canonicalIds = rows.flatMap((row) => row.candidate.analysisSessionId ? [row.candidate.analysisSessionId] : []);
+  const canonicalSessions = canonicalIds.length ? await db.select().from(agentAnalysisSessions).where(and(
+    eq(agentAnalysisSessions.ownerId, session.auth.userId), inArray(agentAnalysisSessions.id, canonicalIds)
+  )) : [];
+  const canonicalById = new Map(canonicalSessions.map((analysisSession) => [analysisSession.id, analysisSession]));
+
+  // Historical compatibility only: new candidates never create external analysis runs.
+  const externalIds = rows.flatMap((row) => !row.candidate.analysisSessionId && row.candidate.externalAnalysisRunId ? [row.candidate.externalAnalysisRunId] : []);
+  let externalRuns = externalIds.length ? await db.select().from(externalAgenticRuns).where(and(
+    eq(externalAgenticRuns.ownerId, session.auth.userId), inArray(externalAgenticRuns.externalRunId, externalIds)
+  )) : [];
   const analysisProgress = new Map<string, { completed: number; total: number; currentStage: string }>();
   const analysisSyncWarnings = new Map<string, string>();
   await Promise.all(externalRuns.filter(run => ['queued', 'running'].includes(run.status)).map(async run => {
@@ -111,7 +163,7 @@ export async function GET(req: Request) {
         completedAt: ['completed', 'failed'].includes(remote.status) ? new Date() : run.completedAt,
       }).where(and(eq(externalAgenticRuns.id, run.id), ne(externalAgenticRuns.status, 'imported')));
     } catch {
-      analysisSyncWarnings.set(run.externalRunId, 'Live analysis status could not be refreshed. The last saved status is shown; automatic refresh will retry.');
+      analysisSyncWarnings.set(run.externalRunId, 'Historical analysis status could not be refreshed. The last saved status is shown.');
     }
   }));
   if (externalRuns.some(run => ['queued', 'running'].includes(run.status))) {
@@ -121,76 +173,65 @@ export async function GET(req: Request) {
   }
   const runByExternalId = new Map(externalRuns.map((run) => [run.externalRunId, run]));
   const runIds = externalRuns.map((run) => run.id);
-  const analyses = runIds.length
-    ? await db.select().from(aiAnalyses).where(and(
-      eq(aiAnalyses.ownerId, session.auth.userId),
-      inArray(aiAnalyses.externalRunId, runIds)
-    ))
-    : [];
+  const analyses = runIds.length ? await db.select().from(aiAnalyses).where(and(
+    eq(aiAnalyses.ownerId, session.auth.userId), inArray(aiAnalyses.externalRunId, runIds)
+  )) : [];
   const analysisByRunId = new Map(analyses.map((analysis) => [analysis.externalRunId!, analysis]));
+
   const candidateIds = rows.map((row) => row.candidate.id);
   const securityIds = rows.flatMap((row) => row.candidate.securityId ? [row.candidate.securityId] : []);
   const [riskRows, valuationRows] = candidateIds.length ? await Promise.all([
-    db.select().from(securityRiskSnapshots).where(and(
-      eq(securityRiskSnapshots.ownerId, session.auth.userId),
-      inArray(securityRiskSnapshots.candidateId, candidateIds)
-    )).orderBy(desc(securityRiskSnapshots.computedAt)),
-    db.select().from(valuationScenarios).where(and(
-      eq(valuationScenarios.ownerId, session.auth.userId),
-      inArray(valuationScenarios.candidateId, candidateIds)
-    )).orderBy(desc(valuationScenarios.createdAt)),
+    db.select().from(securityRiskSnapshots).where(and(eq(securityRiskSnapshots.ownerId, session.auth.userId), inArray(securityRiskSnapshots.candidateId, candidateIds))).orderBy(desc(securityRiskSnapshots.computedAt)),
+    db.select().from(valuationScenarios).where(and(eq(valuationScenarios.ownerId, session.auth.userId), inArray(valuationScenarios.candidateId, candidateIds))).orderBy(desc(valuationScenarios.createdAt)),
   ]) : [[], []];
-  const primarySourceRows = securityIds.length ? await db.select({
-    securityId: marketDataObservations.securityId,
-    metricName: marketDataObservations.metricName,
-  }).from(marketDataObservations).where(and(
-    inArray(marketDataObservations.securityId, securityIds),
-    eq(marketDataObservations.observationType, 'fundamental'),
-    eq(marketDataObservations.status, 'OK'),
-    eq(marketDataObservations.provider, 'investor-relations')
-  )) : [];
+  const primarySourceRows = securityIds.length ? await db.select({ securityId: marketDataObservations.securityId, metricName: marketDataObservations.metricName })
+    .from(marketDataObservations).where(and(
+      inArray(marketDataObservations.securityId, securityIds), eq(marketDataObservations.observationType, 'fundamental'),
+      eq(marketDataObservations.status, 'OK'), eq(marketDataObservations.provider, 'investor-relations')
+    )) : [];
   const primaryMetricsBySecurity = new Map<string, Set<string>>();
-  for (const row of primarySourceRows) {
-    const metrics = primaryMetricsBySecurity.get(row.securityId) ?? new Set<string>();
-    metrics.add(row.metricName);
-    primaryMetricsBySecurity.set(row.securityId, metrics);
+  for (const sourceRow of primarySourceRows) {
+    const metrics = primaryMetricsBySecurity.get(sourceRow.securityId) ?? new Set<string>();
+    metrics.add(sourceRow.metricName); primaryMetricsBySecurity.set(sourceRow.securityId, metrics);
   }
 
   const candidates = rows.map((row) => {
-    const run = row.candidate.externalAnalysisRunId
-      ? runByExternalId.get(row.candidate.externalAnalysisRunId)
-      : null;
-    const analysis = run ? analysisByRunId.get(run.id) : null;
+    const canonical = row.candidate.analysisSessionId ? canonicalById.get(row.candidate.analysisSessionId) ?? null : null;
+    const run = !canonical && row.candidate.externalAnalysisRunId ? runByExternalId.get(row.candidate.externalAnalysisRunId) ?? null : null;
+    const legacyAnalysis = run ? analysisByRunId.get(run.id) : null;
     const manifest = PortfolioAnalysisManifest.safeParse(run?.manifestJson);
     const marketAnalysis = manifest.success ? manifest.data.portfolios.find(p => p.portfolioId === row.candidate.portfolioId)?.analyses.find(a => a.ticker === row.candidate.ticker)?.marketAnalysis : undefined;
     const risk = riskRows.find((snapshot) => snapshot.candidateId === row.candidate.id) ?? null;
     const valuation = valuationRows.find((scenario) => scenario.candidateId === row.candidate.id) ?? null;
-    const analysisMode = run
-      ? analysisModeFromRequest(run.requestJson, row.candidate.ticker, row.candidate.exchange)
-      : row.candidate.decision === 'approved'
-        ? LIMITED_RESEARCH_RISK_MODE
-        : null;
+    const legacyMode = run ? analysisModeFromRequest(run.requestJson, row.candidate.ticker, row.candidate.exchange) : null;
+    const analysisMode = canonical ? LIMITED_RESEARCH_RISK_MODE : legacyMode ?? (row.candidate.decision === 'approved' ? LIMITED_RESEARCH_RISK_MODE : null);
     const primaryDcfReady = row.candidate.securityId != null && ['free_cash_flow', 'total_debt', 'cash_and_equivalents', 'shares_outstanding']
       .every((metric) => primaryMetricsBySecurity.get(row.candidate.securityId!)?.has(metric));
     const dcfLocked = isDcfLocked(analysisMode) && !primaryDcfReady;
     const latestPrice = latestPrices.get(row.candidate.id) ?? null;
     const discovery = DiscoveryCandidate.parse(row.candidate.discoveryJson);
+    const displayStatus = canonical ? canonicalDisplayStatus(canonical.status) : run?.status ?? null;
+    const responseWorkflowStatus = canonical?.status === 'completed' ? 'analysis_completed'
+      : canonical?.status === 'failed' || canonical?.status === 'cancelled' ? 'analysis_failed'
+      : row.candidate.workflowStatus;
     return {
       ...row.candidate,
+      workflowStatus: responseWorkflowStatus,
       latestPrice,
       marketBriefProgress: marketBriefLive.get(row.candidate.id)?.progress ?? null,
       marketBriefSyncWarning: marketBriefLive.get(row.candidate.id)?.syncWarning ?? null,
       evidenceScorecard: scoreDiscoveryEvidence(discovery, latestPrice),
       portfolioName: row.portfolioName,
       discoveryRequestedAt: row.discoveryRequestedAt,
-      analysisRunStatus: run?.status ?? null,
-      analysisRunError: run?.errorMessage ?? null,
-      analysisProgress: run ? analysisProgress.get(run.externalRunId) ?? null : null,
-      analysisSyncWarning: run ? analysisSyncWarnings.get(run.externalRunId) ?? null : null,
+      analysisRunStatus: displayStatus,
+      analysisRunError: canonical?.error ?? run?.errorMessage ?? null,
+      analysisProgress: canonical ? canonicalProgress(canonical) : run ? analysisProgress.get(run.externalRunId) ?? null : null,
+      analysisSyncWarning: canonical ? null : run ? analysisSyncWarnings.get(run.externalRunId) ?? null : null,
       reportUrl: run && (run.reportPdfUrl || run.status === 'completed' || run.status === 'imported')
-        ? `/api/integrations/agentic/reports?externalRunId=${encodeURIComponent(run.externalRunId)}`
-        : null,
-      analysis: analysis ? { ...analysis, marketAnalysis: marketAnalysis ?? null } : null,
+        ? `/api/integrations/agentic/reports?externalRunId=${encodeURIComponent(run.externalRunId)}` : null,
+      analysis: canonical?.finalOutput && canonical.status === 'completed'
+        ? canonicalAnalysis(canonical.finalOutput)
+        : legacyAnalysis ? { ...legacyAnalysis, marketAnalysis: marketAnalysis ?? null } : null,
       risk: risk?.metricsJson ?? null,
       valuation,
       analysisMode,
@@ -204,51 +245,24 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const session = await authenticateRequest(req);
   if (!session.ok) return session.response;
-  try {
-    assertSameOrigin(req);
-  } catch {
-    return NextResponse.json({ error: 'Cross-origin mutation rejected' }, { status: 403 });
-  }
+  try { assertSameOrigin(req); } catch { return NextResponse.json({ error: 'Cross-origin mutation rejected' }, { status: 403 }); }
   const parsed = decisionSchema.safeParse(await req.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   try {
     if (parsed.data.decision === 'approved') {
-      if (!parsed.data.journal) {
-        return NextResponse.json({ error: 'Complete the decision journal before approving a candidate for analysis' }, { status: 400 });
-      }
-      const approval = await approveCandidateForAnalysis(
-        session.auth.userId,
-        parsed.data.candidateId,
-        session.auth.email,
-        parsed.data.journal
-      );
+      if (!parsed.data.journal) return NextResponse.json({ error: 'Complete the decision journal before approving a candidate for analysis' }, { status: 400 });
+      const approval = await approveCandidateForAnalysis(session.auth.userId, parsed.data.candidateId, session.auth.email, parsed.data.journal);
       after(async () => {
-        try {
-          await startApprovedCandidateMarketBrief(session.auth.userId, parsed.data.candidateId);
-        } catch (error) {
-          console.error('[candidate-market-brief] Preparation failed', {
-            candidateId: parsed.data.candidateId,
-            ownerId: session.auth.userId,
-            error: error instanceof Error ? error.message : 'Unknown failure',
-          });
-          try {
-            await failCandidateMarketResearchPreparation(session.auth.userId, parsed.data.candidateId, error);
-          } catch (stateError) {
-            console.error('[candidate-analysis] Could not persist preparation failure', {
-              candidateId: parsed.data.candidateId,
-              error: stateError instanceof Error ? stateError.message : 'Unknown state failure',
-            });
-          }
+        try { await startApprovedCandidateMarketBrief(session.auth.userId, parsed.data.candidateId); }
+        catch (error) {
+          console.error('[candidate-market-brief] Preparation failed', { candidateId: parsed.data.candidateId, ownerId: session.auth.userId, error: error instanceof Error ? error.message : 'Unknown failure' });
+          try { await failCandidateMarketResearchPreparation(session.auth.userId, parsed.data.candidateId, error); }
+          catch (stateError) { console.error('[candidate-analysis] Could not persist preparation failure', { candidateId: parsed.data.candidateId, error: stateError instanceof Error ? stateError.message : 'Unknown state failure' }); }
         }
       });
       return NextResponse.json({ candidate: approval.candidate }, { status: 202 });
     }
-    const candidate = await rejectOrWatchCandidate(
-      session.auth.userId,
-      parsed.data.candidateId,
-      parsed.data.decision,
-      parsed.data.journal
-    );
+    const candidate = await rejectOrWatchCandidate(session.auth.userId, parsed.data.candidateId, parsed.data.decision, parsed.data.journal);
     return NextResponse.json({ candidate });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 409 });
