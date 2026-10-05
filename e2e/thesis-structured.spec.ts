@@ -56,7 +56,7 @@ for (const width of [390, 1440]) {
     const mandateEditor = page.locator('details.strategy-editor-details');
     await expect(mandateEditor).toBeVisible();
     if (!(await mandateEditor.evaluate(element => (element as HTMLDetailsElement).open))) {
-      await mandateEditor.locator('summary').click();
+      await mandateEditor.locator(':scope > summary').click();
     }
     await expect(page.getByLabel('Base currency for mandate 1')).toHaveValue('BRL');
 
