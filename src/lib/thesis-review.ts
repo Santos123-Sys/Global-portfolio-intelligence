@@ -105,6 +105,14 @@ export function prepareThesisCriteria(criteria: ThesisCriteria): ThesisCriteria 
   return { ...normalized, portfolios: normalized.portfolios.map(canonicalizeKnownMandate) };
 }
 
+const clusterLabel = {
+  mandate: 'Mandate',
+  universe: 'Universe',
+  evidence: 'Evidence gate',
+  ranking: 'Ranking',
+  audit: 'Constraint audit',
+} as const;
+
 /** Deterministic checks identify explicit conflicts, not the meaning of arbitrary prose. */
 export function assessThesisReview(input: ThesisCriteria) {
   const criteria = prepareThesisCriteria(input);
@@ -130,13 +138,14 @@ export function assessThesisReview(input: ThesisCriteria) {
     for (const item of portfolio.inclusionCriteria) {
       if (excluded.has(comparisonKey(item))) errors.push(`${label}: “${item}” appears in both inclusion and exclusion criteria.`);
     }
-    if (!portfolio.inclusionCriteria.length && !portfolio.policy?.rules.some(rule => rule.kind !== 'context') && !Object.values(portfolio.policy?.universe ?? {}).some(values => values.length)) warnings.push(`${label}: no explicit selection criteria. Discovery may be too broad.`);
+    const hasUniverseCriteria = portfolio.policy ? Object.values(portfolio.policy.universe).some(values => values.length > 0) : false;
+    if (!portfolio.inclusionCriteria.length && !portfolio.policy?.rules.some(rule => rule.kind !== 'context') && !hasUniverseCriteria) warnings.push(`${label}: no explicit selection criteria. Discovery may be too broad.`);
     if (!expected) warnings.push(`${label}: automatic equity discovery is not configured for this destination.`);
     for (const [key, value] of Object.entries(portfolio.targetMetrics ?? {})) {
       if (!key.trim() || !value) errors.push(`${label}: target metrics need both a name and a value with its intended units or basis.`);
     }
   }
-  warnings.push(...issues.filter(issue => issue.severity === 'warning').map(issue => `${issue.location}: ${issue.reason}`));
+  warnings.push(...issues.filter(issue => issue.severity === 'warning').map(issue => `${clusterLabel[issue.cluster]} · ${issue.location} — ${issue.statement}: ${issue.interpretation}`));
   return {
     criteria,
     errors,
