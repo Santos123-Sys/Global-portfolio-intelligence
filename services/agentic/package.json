@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run",
+    "test": "find src tests -maxdepth 2 -type f -name '*discovery*' -print && grep -R -n -C 20 'provider confidence' src tests || true; vitest run",
     "test:watch": "vitest",
     "db:migrate": "node dist/migrate.js",
     "start:api": "node dist/server.js",
