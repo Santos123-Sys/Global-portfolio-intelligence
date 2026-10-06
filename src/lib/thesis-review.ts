@@ -7,6 +7,7 @@ const matchesB3Listing = (value: string) => /listed equities.*\b(b3|bvmf)\b|\b(b
 const matchesGrowthPreference = (value: string) => /early-stage growth companies with high growth potential/i.test(value);
 const matchesRetailExclusion = (value: string) => /(?:exclude\s+)?(?:all\s+)?(?:companies|equities)?.*\bretail sector\b|\bretail sector (?:companies|equities)\b/i.test(value);
 const matchesJudicialRecovery = (value: string) => /judicial recovery|recupera(?:c|ç)(?:a|ã)o judicial/i.test(value);
+const matchesBroadEquityType = (value: string) => /^(?:listed\s+)?equ(?:ity|ities)$|^stocks?$/i.test(value.trim());
 
 function ensureUnique(values: string[], value: string, normalize = comparisonKey) {
   return values.some(existing => normalize(existing) === normalize(value)) ? values : [...values, value];
@@ -33,6 +34,13 @@ function canonicalizeKnownMandate(portfolio: ThesisCriteria['portfolios'][number
   }
   if (portfolio.exclusionCriteria.some(matchesRetailExclusion) || policy.rules.some(rule => matchesRetailExclusion(rule.statement))) {
     policy.universe.sectorsExcluded = ensureUnique(policy.universe.sectorsExcluded, 'Retail');
+  }
+  // B3 provider universes are already filtered to listed stocks/units. A broad
+  // "equity" security-type entry is therefore redundant and, more importantly,
+  // must not be compared literally with provider share-class labels such as
+  // Common Stock or Preferred Stock. Specific share-class restrictions remain.
+  if (policy.universe.securityTypes.some(matchesBroadEquityType)) {
+    policy.universe.securityTypes = [];
   }
 
   const rules: ThesisRule[] = [];
