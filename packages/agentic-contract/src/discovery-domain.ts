@@ -53,6 +53,33 @@ export function discoveryMarkets(role: string) {
   return role === 'swiss_quality' ? ['XSWX'] : role === 'brazilian_growth' ? ['BVMF'] : [];
 }
 
+const normalizedType = (value: string) => value.trim().toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+const BROAD_EQUITY_TYPES = new Set(['equity', 'equities', 'listed equity', 'listed equities', 'stock', 'stocks']);
+const PROVIDER_EQUITY_TYPES = new Set([
+  'equity', 'listed equity', 'stock', 'common stock', 'ordinary stock', 'ordinary share',
+  'preferred stock', 'preferred share', 'preference share', 'unit',
+]);
+
+/**
+ * Provider taxonomies describe share classes while an investor mandate often
+ * says only "equities". A broad equity restriction must therefore accept
+ * common shares, preferred shares and listed units; a specifically named share
+ * class remains exact and is never widened here.
+ */
+function recordForEligibility(
+  mandate: DiscoveryRunRequest['thesis']['criteria']['portfolios'][number] | undefined,
+  record: SecurityUniverseRecord,
+): SecurityUniverseRecord {
+  const broad = mandate?.policy?.universe.securityTypes.find((value) => BROAD_EQUITY_TYPES.has(normalizedType(value)));
+  if (!broad || !PROVIDER_EQUITY_TYPES.has(normalizedType(record.assetType))) return record;
+  return { ...record, assetType: broad };
+}
+
+function providerRank(record: SecurityUniverseRecord): number {
+  const rank = record.attributes.universe_rank;
+  return typeof rank === 'number' && Number.isFinite(rank) && rank > 0 ? rank : Number.POSITIVE_INFINITY;
+}
+
 /** Pure, reproducible stage before any web/model requests. */
 export function screenDiscoveryUniverse(request: DiscoveryRunRequest) {
   const records: z.infer<typeof DiscoveryScreening>[] = [];
@@ -62,9 +89,11 @@ export function screenDiscoveryUniverse(request: DiscoveryRunRequest) {
     const selected: SecurityUniverseRecord[] = [];
     const seen = new Set<string>();
     const universe = request.universe.filter(r => discoveryMarkets(portfolio.role).includes(r.exchange))
-      .slice().sort((a, b) => Number(b.attributes.listing_primary_status === 'Yes') - Number(a.attributes.listing_primary_status === 'Yes') || listingKey(a).localeCompare(listingKey(b)));
+      .slice().sort((a, b) => providerRank(a) - providerRank(b)
+        || Number(b.attributes.listing_primary_status === 'Yes') - Number(a.attributes.listing_primary_status === 'Yes')
+        || listingKey(a).localeCompare(listingKey(b)));
     for (const record of universe) {
-      const review = mandate ? evaluateThesisEligibility(mandate, record) : null;
+      const review = mandate ? evaluateThesisEligibility(mandate, recordForEligibility(mandate, record)) : null;
       const identity = issuerKey(record);
       const row: z.infer<typeof DiscoveryScreening> = {
         portfolioId: portfolio.id, ticker: record.ticker, exchange: record.exchange, issuerKey: identity,
@@ -86,7 +115,7 @@ export function screenDiscoveryUniverse(request: DiscoveryRunRequest) {
     for (const record of selected.slice(budget)) {
       const row = records.find(r => r.portfolioId === portfolio.id && r.ticker === record.ticker && r.exchange === record.exchange)!;
       row.status = 'budget_deferred';
-      row.reasons.push('Passed eligibility; deferred by the per-portfolio research budget, not a thesis failure. Primary listings then listing identifiers determine stable processing order, not investment attractiveness.');
+      row.reasons.push('Passed eligibility; deferred by the per-portfolio research budget, not a thesis failure. Provider rank is preserved when available; deterministic listing identity is used only as a stable tiebreak, not as an investment score.');
     }
     eligibleByPortfolio.set(portfolio.id, selected.slice(0, budget));
   }
