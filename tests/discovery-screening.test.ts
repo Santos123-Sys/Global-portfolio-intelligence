@@ -26,6 +26,18 @@ describe('deterministic Discovery screening', () => {
     expect(rows[0].rules.find(r => r.criterion === 'Sector exclusion')?.status).toBe('FAIL');
     expect(rows[1].rules.find(r => r.criterion === 'Sector exclusion')?.status).toBe('UNKNOWN');
   });
+  it('treats a broad equity mandate as compatible with common, preferred and unit provider labels', () => {
+    const req = request();
+    req.thesis.criteria.portfolios[0].policy!.universe.securityTypes = ['Listed Equity'];
+    req.universe = [
+      record('COMMON', { assetType: 'Common Stock' }),
+      record('PREFERRED', { assetType: 'Preferred Stock' }),
+      record('UNIT', { assetType: 'unit' }),
+    ];
+    expect(screenDiscoveryUniverse(req).records.map(row => row.status)).toEqual(['eligible', 'eligible', 'eligible']);
+    req.thesis.criteria.portfolios[0].policy!.universe.securityTypes = ['Common Stock'];
+    expect(screenDiscoveryUniverse(req).records.map(row => row.status)).toEqual(['eligible', 'ineligible', 'ineligible']);
+  });
   it('never uses a preference or contextual assumption as an exclusion', () => {
     const req = request(); req.thesis.criteria.portfolios[0].policy!.rules = [
       { kind: 'preference', category: 'selection', statement: 'High ROIC', metric: { field: 'roic', operator: 'gte', value: 15, unit: 'percent', period: 'TTM' } },
@@ -54,6 +66,17 @@ describe('deterministic Discovery screening', () => {
     const req = request(); req.universe = [record('A', { attributes: { issuer_lei: 'SAME' } }), record('Z', { attributes: { issuer_lei: 'SAME', listing_primary_status: 'Yes' } })];
     expect(screenDiscoveryUniverse(req).eligibleByPortfolio.get(swiss)?.map(r => r.ticker)).toEqual(['Z']);
     expect(screenDiscoveryUniverse(req).records.find(r => r.ticker === 'A')?.status).toBe('duplicate');
+  });
+  it('preserves provider rank before deterministic listing tiebreaks', () => {
+    const req = request();
+    req.researchBudgetPerPortfolio = 2;
+    req.universe = [
+      record('AAA', { attributes: { universe_rank: 3 } }),
+      record('ZZZ', { attributes: { universe_rank: 1 } }),
+      record('MMM', { attributes: { universe_rank: 2 } }),
+    ];
+    expect(screenDiscoveryUniverse(req).eligibleByPortfolio.get(swiss)?.map(row => row.ticker)).toEqual(['ZZZ', 'MMM']);
+    expect(screenDiscoveryUniverse(req).records.find(row => row.ticker === 'AAA')?.status).toBe('budget_deferred');
   });
   it('suppresses holdings and active candidates only within their portfolio; reconsiders rejection after a thesis change', () => {
     const req = request(); req.knownSecurities = [{ portfolioId: brazil, ticker: 'AAA', exchange: 'XSWX', reason: 'held' }];
