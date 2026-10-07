@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import type { InvestmentWorkflowState, WorkflowStageState } from '@/lib/workflow-state';
+import { StatusPill, type WorkflowStatus } from '@/components/ui/status-pill';
 
 const WORKFLOW_PATHS = ['/investment-thesis', '/ai-stock-discovery', '/research', '/positions', '/allocation', '/risk', '/governance'];
 
@@ -13,6 +14,12 @@ function stateLabel(state: WorkflowStageState): string {
   if (state === 'attention') return 'Attention';
   if (state === 'ready') return 'Ready';
   return 'Waiting';
+}
+
+function toPillStatus(state: WorkflowStageState): WorkflowStatus {
+  // 'locked' (prerequisite not met) maps to the 'blocked' vocabulary term.
+  if (state === 'locked') return 'blocked';
+  return state;
 }
 
 export function WorkflowNextAction() {
@@ -43,7 +50,9 @@ export function WorkflowNextAction() {
 
   return <section className="workflow-command-bar" aria-label="Investment workflow status">
     <div className="workflow-command-state">
-      {stages.map(([label, state]) => <span key={label} data-state={state}><strong>{label}</strong>{stateLabel(state)}</span>)}
+      {stages.map(([label, state]) => <span key={label} data-state={state}><strong>{label}</strong>
+        <StatusPill status={toPillStatus(state)} />
+      </span>)}
     </div>
     <div className="workflow-command-next">
       <div><span>Next action</span><strong>{workflow.nextAction.label}</strong><p>{workflow.nextAction.reason}</p></div>

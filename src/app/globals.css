@@ -27,28 +27,30 @@
   font-display: swap;
 }
 
+/* Legacy surface variables are aliases onto the design token layer
+   (design-tokens.css). New styles should consume --pi-* tokens directly. */
 :root {
-  --bg: #f5f7fb;
-  --panel: #ffffff;
-  --border: #d9e1ec;
-  --text: #17263d;
-  --muted: #52647f;
-  --accent: #1f5fae;
-  --warn: #93650f;
-  --danger: #b3342f;
+  --bg: var(--pi-gray-10);
+  --panel: var(--pi-gray-00);
+  --border: var(--pi-gray-30);
+  --text: var(--pi-gray-100);
+  --muted: var(--pi-gray-70);
+  --accent: var(--pi-color-action);
+  --warn: var(--pi-color-warning);
+  --danger: var(--pi-color-danger);
 }
 
 /* The dark-theme toggle selects the glass-green palette. */
 :root[data-theme='dark'] {
-  --bg: #0b1620;
-  --panel: #0e1a2a;
-  --border: rgba(20, 184, 166, 0.25);
-  --text: #f1f5f9;
-  --muted: #94a3b8;
-  --accent: #14b8a6;
-  --warn: #fbbf24;
-  --danger: #f87171;
-  --success: #34d399;
+  --bg: var(--pi-gray-10);
+  --panel: var(--pi-gray-00);
+  --border: var(--pi-gray-30);
+  --text: var(--pi-gray-100);
+  --muted: var(--pi-gray-70);
+  --accent: var(--pi-color-action);
+  --warn: var(--pi-color-warning);
+  --danger: var(--pi-color-danger);
+  --success: var(--pi-color-success);
   --glass-teal: #14b8a6;
   --glass-teal-deep: #0d9488;
   --glass-teal-tint: #5eead4;
