@@ -29,6 +29,7 @@ describe('canonical thesis review', () => {
   });
   it('canonicalizes the Brazilian creator mandate instead of printing duplicate validator warnings', () => {
     const policy = emptyThesisPolicy();
+    policy.universe.securityTypes = ['Listed Equity'];
     policy.rules = [
       { statement: 'Exclude all companies operating in the retail sector.', kind: 'hard', category: 'sector' },
       { statement: 'Exclude companies currently under judicial recovery proceedings.', kind: 'hard', category: 'risk' },
@@ -59,6 +60,7 @@ describe('canonical thesis review', () => {
     expect(brazil.inclusionCriteria).toEqual([]);
     expect(brazil.exclusionCriteria).toEqual([]);
     expect(brazil.policy?.universe.listingMarkets).toContain('BVMF');
+    expect(brazil.policy?.universe.securityTypes).toEqual([]);
     expect(brazil.policy?.universe.sectorsExcluded).toContain('Retail');
     expect(brazil.policy?.rules).toContainEqual(expect.objectContaining({ statement: 'Early-stage growth companies with high growth potential', kind: 'preference' }));
     expect(brazil.policy?.rules).toContainEqual(expect.objectContaining({
