@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
+import './design-tokens.css';
 import './globals.css';
 import './platform-v2.css';
 import './agent-console-v2.css';
