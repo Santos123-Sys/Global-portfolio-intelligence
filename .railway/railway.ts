@@ -134,6 +134,7 @@ export default defineRailway((context) => {
       // The bundled canonical finance runtime polls the dashboard analysis-session
       // tables. Production startup rejects a missing reference or unreadable queue.
       FINANCE_DATABASE_URL: dashboardDatabase.env.DATABASE_URL,
+      AGENTIC_SYSTEM_BASE_URL: dashboard.env.AGENTIC_SYSTEM_BASE_URL,
       // getEnv() is shared with the finance runtime. Reference the dashboard's
       // configuration so activating the runtime cannot silently use stub data.
       SESSION_SECRET: dashboard.env.SESSION_SECRET,

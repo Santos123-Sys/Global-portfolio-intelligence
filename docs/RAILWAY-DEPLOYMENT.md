@@ -155,7 +155,8 @@ The production worker also requires `FINANCE_DATABASE_URL` referencing
 `${{portfolio-intelligence.DATABASE_URL}}`. Its bundled Research Director reads
 the canonical analysis and evaluation queues from that database. The worker
 awaits runtime configuration and queue-table checks before opening `/health`.
-Reference the dashboard's `SESSION_SECRET`, `PUBLIC_APP_URL`, market-provider
+Reference the dashboard's `AGENTIC_SYSTEM_BASE_URL` (paired with the worker's
+existing `AGENTIC_SYSTEM_API_KEY`), `SESSION_SECRET`, `PUBLIC_APP_URL`, market-provider
 settings and optional `GEMINI_API_KEY`; the shared runtime validator requires
 these settings even though the worker does not serve login routes. The IaC
 definition also maps bucket credentials to `AWS_*` for retained-file reads.
