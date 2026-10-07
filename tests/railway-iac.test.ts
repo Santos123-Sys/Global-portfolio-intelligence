@@ -87,7 +87,7 @@ describe('Railway infrastructure definition', () => {
 
   it('passes the runtime configuration through dashboard and bucket references', async () => {
     const worker = (await productionServices()).find(({ name }) => name === 'agentic-worker');
-    for (const name of ['SESSION_SECRET', 'PUBLIC_APP_URL', 'MARKET_DATA_PROVIDER', 'MARKET_DATA_API_KEY', 'DISCOVERY_PROVIDER', 'FINNHUB_API_KEY', 'DISCOVERY_FALLBACK_PROVIDER', 'GEMINI_API_KEY']) {
+    for (const name of ['AGENTIC_SYSTEM_BASE_URL', 'SESSION_SECRET', 'PUBLIC_APP_URL', 'MARKET_DATA_PROVIDER', 'MARKET_DATA_API_KEY', 'DISCOVERY_PROVIDER', 'FINNHUB_API_KEY', 'DISCOVERY_FALLBACK_PROVIDER', 'GEMINI_API_KEY']) {
       expect(worker?.variables?.[name]).toMatchObject({
         type: 'reference', resource: 'service.portfolio-intelligence', output: name,
       });
