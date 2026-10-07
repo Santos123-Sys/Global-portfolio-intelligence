@@ -20,6 +20,7 @@ import { processEvaluationQueue } from '@/lib/agent-evaluations';
 import { validateQuality } from '../l3/quality';
 import { dynamicResearchBudget, planDynamicResearchSwarm, runDynamicResearchSpecialist, summarizeDynamicResearch, type DynamicResearchPlan } from './dynamic-research-swarm';
 import { resolveTaskSchedulerOptions, runScheduled } from '../l3/task-scheduler';
+export { initializeFinanceRuntime } from '../startup';
 
 function throwRejected(results: ReadonlyArray<PromiseSettledResult<unknown>>): void {
   const rejected=results.find(result=>result.status==='rejected');

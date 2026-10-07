@@ -14,8 +14,9 @@ describe('canonical finance runtime production wiring', () => {
 
   it('loads that runtime only against an explicit finance database', () => {
     expect(workerConfig).toContain('FINANCE_DATABASE_URL:z.string().url().optional()');
-    expect(worker).toContain('config.FINANCE_DATABASE_URL ?');
-    expect(worker).toContain("return import('./finance-runtime.js')");
+    expect(worker).toContain('financeRuntime = await loadFinanceRuntime(');
+    expect(worker).toContain("() => import('./finance-runtime.js')");
+    expect(worker.indexOf('financeRuntime = await loadFinanceRuntime(')).toBeLessThan(worker.indexOf('healthServer.listen('));
   });
 
   it('wires the dashboard database into the production worker so the canonical runtime is not dormant', () => {

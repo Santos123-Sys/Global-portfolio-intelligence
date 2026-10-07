@@ -49,6 +49,9 @@ const workerSchema = commonSchema.extend({
   AGENTIC_CALLBACK_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(8),
   AGENTIC_INTERNAL_BASE_URL: z.string().url().optional(),
 }).superRefine((config, context) => {
+  if (config.NODE_ENV === 'production' && !config.FINANCE_DATABASE_URL) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ['FINANCE_DATABASE_URL'], message: 'FINANCE_DATABASE_URL is required in production so canonical research sessions cannot remain unprocessed' });
+  }
   if (config.WEB_SEARCH_PROVIDER !== 'none' && !config.WEB_SEARCH_API_KEY) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['WEB_SEARCH_API_KEY'], message: 'WEB_SEARCH_API_KEY is required when web research is enabled' });
   }
