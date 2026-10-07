@@ -84,4 +84,16 @@ describe('Railway infrastructure definition', () => {
       output: 'AGENTIC_SYSTEM_API_KEY',
     });
   });
+
+  it('passes the runtime configuration through dashboard and bucket references', async () => {
+    const worker = (await productionServices()).find(({ name }) => name === 'agentic-worker');
+    for (const name of ['SESSION_SECRET', 'PUBLIC_APP_URL', 'MARKET_DATA_PROVIDER', 'MARKET_DATA_API_KEY', 'DISCOVERY_PROVIDER', 'FINNHUB_API_KEY', 'DISCOVERY_FALLBACK_PROVIDER', 'GEMINI_API_KEY']) {
+      expect(worker?.variables?.[name]).toMatchObject({
+        type: 'reference', resource: 'service.portfolio-intelligence', output: name,
+      });
+    }
+    for (const name of ['AWS_S3_BUCKET', 'AWS_ENDPOINT', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_REGION']) {
+      expect(worker?.variables?.[name]).toMatchObject({ type: 'reference', resource: 'bucket.agentic-artifacts' });
+    }
+  });
 });

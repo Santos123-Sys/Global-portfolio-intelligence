@@ -6,6 +6,7 @@ import { PostgresJobRepository } from './postgres-repository.js';
 import { processJob } from './process-job.js';
 import { createWorkerHealthServer, type WorkerHeartbeat, type WorkerState } from './worker-health.js';
 import { keepJobLeaseAlive } from './worker-lease.js';
+import { loadFinanceRuntime, type FinanceRuntime } from './finance-startup.js';
 
 const config = getWorkerConfig();
 const repository = new PostgresJobRepository(config.AGENTIC_DATABASE_URL);
@@ -21,10 +22,7 @@ const pipeline = new OpenAIAgenticPipeline(
 );
 const workerId = `worker-${randomUUID()}`;
 /** The bundled finance runtime is the sole security-analysis orchestrator. */
-const financeRuntime=config.FINANCE_DATABASE_URL ? (async()=>{
-  process.env.DATABASE_URL=config.FINANCE_DATABASE_URL;
-  return import('./finance-runtime.js');
-})() : null;
+let financeRuntime: FinanceRuntime | null = null;
 let stopping = false;
 
 // The healthcheck reads these; the loop is the only writer.
@@ -70,6 +68,13 @@ function closeHealthServer(): Promise<void> {
 
 async function run(): Promise<void> {
   await repository.ping();
+  financeRuntime = await loadFinanceRuntime(
+    config.FINANCE_DATABASE_URL,
+    () => import('./finance-runtime.js')
+  );
+  process.stdout.write(financeRuntime
+    ? 'Canonical finance runtime ready: configuration and research queue verified\n'
+    : 'Canonical finance runtime disabled in local preparatory-only mode\n');
   await new Promise<void>((resolve, reject) => {
     const failedToBind = (error: Error) => reject(error);
     healthServer.once('error', failedToBind);
@@ -92,7 +97,7 @@ async function run(): Promise<void> {
     if (await deliverNextCallback()) continue;
     if(financeRuntime) {
       state='processing';
-      const processed=await (await financeRuntime).processQueuedSessions(()=>{lastPollAt=Date.now();});
+      const processed=await financeRuntime.processQueuedSessions(()=>{lastPollAt=Date.now();});
       lastPollAt=Date.now(); state='idle'; jobsProcessed+=processed;
     }
     const job = await repository.claimNext(workerId, config.AGENTIC_JOB_LEASE_SECONDS);

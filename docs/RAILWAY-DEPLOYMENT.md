@@ -151,6 +151,18 @@ comparable-peer discovery.
 The callback URL must reference the dashboard service's domain and port, not
 the worker's own `$PORT`.
 
+The production worker also requires `FINANCE_DATABASE_URL` referencing
+`${{portfolio-intelligence.DATABASE_URL}}`. Its bundled Research Director reads
+the canonical analysis and evaluation queues from that database. The worker
+awaits runtime configuration and queue-table checks before opening `/health`.
+Reference the dashboard's `SESSION_SECRET`, `PUBLIC_APP_URL`, market-provider
+settings and optional `GEMINI_API_KEY`; the shared runtime validator requires
+these settings even though the worker does not serve login routes. The IaC
+definition also maps bucket credentials to `AWS_*` for retained-file reads.
+See [the readiness contract](WORKER-READINESS-CONTRACT.md) for acceptance criteria
+and the release/rollback checklist. Existing manually configured services must
+receive those references; committing IaC alone does not apply them to Railway.
+
 ## First administrator
 
 Temporarily add `INITIAL_ADMIN_EMAIL`, `INITIAL_ADMIN_PASSWORD` and optionally
@@ -197,8 +209,8 @@ CRON_SECRET=<same dashboard cron secret>
 1. All pre-deploy migrations finish successfully.
 2. Dashboard `/api/health`, agentic API `/health` and agentic worker `/health`
    return HTTP 200. The worker endpoint answers 503 while it has not polled the
-   job queue within its budget, so a wedged worker fails its healthcheck instead
-   of reporting Online while jobs pile up behind it.
+   job queue within its budget. Railway invokes the healthcheck only during
+   deployment; detecting a later hang requires continuous monitoring separately.
 3. An unauthenticated dashboard request redirects to `/login`; an
    unauthenticated agentic `/v1/**` call returns HTTP 401.
 4. The login response contains CSP, HSTS, `nosniff`, `DENY` framing and

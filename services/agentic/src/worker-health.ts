@@ -87,8 +87,8 @@ export interface WorkerHealthServerOptions extends HealthBudgets {
 
 /**
  * A liveness endpoint for the worker. Railway restarts on process exit, which
- * catches a crash but not a hang: without this, a wedged worker reports Online
- * forever while jobs queue behind it.
+ * catches a crash but not a hang. Railway calls this only during deployment;
+ * continuous monitoring must poll it separately to detect a wedged live loop.
  */
 export function createWorkerHealthServer(options: WorkerHealthServerOptions): Server {
   const clock = options.now ?? Date.now;

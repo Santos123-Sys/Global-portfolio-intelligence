@@ -120,7 +120,8 @@ export default defineRailway((context) => {
     preDeploy: 'npm run agentic:migrate',
     start: 'npm run agentic:worker',
     // The worker serves only a liveness endpoint. ON_FAILURE restarts a crash;
-    // this is what catches a hang, where the process is up but no longer polling.
+    // Railway checks readiness only at deploy time. A continuous monitor may
+    // also read this endpoint to detect a loop that has stopped polling.
     healthcheck: '/health',
     healthcheckTimeout: 300,
     deploy: {
@@ -131,9 +132,23 @@ export default defineRailway((context) => {
       NODE_ENV: 'production',
       AGENTIC_DATABASE_URL: agenticDatabase.env.DATABASE_URL,
       // The bundled canonical finance runtime polls the dashboard analysis-session
-      // tables. Without this reference worker.ts deliberately leaves that runtime
-      // disabled even though it was compiled into the worker image.
+      // tables. Production startup rejects a missing reference or unreadable queue.
       FINANCE_DATABASE_URL: dashboardDatabase.env.DATABASE_URL,
+      // getEnv() is shared with the finance runtime. Reference the dashboard's
+      // configuration so activating the runtime cannot silently use stub data.
+      SESSION_SECRET: dashboard.env.SESSION_SECRET,
+      PUBLIC_APP_URL: dashboard.env.PUBLIC_APP_URL,
+      MARKET_DATA_PROVIDER: dashboard.env.MARKET_DATA_PROVIDER,
+      MARKET_DATA_API_KEY: dashboard.env.MARKET_DATA_API_KEY,
+      DISCOVERY_PROVIDER: dashboard.env.DISCOVERY_PROVIDER,
+      FINNHUB_API_KEY: dashboard.env.FINNHUB_API_KEY,
+      DISCOVERY_FALLBACK_PROVIDER: dashboard.env.DISCOVERY_FALLBACK_PROVIDER,
+      GEMINI_API_KEY: dashboard.env.GEMINI_API_KEY,
+      AWS_S3_BUCKET: ref(agenticArtifacts, 'BUCKET'),
+      AWS_ENDPOINT: ref(agenticArtifacts, 'ENDPOINT'),
+      AWS_ACCESS_KEY_ID: ref(agenticArtifacts, 'ACCESS_KEY_ID'),
+      AWS_SECRET_ACCESS_KEY: ref(agenticArtifacts, 'SECRET_ACCESS_KEY'),
+      AWS_REGION: ref(agenticArtifacts, 'REGION'),
       AGENTIC_SYSTEM_API_KEY: agenticApi.env.AGENTIC_SYSTEM_API_KEY,
       OPENAI_API_KEY: context.shared.OPENAI_API_KEY,
       OPENAI_MODEL: 'gpt-5.6',
