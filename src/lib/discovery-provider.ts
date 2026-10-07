@@ -151,13 +151,15 @@ function brapiRecord(row: Record<string, unknown>): SecurityUniverseRecordType |
 }
 
 /**
- * BrAPI's B3 list endpoint is the primary Brazil universe. It contains the
- * listing identity together with current close, change, volume and market cap,
- * so discovery need not spend EODHD entitlement on the same first pass.
+ * BrAPI's paginated B3 stock list is the canonical first-pass Brazil universe.
+ * The endpoint is usable without a token; a configured token is sent when
+ * available for the account's normal rate limits. Rows are requested in
+ * descending market-cap order, so a complete response is a ranked provider
+ * universe rather than an arbitrary symbol-directory slice.
  */
 export class BrapiDiscoveryProvider implements MarketDiscoveryProvider {
   readonly name = 'brapi' as const;
-  constructor(private readonly apiKey: string) {}
+  constructor(private readonly apiKey?: string) {}
 
   async getSecurityUniverse(exchange: string, limit: number): Promise<SecurityUniverseRecordType[]> {
     if (exchange !== 'BVMF') throw new Error(`BrAPI only supports the Brazilian B3 universe, not ${exchange}`);
@@ -175,10 +177,14 @@ export class BrapiDiscoveryProvider implements MarketDiscoveryProvider {
         perform: async () => {
           const url = new URL('https://brapi.dev/api/quote/list');
           url.searchParams.set('type', 'stock');
+          url.searchParams.set('sortBy', 'market_cap_basic');
+          url.searchParams.set('sortOrder', 'desc');
           url.searchParams.set('page', String(page));
           url.searchParams.set('limit', String(pageSize));
+          const headers: Record<string, string> = { accept: 'application/json' };
+          if (this.apiKey?.trim()) headers.authorization = `Bearer ${this.apiKey.trim()}`;
           const response = await fetch(url, {
-            headers: { accept: 'application/json', authorization: `Bearer ${this.apiKey}` },
+            headers,
             signal: AbortSignal.timeout(20_000),
           });
           if (!response.ok) throw new Error(`BrAPI B3 listing request failed: ${response.status} ${response.statusText}`);
@@ -204,12 +210,15 @@ export class BrapiDiscoveryProvider implements MarketDiscoveryProvider {
     const unique = [...new Map(rows.map((record) => [`${record.exchange}:${record.ticker}`, record])).values()];
     const selected = unique.slice(0, cappedLimit);
     const eligibleCount = totalCount ?? unique.length;
-    return selected.map((record) => ({
+    return selected.map((record, index) => ({
       ...record,
       attributes: {
         ...record.attributes,
         universe_truncated: eligibleCount > selected.length,
-        universe_ranking: 'unranked',
+        universe_ranking: 'market_cap_desc',
+        universe_rank: index + 1,
+        universe_scope: 'b3_listed_stocks',
+        universe_complete: eligibleCount <= selected.length,
         universe_eligible_count: eligibleCount,
         universe_selected_count: selected.length,
       },
@@ -228,8 +237,7 @@ class EodhdDiscoveryProvider implements MarketDiscoveryProvider {
 export function getDiscoveryProvider(exchange?: string): MarketDiscoveryProvider {
   const env = getEnv();
   if (exchange === 'BVMF') {
-    if (!env.BRAPI_API_KEY) throw new Error('BRAPI_API_KEY is required for the Brazilian B3 discovery universe');
-    return new BrapiDiscoveryProvider(env.BRAPI_API_KEY);
+    return new BrapiDiscoveryProvider(env.BRAPI_API_KEY || undefined);
   }
   if (env.DISCOVERY_PROVIDER === 'finnhub') {
     if (!env.FINNHUB_API_KEY) throw new Error('FINNHUB_API_KEY is required when DISCOVERY_PROVIDER=finnhub');
@@ -308,9 +316,9 @@ async function saveUniverse(provider: string, exchange: string, records: Securit
  */
 export async function loadDiscoveryUniverse(exchange: string, limit: number): Promise<{ records: SecurityUniverseRecordType[]; provider: string; cached: boolean }> {
   const env = getEnv();
-  // Resolve the configured provider inside the guarded block. In particular,
-  // a missing BrAPI key must still allow the explicitly configured EODHD
-  // fallback to serve a B3 universe.
+  // BrAPI's B3 list endpoint supports unauthenticated discovery. A token, when
+  // configured, raises the normal account limits; EODHD remains the explicit
+  // fallback if the live/cached BrAPI universe cannot be read.
   const primaryName = exchange === 'BVMF' ? 'brapi' : env.DISCOVERY_PROVIDER;
   let primaryError: unknown;
   try {
