@@ -12,6 +12,9 @@ const beat = (overrides: Partial<WorkerHeartbeat> = {}): WorkerHeartbeat => ({
   state: 'idle',
   lastPollAt: 1_000_000,
   jobsProcessed: 3,
+  busyRatio: 0.25,
+  canonicalQueue: {queued:2,running:1,oldestQueuedSeconds:45},
+  preparatoryQueue: {queued:1,running:0,oldestQueuedSeconds:10},
   ...overrides,
 });
 
@@ -74,6 +77,8 @@ describe('worker liveness endpoint', () => {
       state: 'idle',
       secondsSinceLastPoll: 0,
       jobsProcessed: 3,
+      busyRatio: 0.25,
+      canonicalQueue: {queued:2,running:1,oldestQueuedSeconds:45},
     });
 
     now += 120_000;

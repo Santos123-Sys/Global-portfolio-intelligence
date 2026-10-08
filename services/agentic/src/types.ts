@@ -43,6 +43,12 @@ export interface AgenticJob {
   completedAt: Date | null;
 }
 
+export interface QueueTelemetry {
+  queued: number;
+  running: number;
+  oldestQueuedSeconds: number | null;
+}
+
 export interface JobRepository {
   ping(): Promise<void>;
   close(): Promise<void>;
@@ -51,6 +57,7 @@ export interface JobRepository {
   retry(id: string): Promise<AgenticJob | null>;
   claimNext(workerId: string, leaseSeconds: number): Promise<AgenticJob | null>;
   renewLease(id: string, workerId: string, leaseSeconds: number): Promise<boolean>;
+  queueTelemetry(): Promise<QueueTelemetry>;
   updateProgress(id: string, completed: number, total: number, stage: string, attempt?: number): Promise<void>;
   completeExtraction(id: string, result: ThesisExtractionResult, attempt?: number): Promise<void>;
   completeDiscovery(id: string, result: MarketDiscoveryOutput, attempt?: number): Promise<void>;

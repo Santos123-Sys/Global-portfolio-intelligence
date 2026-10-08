@@ -96,4 +96,11 @@ describe('Railway infrastructure definition', () => {
       expect(worker?.variables?.[name]).toMatchObject({ type: 'reference', resource: 'bucket.agentic-artifacts' });
     }
   });
+
+  it('pins the production model and exposes bounded worker telemetry settings', async () => {
+    const worker = (await productionServices()).find(({ name }) => name === 'agentic-worker');
+    expect(worker?.variables?.OPENAI_MODEL).toMatchObject({ type: 'literal', value: 'gpt-6-sol' });
+    expect(worker?.variables?.AGENTIC_TELEMETRY_POLL_MS).toMatchObject({ type: 'literal', value: '15000' });
+    expect(worker?.variables?.AGENT_MODEL_PRICING_JSON).toEqual({ type: 'preserve' });
+  });
 });

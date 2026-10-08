@@ -152,12 +152,15 @@ export default defineRailway((context) => {
       AWS_REGION: ref(agenticArtifacts, 'REGION'),
       AGENTIC_SYSTEM_API_KEY: agenticApi.env.AGENTIC_SYSTEM_API_KEY,
       OPENAI_API_KEY: context.shared.OPENAI_API_KEY,
-      OPENAI_MODEL: 'gpt-5.6',
+      OPENAI_MODEL: 'gpt-6-sol',
       OPENAI_REASONING_EFFORT: 'medium',
       // Optional Responses-compatible model gateway. If unset, the canonical
       // finance runtime continues to use OPENAI_API_KEY and OpenAI directly.
       MODEL_API_KEY: preserve(),
       MODEL_API_BASE_URL: preserve(),
+      // Operator-supplied per-million-token prices. Unknown pricing remains
+      // null in telemetry instead of being guessed from a model name.
+      AGENT_MODEL_PRICING_JSON: preserve(),
       // Provider reliability policy: research breadth is independent from
       // simultaneous model calls. These values can be tuned without code changes.
       AGENT_MAX_CONCURRENCY: '3',
@@ -167,6 +170,7 @@ export default defineRailway((context) => {
       AGENTIC_INTERNAL_BASE_URL:
         'http://${{agentic-api.RAILWAY_PRIVATE_DOMAIN}}:${{agentic-api.PORT}}',
       AGENTIC_WORKER_POLL_MS: '1000',
+      AGENTIC_TELEMETRY_POLL_MS: '15000',
       AGENTIC_WORKER_HEALTH_IDLE_BUDGET_MS: '60000',
       AGENTIC_JOB_LEASE_SECONDS: '300',
       AGENTIC_CALLBACK_MAX_ATTEMPTS: '8',
