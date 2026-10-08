@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, lt, sql,or,isNull } from 'drizzle-orm';
+import { and, eq, lt, sql,or,isNull,inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { agentAnalysisSessions, agentDebates, agentRuns } from '@/lib/db/agent-schema';
 import { analyzeSchema, dcfAgents, analysisAgents, evidenceOutput, executionPlan, outputSchema } from '../contracts';
@@ -20,6 +20,8 @@ import { processEvaluationQueue } from '@/lib/agent-evaluations';
 import { validateQuality } from '../l3/quality';
 import { dynamicResearchBudget, planDynamicResearchSwarm, runDynamicResearchSpecialist, summarizeDynamicResearch, type DynamicResearchPlan } from './dynamic-research-swarm';
 import { resolveTaskSchedulerOptions, runScheduled } from '../l3/task-scheduler';
+import { withModelBudget } from '../l2/model-budget-context';
+import { resolveSessionBudgetLimits, SessionBudget, SessionBudgetExceededError, sessionBudgetLimitsSchema } from '../l3/session-budget';
 export { initializeFinanceRuntime } from '../startup';
 
 function throwRejected(results: ReadonlyArray<PromiseSettledResult<unknown>>): void {
@@ -35,9 +37,20 @@ export async function executeSession(sessionId: string,onHeartbeat?:()=>void): P
     .where(and(eq(agentAnalysisSessions.id, sessionId), eq(agentAnalysisSessions.status, 'queued'))).returning();
   if (!session) return;
   let lost=false;
+  let budget:SessionBudget|null=null;
   const heartbeat=setInterval(()=>{ void db.update(agentAnalysisSessions).set({leaseExpiresAt:new Date(Date.now()+120_000),updatedAt:new Date()}).where(owned).returning({id:agentAnalysisSessions.id}).then(rows=>{if(!rows.length) lost=true;else onHeartbeat?.();}).catch(()=>{lost=true;}); },30_000);
   try {
     const request = analyzeSchema.parse(session.requestPayload);
+    const savedLimits=sessionBudgetLimitsSchema.safeParse(session.budgetSnapshot);
+    const limits=savedLimits.success?savedLimits.data:resolveSessionBudgetLimits(request.analysisType);
+    const sessionBudget=budget=new SessionBudget({limits,usage:{modelCalls:session.modelCalls,inputTokens:session.inputTokens,outputTokens:session.outputTokens,unmeteredModelCalls:session.unmeteredModelCalls,
+      estimatedCostUsd:session.estimatedCostUsd===null?null:Number(session.estimatedCostUsd),activeMs:session.budgetActiveMs},persist:async usage=>{
+        const rows=await db.update(agentAnalysisSessions).set({modelCalls:usage.modelCalls,inputTokens:usage.inputTokens,outputTokens:usage.outputTokens,unmeteredModelCalls:usage.unmeteredModelCalls,
+          estimatedCostUsd:usage.estimatedCostUsd===null?null:String(usage.estimatedCostUsd),budgetActiveMs:usage.activeMs,updatedAt:new Date()}).where(owned).returning({id:agentAnalysisSessions.id});
+        if(!rows.length)throw new SessionInterrupted();
+      }});
+    await db.update(agentAnalysisSessions).set({budgetSnapshot:limits,budgetStartedAt:session.budgetStartedAt??new Date()}).where(owned);
+    await withModelBudget(sessionBudget,async()=>{
     if(request.portfolioId) {
       const scopes=await analysisScopes(session.ownerId,session.securityId);
       if(!scopes.some(scope=>scope.portfolioId===request.portfolioId && scope.thesisVersionId===request.thesisVersionId)) throw new Error('Linked thesis is no longer active; start a new analysis against the current thesis.');
@@ -76,6 +89,7 @@ export async function executeSession(sessionId: string,onHeartbeat?:()=>void): P
     });
     const financials=await engine.run('financial-statement-analyzer', async () => outputSchema.parse(await engine.tool('financial-statement-analyzer','analyze_financial_statements')));
     if(request.analysisType!=='dcf' && foundation.researchPolicy?.valueScorecard?.enabled && financials.status==='completed' && financials.dataQuality?.status==='review_required' && !foundation.financialReview) {
+      await sessionBudget.flush();
       const paused=await db.update(agentAnalysisSessions).set({status:'awaiting_approval',leaseOwner:null,leaseExpiresAt:null,updatedAt:new Date()}).where(owned).returning({id:agentAnalysisSessions.id});
       if(paused.length) await recordSessionEvent(sessionId,{eventType:'approval_required',summary:'Review financial period lengths and source provenance before optional value scoring.',detail:'No timeout implies approval. Missing fields or weak sources will continue to withhold the scorecard total.',authority:'approval_required',consequence:'high',reversible:true});
       throw new SessionInterrupted();
@@ -134,7 +148,7 @@ export async function executeSession(sessionId: string,onHeartbeat?:()=>void): P
         if(errors.length)throw new Error('Shadow output failed QA');
         await engine.assertLease();
         await db.insert(agentRuns).values({sessionId:session.id,agentName:`${name}:shadow`,agentRole:name,inputPayload:{configuration:shadow.configurationHash},configurationHash:shadow.configurationHash,outputPayload:result,status:'shadow',confidenceScore:String(result.confidenceScore),executionTimeMs:Date.now()-started,completedAt:new Date()});
-      }catch(error){if(error instanceof SessionInterrupted)throw error;await engine.assertLease();await db.insert(agentRuns).values({sessionId:session.id,agentName:`${name}:shadow`,agentRole:name,inputPayload:{},configurationHash:shadow.configurationHash,status:'shadow_failed',completedAt:new Date()});}
+      }catch(error){if(error instanceof SessionInterrupted||error instanceof SessionBudgetExceededError)throw error;await engine.assertLease();await db.insert(agentRuns).values({sessionId:session.id,agentName:`${name}:shadow`,agentRole:name,inputPayload:{},configurationHash:shadow.configurationHash,status:'shadow_failed',completedAt:new Date()});}
     }
     const dynamicResearch=summarizeDynamicResearch(dynamicPlan,engine.outputs);
     const coreEntries=Object.entries(engine.outputs).filter(([name])=>!name.startsWith('dynamic-research-'));
@@ -142,8 +156,10 @@ export async function executeSession(sessionId: string,onHeartbeat?:()=>void): P
     const confidenceScore = analytical.length ? Math.min(...analytical.map(row => row.confidenceScore)) : 0;
     const highPriorityDynamicGap=dynamicResearch.tasks.some(row=>row.priority==='high' && row.output && row.output.status!=='completed');
     const coreValues=coreEntries.map(([,output])=>output);
+    await sessionBudget.flush();
     const finalOutput = { ticker: request.ticker, outputs: engine.outputs,
       equityResearch:aggregateEquityResearch(foundation.company,foundation.fiscalDate,request,engine.outputs,foundation.researchLocale ?? foundation.researchPolicy?.locale),dynamicResearch,valueScorecard,
+      executionBudget:{limits,usage:sessionBudget.snapshot()},
       confidenceScore, reasoningChain: ['Research Director froze retained and bounded live evidence before decomposing decision-relevant questions.', 'Synthesize validated specialist outputs without overwriting conflicting views.', 'Numerical results remain separate from model-written narratives and require human review.'],
       citations: [...new Set(values.flatMap(row => row.citations))], requiresHumanReview: true,
       limitations: [...new Set(values.flatMap(row => row.limitations))],
@@ -153,9 +169,12 @@ export async function executeSession(sessionId: string,onHeartbeat?:()=>void): P
     if(lost) throw new Error('Session lease lost');
     const finished=await db.update(agentAnalysisSessions).set({ status: 'completed',leaseOwner:null,leaseExpiresAt:null, phase: 'complete', finalOutput, updatedAt: new Date(), completedAt: new Date() }).where(owned).returning({id:agentAnalysisSessions.id});
     if(finished.length) await recordSessionEvent(sessionId,{eventType:'approval_required',summary:'Research finished. Review evidence, conflicts and limitations before accepting.',authority:'approval_required',consequence:'high',reversible:true});
+    });
   } catch (error) {
+    await budget?.flush().catch(()=>undefined);
+    if(error instanceof SessionBudgetExceededError) await recordSessionEvent(sessionId,{eventType:'failed',summary:'Research stopped at its session execution budget.',detail:error.message,agent:'research-director',authority:'notify',consequence:'high',reversible:true});
     await db.update(agentAnalysisSessions).set({ status: 'failed',leaseOwner:null,leaseExpiresAt:null, error: error instanceof Error ? error.message : 'Analysis failed', updatedAt: new Date(), completedAt: new Date() }).where(owned);
-  } finally {clearInterval(heartbeat);}
+  } finally {await budget?.flush().catch(()=>undefined);clearInterval(heartbeat);}
 }
 
 export async function processQueuedSessions(onHeartbeat?:()=>void): Promise<number> {
@@ -167,4 +186,13 @@ export async function processQueuedSessions(onHeartbeat?:()=>void): Promise<numb
   const queued = await db.select({ id: agentAnalysisSessions.id }).from(agentAnalysisSessions).where(eq(agentAnalysisSessions.status, 'queued')).limit(1);
   for (const row of queued) await executeSession(row.id,onHeartbeat);
   return queued.length+evaluated;
+}
+
+export interface ResearchQueueTelemetry {queued:number;running:number;oldestQueuedSeconds:number|null}
+export async function getResearchQueueTelemetry(now:number=Date.now()):Promise<ResearchQueueTelemetry> {
+  const rows=await db.select({status:agentAnalysisSessions.status,createdAt:agentAnalysisSessions.createdAt}).from(agentAnalysisSessions)
+    .where(inArray(agentAnalysisSessions.status,['queued','running'])).limit(1000);
+  const queued=rows.filter(row=>row.status==='queued');
+  const oldest=queued.reduce<Date|null>((value,row)=>!value||row.createdAt<value?row.createdAt:value,null);
+  return {queued:queued.length,running:rows.length-queued.length,oldestQueuedSeconds:oldest===null?null:Math.max(0,Math.round((now-oldest.getTime())/1000))};
 }

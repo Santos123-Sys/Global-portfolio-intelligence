@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react';
 import { AgentActivityInspectorPanel } from '@/components/dashboard/agent-activity-inspector';
 import type { AgentActivityInspector } from '@/lib/agent-finance/activity-inspector';
 import type { RunEvent } from '@/components/dashboard/agent-run-status';
+import type { ResearchOperationsTelemetry } from '@/lib/agent-finance/operations-telemetry';
 
 interface SessionSummary {
-  id:string;ownerName:string|null;ticker:string;analysisType:string;status:string;phase:string;createdAt:string;updatedAt:string;completedAt:string|null;error:string|null;
+  id:string;ownerName:string|null;ticker:string;analysisType:string;status:string;phase:string;modelCalls:number;inputTokens:number;outputTokens:number;unmeteredModelCalls:number;estimatedCostUsd:string|null;budgetActiveMs:number;createdAt:string;updatedAt:string;completedAt:string|null;error:string|null;
 }
 interface SessionDetail {status:string;inspector:AgentActivityInspector;events:RunEvent[]}
 
@@ -14,6 +15,7 @@ export default function AgentResearchOperations() {
   const [sessions,setSessions]=useState<SessionSummary[]>([]);
   const [selectedId,setSelectedId]=useState('');
   const [detail,setDetail]=useState<SessionDetail|null>(null);
+  const [telemetry,setTelemetry]=useState<ResearchOperationsTelemetry|null>(null);
   const [indexError,setIndexError]=useState('');
   const [detailError,setDetailError]=useState('');
   const [loading,setLoading]=useState(true);
@@ -23,9 +25,9 @@ export default function AgentResearchOperations() {
     async function refreshIndex() {
       try {
         const response=await fetch('/api/agents/sessions?operations=true',{signal:controller.signal,cache:'no-store'});
-        const body=await response.json() as {sessions?:SessionSummary[];error?:string};
+        const body=await response.json() as {sessions?:SessionSummary[];telemetry?:ResearchOperationsTelemetry|null;error?:string};
         if(!response.ok)throw new Error(body.error??'Agent activity could not be loaded.');
-        const rows=body.sessions??[];setSessions(rows);setSelectedId(current=>rows.some(row=>row.id===current)?current:rows[0]?.id??'');setIndexError('');
+        const rows=body.sessions??[];setSessions(rows);setTelemetry(body.telemetry??null);setSelectedId(current=>rows.some(row=>row.id===current)?current:rows[0]?.id??'');setIndexError('');
       } catch(cause) {
         if(!controller.signal.aborted)setIndexError(cause instanceof Error?cause.message:'Agent activity could not be loaded.');
       } finally {if(!controller.signal.aborted)setLoading(false);}
@@ -58,12 +60,19 @@ export default function AgentResearchOperations() {
   return <section className="card glass-panel" aria-label="Agent research operations">
     <div className="card-heading"><div><p className="eyebrow">Agent operations</p><h2>Research session traces</h2></div><span className="stat-chip">Platform admin</span></div>
     <p className="note">Platform administrators can inspect runs across accounts. Prompts, raw request payloads, frozen evidence/configuration snapshots, credentials and private chain-of-thought remain excluded.</p>
+    {telemetry&&<><section className="metrics-grid" aria-label="Canonical research telemetry">
+      <div className="card"><span className="note">Queue p95 · 24h</span><h2>{telemetry.queue.queueWaitP95Seconds===null?'Collecting':`${telemetry.queue.queueWaitP95Seconds}s`}</h2><p className="note">{telemetry.queue.startedSampleSize} started sessions</p></div>
+      <div className="card"><span className="note">Canonical occupancy</span><h2>{telemetry.canonicalWorker.occupancyRatio===null?'Collecting':`${Math.round(telemetry.canonicalWorker.occupancyRatio*100)}%`}</h2><p className="note">{telemetry.canonicalWorker.observedHours} observed hours</p></div>
+      <div className="card"><span className="note">Current backlog</span><h2>{telemetry.queue.queued} queued · {telemetry.queue.running} running</h2><p className="note">Oldest {telemetry.queue.oldestQueuedSeconds===null?'—':`${telemetry.queue.oldestQueuedSeconds}s`}</p></div>
+      <div className="card"><span className="note">Worker-pool decision</span><h2>{telemetry.scaleDecision.recommendation.replaceAll('_',' ')}</h2><p className="note">Requires p95 ≥ {telemetry.scaleDecision.thresholds.queueWaitP95Seconds}s and occupancy ≥ {Math.round(telemetry.scaleDecision.thresholds.canonicalOccupancyRatio*100)}%.</p></div>
+    </section><p className="note">Model usage · {telemetry.usage.modelCalls} calls · {telemetry.usage.inputTokens.toLocaleString()} input tokens · {telemetry.usage.outputTokens.toLocaleString()} output tokens · {telemetry.usage.unmeteredModelCalls} unmetered calls · estimated cost {telemetry.usage.estimatedCostUsd===null?'unavailable until operator pricing is configured':`$${telemetry.usage.estimatedCostUsd.toFixed(4)}`}.</p></>}
     {(indexError||detailError)&&<p role="alert" className="error-text">{indexError||detailError} Saved activity remains visible; automatic refresh will retry.</p>}
     {loading?<p className="note">Loading research sessions…</p>:sessions.length===0?<p className="note">No agent research sessions are recorded for this account yet.</p>:<>
       <div className="form-grid" aria-label="Choose a research session">{sessions.map(row=><button key={row.id} type="button" className={`portfolio-tab${selectedId===row.id?' active':''}`} aria-pressed={selectedId===row.id} onClick={()=>setSelectedId(row.id)}>
         {row.ownerName?`${row.ownerName} · `:''}{row.ticker} · {row.analysisType.replaceAll('_',' ')} · {row.status.replaceAll('_',' ')} · {new Date(row.createdAt).toLocaleDateString()}
       </button>)}</div>
       {selected&&<p className="note">Selected {selected.ticker} · phase {selected.phase.replaceAll('_',' ')} · updated {new Date(selected.updatedAt).toLocaleString()}{selected.error?` · ${selected.error}`:''}</p>}
+      {selected&&<p className="note">Session budget usage · {selected.modelCalls} model calls · {(selected.inputTokens+selected.outputTokens).toLocaleString()} tokens · {Math.round(selected.budgetActiveMs/1000)}s active · {selected.unmeteredModelCalls} unmetered · cost {selected.estimatedCostUsd===null?'unavailable':`$${Number(selected.estimatedCostUsd).toFixed(4)}`}.</p>}
       {detail?<AgentActivityInspectorPanel inspector={detail.inspector} events={detail.events}/>:<p className="note">Loading the selected run’s detailed trace…</p>}
     </>}
   </section>;

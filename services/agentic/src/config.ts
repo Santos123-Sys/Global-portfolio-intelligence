@@ -44,6 +44,7 @@ const workerSchema = commonSchema.extend({
   // The local default differs from the API's so both can run side by side.
   PORT: z.coerce.number().int().positive().default(3002),
   AGENTIC_WORKER_POLL_MS: z.coerce.number().int().min(250).max(60_000).default(1_000),
+  AGENTIC_TELEMETRY_POLL_MS: z.coerce.number().int().min(5_000).max(300_000).default(15_000),
   AGENTIC_WORKER_HEALTH_IDLE_BUDGET_MS: z.coerce.number().int().min(5_000).max(600_000).default(60_000),
   AGENTIC_JOB_LEASE_SECONDS: z.coerce.number().int().min(30).max(3_600).default(300),
   AGENTIC_CALLBACK_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(8),

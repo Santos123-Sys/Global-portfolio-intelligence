@@ -7,6 +7,7 @@ import { validateQuality } from './quality';
 import { SessionInterrupted } from './session-control';
 import { recordSessionEvent, sanitizeActivityDetail } from './session-events';
 import { selectPrior, type EffectiveAgentConfig } from '@/lib/agent-governance';
+import { SessionBudgetExceededError } from './session-budget';
 
 export class ExecutionEngine {
   readonly outputs: Record<string, AgentOutput> = {};
@@ -52,7 +53,7 @@ export class ExecutionEngine {
           output=outputSchema.parse(await handler(errors.length ? {...prior,'qa-feedback':feedback} : prior));
           errors=validateQuality(output,this.sources);
           if(!errors.length && output.claims?.length) errors=await this.tool('quality-validator','verify_claims',output) as string[];
-        } catch(error) { if(error instanceof SessionInterrupted)throw error;errors=[error instanceof Error ? error.message : 'Invalid output']; }
+        } catch(error) { if(error instanceof SessionInterrupted||error instanceof SessionBudgetExceededError)throw error;errors=[error instanceof Error ? error.message : 'Invalid output']; }
         if(!errors.length && output) break;
         await recordSessionEvent(this.sessionId,{eventType:'retry',summary:`${name.replaceAll('-',' ')} needs another validation attempt.`,detail:errors.slice(0,4).join('; ').slice(0,4000),agent:name,authority:'notify',consequence:'medium',reversible:true});
         await this.tool('quality-validator','deliver_message',{from:'quality-validator',to:executionAgent,messageType:'feedback',payload:{attempt:attempt+1,errors},timestamp:new Date().toISOString(),sessionId:this.sessionId});
@@ -70,7 +71,7 @@ export class ExecutionEngine {
       if(output.dataQuality) await recordSessionEvent(this.sessionId,{eventType:'data_quality_changed',summary:`${name.replaceAll('-',' ')} assessed data quality as ${output.dataQuality.status.replaceAll('_',' ')}.`,detail:`${Math.round(output.dataQuality.completeness*100)}% core coverage. ${output.dataQuality.issues.slice(0,4).join(' ')}`.slice(0,4000),agent:name,authority:'notify',consequence:output.dataQuality.status==='verified'?'low':'medium',reversible:true});
       return output;
     } catch (error) {
-      if(error instanceof SessionInterrupted) throw error;
+      if(error instanceof SessionInterrupted||error instanceof SessionBudgetExceededError) throw error;
       await this.assertLease();
       const output = outputSchema.parse({ status: 'blocked', data: {}, reasoningChain: ['Agent execution did not produce a validated evidence-backed result.'], confidenceScore: 0, citations: [], limitations: [sanitizeActivityDetail(error instanceof Error ? error.message : 'Agent failed')] });
       const saved=await db.update(agentRuns).set({ status: 'failed', outputPayload: output, reasoningChain: JSON.stringify(output.reasoningChain), confidenceScore: '0', completedAt: new Date(), executionTimeMs: Date.now() - start }).where(this.runFence(run.id)).returning({id:agentRuns.id});

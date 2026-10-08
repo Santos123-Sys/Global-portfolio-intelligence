@@ -211,6 +211,7 @@ Stated plainly, because a spec that overstates completeness is worse than no spe
 | `docs/architecture.md` | Components, data flow, dashboard IA, phasing |
 | `docs/V0-DASHBOARD-BRIEF.md` | **Paste this into v0** — frontend spec only |
 | `docs/AGENTIC-SYSTEM-HANDOFF.md` | Implemented 16-point dashboard/agentic contract reference |
+| `docs/AGENT-OPERATIONS-BUDGETS.md` | Aggregate session ceilings, telemetry, and the evidence gate for a second worker pool |
 | `docs/RAILWAY-DEPLOYMENT.md` | Railway services, variables, migration and bootstrap checklist |
 | `docs/MARKET-DATA.md` | Provider options and how to confirm SIX/B3 coverage before trusting one |
 | `docs/DOCUMENT-INTELLIGENCE.md` | Company document ingestion, grounded RAG, schedules, monitoring, deployment, and rollback |

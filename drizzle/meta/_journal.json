@@ -190,6 +190,13 @@
       "when": 1791209100000,
       "tag": "0026_canonical_research_orchestrator",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1791447000000,
+      "tag": "0027_session_budget_observability",
+      "breakpoints": true
     }
   ]
 }

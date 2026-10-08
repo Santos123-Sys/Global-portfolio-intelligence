@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { hasModelRuntime, modelRuntimeConfig, requestModelResponse } from '../src/lib/agent-finance/l2/model-runtime';
+import { withModelBudget, type ModelBudgetController } from '../src/lib/agent-finance/l2/model-budget-context';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -22,5 +23,22 @@ describe('model runtime transport', () => {
     const [url, options] = fetchMock.mock.calls[0];
     expect(url).toBe('https://models.example/v1/responses');
     expect((options?.headers as Record<string, string>).Authorization).toBe('Bearer provider-key');
+  });
+
+  it('accounts for every provider call at the shared transport boundary', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'openai-key');
+    vi.stubEnv('AGENT_MODEL_PRICING_JSON', JSON.stringify({ metered: { input: 2, output: 8 } }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      usage: { input_tokens: 100, output_tokens: 50 },
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    const controller: ModelBudgetController = {
+      beforeRequest: vi.fn(async () => 1_250),
+      afterResponse: vi.fn(async () => undefined),
+    };
+    await withModelBudget(controller, () => requestModelResponse({ model: 'metered' }, 5_000));
+    expect(controller.beforeRequest).toHaveBeenCalledWith(5_000);
+    expect(controller.afterResponse).toHaveBeenCalledWith({
+      model: 'metered', inputTokens: 100, outputTokens: 50, estimatedCostUsd: 0.0006,
+    });
   });
 });

@@ -1,4 +1,5 @@
 import { createServer, type Server } from 'node:http';
+import type { QueueTelemetry } from './types.js';
 
 export type WorkerState = 'starting' | 'idle' | 'processing';
 
@@ -7,6 +8,9 @@ export interface WorkerHeartbeat {
   /** Last queue poll or successful owned-job lease renewal. */
   lastPollAt: number | null;
   jobsProcessed: number;
+  busyRatio: number;
+  canonicalQueue: QueueTelemetry | null;
+  preparatoryQueue: QueueTelemetry | null;
 }
 
 export interface HealthBudgets {
@@ -31,6 +35,9 @@ export interface HealthReport {
   state: WorkerState;
   msSinceLastPoll: number | null;
   jobsProcessed: number;
+  busyRatio: number;
+  canonicalQueue: QueueTelemetry | null;
+  preparatoryQueue: QueueTelemetry | null;
 }
 
 /**
@@ -52,6 +59,9 @@ export function evaluateWorkerHealth(
     state: beat.state,
     msSinceLastPoll,
     jobsProcessed: beat.jobsProcessed,
+    busyRatio: beat.busyRatio,
+    canonicalQueue: beat.canonicalQueue,
+    preparatoryQueue: beat.preparatoryQueue,
   };
 
   if (beat.state === 'starting' || msSinceLastPoll === null) {
@@ -114,6 +124,9 @@ export function createWorkerHealthServer(options: WorkerHealthServerOptions): Se
         secondsSinceLastPoll:
           report.msSinceLastPoll === null ? null : Math.round(report.msSinceLastPoll / 1000),
         jobsProcessed: report.jobsProcessed,
+        busyRatio: Number(report.busyRatio.toFixed(4)),
+        canonicalQueue: report.canonicalQueue,
+        preparatoryQueue: report.preparatoryQueue,
       })
     );
     response.writeHead(report.healthy ? 200 : 503, {

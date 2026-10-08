@@ -19,6 +19,7 @@ describe('canonical runtime startup', () => {
     const runtime: FinanceRuntime = {
       initializeFinanceRuntime: vi.fn(() => initialized),
       processQueuedSessions: vi.fn(async () => 0),
+      getResearchQueueTelemetry: vi.fn(async () => ({ queued: 0, running: 0, oldestQueuedSeconds: null })),
     };
     const load = vi.fn(async () => {
       expect(env.DATABASE_URL).toBe(databaseUrl);
@@ -44,6 +45,7 @@ describe('canonical runtime startup', () => {
     const runtime: FinanceRuntime = {
       initializeFinanceRuntime: vi.fn(async () => { throw new Error('Queue table missing'); }),
       processQueuedSessions: vi.fn(async () => 0),
+      getResearchQueueTelemetry: vi.fn(async () => ({ queued: 0, running: 0, oldestQueuedSeconds: null })),
     };
     await expect(loadFinanceRuntime(databaseUrl, async () => runtime, {}))
       .rejects.toThrow('Queue table missing');

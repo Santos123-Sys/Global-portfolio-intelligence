@@ -1,6 +1,11 @@
 export interface FinanceRuntime {
   initializeFinanceRuntime(): Promise<void>;
   processQueuedSessions(onHeartbeat?: () => void): Promise<number>;
+  getResearchQueueTelemetry(): Promise<{
+    queued: number;
+    running: number;
+    oldestQueuedSeconds: number | null;
+  }>;
 }
 
 /** Await every readiness dependency; a detached import must never signal ready. */

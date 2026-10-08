@@ -2,7 +2,7 @@ import { DispatchConflictError } from './types.js';
 import { randomUUID } from 'node:crypto';
 import postgres from 'postgres';
 import type { MarketBrief, PortfolioAnalysisManifest } from '@portfolio-intelligence/agentic-contract';
-import type { AgenticJob, CallbackStatus, JobKind, JobRepository, JobStatus } from './types.js';
+import type { AgenticJob, CallbackStatus, JobKind, JobRepository, JobStatus, QueueTelemetry } from './types.js';
 
 type Sql = ReturnType<typeof postgres>;
 type Row = Record<string, unknown>;
@@ -124,6 +124,18 @@ export class PostgresJobRepository implements JobRepository {
       returning id
     `;
     return rows.length === 1;
+  }
+
+  async queueTelemetry(): Promise<QueueTelemetry> {
+    const rows = await this.sql<Row[]>`
+      select
+        count(*) filter (where status = 'queued' and kind <> 'analysis_run')::integer as queued,
+        count(*) filter (where status = 'running' and kind <> 'analysis_run')::integer as running,
+        extract(epoch from (now() - min(created_at) filter (where status = 'queued' and kind <> 'analysis_run')))::integer as oldest_queued_seconds
+      from agentic_jobs
+    `;
+    const row=rows[0] ?? {};
+    return {queued:Number(row.queued ?? 0),running:Number(row.running ?? 0),oldestQueuedSeconds:row.oldest_queued_seconds==null?null:Number(row.oldest_queued_seconds)};
   }
 
   async updateProgress(id: string, completed: number, total: number, stage: string, attempt?: number): Promise<void> {

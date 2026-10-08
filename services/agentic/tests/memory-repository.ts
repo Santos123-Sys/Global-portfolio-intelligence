@@ -5,7 +5,7 @@ import type {
   PortfolioAnalysisManifest,
   ThesisExtractionResult,
 } from '@portfolio-intelligence/agentic-contract';
-import type { AgenticJob, JobKind, JobRepository } from '../src/types.js';
+import type { AgenticJob, JobKind, JobRepository, QueueTelemetry } from '../src/types.js';
 
 export class MemoryRepository implements JobRepository {
   readonly jobs = new Map<string, AgenticJob>();
@@ -78,6 +78,13 @@ export class MemoryRepository implements JobRepository {
   async renewLease(id: string, workerId: string, leaseSeconds: number) {
     void leaseSeconds;
     return this.jobs.get(id)?.status === 'running' && this.leaseOwners.get(id) === workerId;
+  }
+
+  async queueTelemetry(): Promise<QueueTelemetry> {
+    const queued=[...this.jobs.values()].filter(job=>job.status==='queued'&&job.kind!=='analysis_run');
+    const running=[...this.jobs.values()].filter(job=>job.status==='running'&&job.kind!=='analysis_run');
+    const oldest=queued.reduce<Date|null>((value,job)=>!value||job.createdAt<value?job.createdAt:value,null);
+    return {queued:queued.length,running:running.length,oldestQueuedSeconds:oldest===null?null:Math.max(0,Math.round((Date.now()-oldest.getTime())/1000))};
   }
 
   private claimIsCurrent(id: string, attempt?: number) {

@@ -7,6 +7,7 @@ import { processJob } from './process-job.js';
 import { createWorkerHealthServer, type WorkerHeartbeat, type WorkerState } from './worker-health.js';
 import { keepJobLeaseAlive } from './worker-lease.js';
 import { loadFinanceRuntime, type FinanceRuntime } from './finance-startup.js';
+import type { QueueTelemetry } from './types.js';
 
 const config = getWorkerConfig();
 const repository = new PostgresJobRepository(config.AGENTIC_DATABASE_URL);
@@ -29,8 +30,36 @@ let stopping = false;
 let state: WorkerState = 'starting';
 let lastPollAt: number | null = null;
 let jobsProcessed = 0;
+const workerStartedAt = Date.now();
+let accumulatedBusyMs = 0;
+let busyStartedAt: number | null = null;
+let canonicalQueue: QueueTelemetry | null = null;
+let preparatoryQueue: QueueTelemetry | null = null;
+let nextTelemetryAt = 0;
 
-const heartbeat = (): WorkerHeartbeat => ({ state, lastPollAt, jobsProcessed });
+function setState(next: WorkerState): void {
+  const now = Date.now();
+  if (next === 'processing' && busyStartedAt === null) busyStartedAt = now;
+  if (next !== 'processing' && busyStartedAt !== null) {
+    accumulatedBusyMs += now - busyStartedAt;
+    busyStartedAt = null;
+  }
+  state = next;
+}
+
+function busyRatio(now = Date.now()): number {
+  const current = busyStartedAt === null ? 0 : now - busyStartedAt;
+  return Math.min(1, (accumulatedBusyMs + current) / Math.max(1, now - workerStartedAt));
+}
+
+const heartbeat = (): WorkerHeartbeat => ({
+  state,
+  lastPollAt,
+  jobsProcessed,
+  busyRatio: busyRatio(),
+  canonicalQueue,
+  preparatoryQueue,
+});
 const healthServer = createWorkerHealthServer({
   workerId,
   heartbeat,
@@ -60,6 +89,20 @@ async function deliverNextCallback(): Promise<boolean> {
     );
   }
   return true;
+}
+
+async function refreshQueueTelemetry(): Promise<void> {
+  const now = Date.now();
+  if (now < nextTelemetryAt) return;
+  nextTelemetryAt = now + config.AGENTIC_TELEMETRY_POLL_MS;
+  const [canonical, preparatory] = await Promise.allSettled([
+    financeRuntime?.getResearchQueueTelemetry() ?? Promise.resolve(null),
+    repository.queueTelemetry(),
+  ]);
+  if (canonical.status === 'fulfilled') canonicalQueue = canonical.value;
+  else process.stderr.write(`Canonical queue telemetry unavailable: ${canonical.reason instanceof Error ? canonical.reason.message : String(canonical.reason)}\n`);
+  if (preparatory.status === 'fulfilled') preparatoryQueue = preparatory.value;
+  else process.stderr.write(`Preparatory queue telemetry unavailable: ${preparatory.reason instanceof Error ? preparatory.reason.message : String(preparatory.reason)}\n`);
 }
 
 function closeHealthServer(): Promise<void> {
@@ -93,17 +136,23 @@ async function run(): Promise<void> {
     // Recorded before the work, not after, so a job that never returns shows up
     // as a stalled worker instead of freezing the last healthy timestamp.
     lastPollAt = Date.now();
-    state = 'idle';
+    setState('idle');
+    await refreshQueueTelemetry();
     if (await deliverNextCallback()) continue;
-    if(financeRuntime) {
-      state='processing';
-      const processed=await financeRuntime.processQueuedSessions(()=>{lastPollAt=Date.now();});
-      lastPollAt=Date.now(); state='idle'; jobsProcessed+=processed;
+    if (financeRuntime) {
+      setState('processing');
+      const processed = await financeRuntime.processQueuedSessions(() => {
+        lastPollAt = Date.now();
+      });
+      lastPollAt = Date.now();
+      setState('idle');
+      jobsProcessed += processed;
+      if (processed > 0) nextTelemetryAt = 0;
     }
     const job = await repository.claimNext(workerId, config.AGENTIC_JOB_LEASE_SECONDS);
     if (job) {
       process.stdout.write(`Processing ${job.kind} ${job.externalId}\n`);
-      state = 'processing';
+      setState('processing');
       const lease = keepJobLeaseAlive(repository, job.id, workerId, config.AGENTIC_JOB_LEASE_SECONDS, () => {
         lastPollAt = Date.now();
       });
@@ -114,8 +163,9 @@ async function run(): Promise<void> {
         if (lease.lost) {
           throw new Error(`Worker lost its lease while processing ${job.externalId}`);
         }
-        state = 'idle';
+        setState('idle');
         jobsProcessed += 1;
+        nextTelemetryAt = 0;
       }
       continue;
     }
