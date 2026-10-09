@@ -1,54 +1,11 @@
 import { NextResponse } from 'next/server';
-import { and, eq } from 'drizzle-orm';
-import { requireSession, type AuthContext } from './auth';
-import { accountCanEdit } from './account-scope';
-import { db } from './db';
-import { aiAnalyses, portfolios, positions } from './db/schema';
-
-export type AuthenticationResult =
-  | { ok: true; auth: AuthContext }
-  | { ok: false; response: NextResponse };
-
-export async function authenticateRequest(req: Request): Promise<AuthenticationResult> {
+import { getOptionalSession } from './auth';
+export async function authenticateRequest(req: Request) {
   try {
-    const auth = await requireSession(req);
-    const pathname = new URL(req.url).pathname;
-    const businessMutation = !['GET', 'HEAD', 'OPTIONS'].includes(req.method)
-      && !pathname.startsWith('/api/auth/')
-      && pathname !== '/api/translation'
-      && pathname !== '/api/accounts';
-    if (businessMutation && !accountCanEdit(auth.role)) {
-      return { ok: false, response: NextResponse.json({ error: 'This account is read-only' }, { status: 403 }) };
-    }
-    return { ok: true, auth };
+    const auth = await getOptionalSession(req);
+    if (auth) return { ok: true as const, auth };
+    return { ok: false as const, response: NextResponse.json({ error: 'Authentication required' }, { status: 401, headers: { 'cache-control': 'no-store' } }) };
   } catch {
-    return {
-      ok: false,
-      response: NextResponse.json({ error: 'Authentication required' }, { status: 401 }),
-    };
+    return { ok: false as const, response: NextResponse.json({ error: 'Authentication service unavailable' }, { status: 503, headers: { 'cache-control': 'no-store' } }) };
   }
-}
-
-export async function portfolioIsOwned(userId: string, portfolioId: string): Promise<boolean> {
-  const [row] = await db
-    .select({ id: portfolios.id })
-    .from(portfolios)
-    .where(and(eq(portfolios.id, portfolioId), eq(portfolios.ownerId, userId)))
-    .limit(1);
-  return Boolean(row);
-}
-
-export async function ownedSecurityIds(userId: string): Promise<string[]> {
-  const [positionRows, analysisRows] = await Promise.all([
-    db
-      .select({ securityId: positions.securityId })
-      .from(positions)
-      .innerJoin(portfolios, eq(positions.portfolioId, portfolios.id))
-      .where(eq(portfolios.ownerId, userId)),
-    db
-      .select({ securityId: aiAnalyses.securityId })
-      .from(aiAnalyses)
-      .where(eq(aiAnalyses.ownerId, userId)),
-  ]);
-  return [...new Set([...positionRows, ...analysisRows].map((row) => row.securityId))];
 }

@@ -2,15 +2,13 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { getDatabaseUrl } from '../env';
 import * as coreSchema from './schema';
-import * as workflowSchema from './workflow-schema';
-import * as agentSchema from './agent-schema';
 
 /**
  * Railway Postgres and local Postgres both expose standard TCP connections.
  * Keep a conservative pool per dashboard replica so scaling the web service
  * does not exhaust the database connection limit.
  */
-const schema = { ...coreSchema, ...workflowSchema, ...agentSchema };
+const schema = coreSchema;
 
 function createDatabase() {
   const queryClient = postgres(getDatabaseUrl(), {

@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { and, eq, gt, isNull, ne } from 'drizzle-orm';
 import { db } from './db';
 import { users, userSessions } from './db/schema';
@@ -150,16 +150,4 @@ export function assertSameOrigin(req: Request): void {
     production: env.NODE_ENV === 'production',
     publicAppUrl: env.PUBLIC_APP_URL,
   });
-}
-
-export function assertAgenticServiceAuthorized(req: Request): void {
-  const expected = getEnv().AGENTIC_SYSTEM_API_KEY;
-  if (!expected) throw new Error('AGENTIC_SYSTEM_API_KEY is not configured');
-  const bearer = req.headers.get('authorization');
-  const supplied = req.headers.get('x-agentic-api-key') ??
-    (bearer?.toLowerCase().startsWith('bearer ') ? bearer.slice(7).trim() : null);
-  if (!supplied) throw new Error('Agentic service authentication required');
-  const a = Buffer.from(supplied);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) throw new Error('Invalid agentic service credential');
 }

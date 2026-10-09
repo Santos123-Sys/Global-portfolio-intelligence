@@ -1,89 +1,26 @@
 'use client';
-
-import { FormEvent, useState } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import { safeLocalReturnPath } from '@/lib/request-security';
-
-export default function LoginPage() {
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [mfaRequired, setMfaRequired] = useState(false);
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSubmitting(true);
-    setError(null);
-    const data = new FormData(event.currentTarget);
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+export default function Login() {
+  const router = useRouter();
+  const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [mfa, setMfa] = useState(false);
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setBusy(true); setError('');
+    const f = new FormData(event.currentTarget);
     try {
-      const response = await fetch('/api/auth/session', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          email: data.get('email'),
-          password: data.get('password'),
-          mfaCode: mfaRequired ? data.get('mfaCode') : undefined,
-        }),
-      });
-      const body = (await response.json().catch(() => ({}))) as { error?: string; mfaRequired?: boolean };
-      if (response.status === 202 && body.mfaRequired) {
-        setMfaRequired(true);
-        return;
-      }
-      if (!response.ok) {
-        setError(body.error ?? 'Unable to sign in');
-        return;
-      }
-      const requested = new URLSearchParams(window.location.search).get('returnTo');
-      const destination = safeLocalReturnPath(requested, window.location.origin);
-      window.location.assign(destination);
-    } catch {
-      setError('Unable to reach the sign-in service');
-    } finally {
-      setSubmitting(false);
-    }
+      const res = await fetch('/api/auth/session', { method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: f.get('email'), password: f.get('password'), ...(mfa ? { mfaCode: f.get('mfaCode') } : {}) }) });
+      const data = await res.json();
+      if (res.status === 202 && data.mfaRequired) setMfa(true);
+      else if (!res.ok) setError(data.error ?? 'Sign-in unavailable');
+      else { router.replace('/'); router.refresh(); }
+    } catch { setError('Sign-in service unavailable. Please try again.'); } finally { setBusy(false); }
   }
-
-  return (
-    <main className="login-page">
-      <div className="login-content">
-        <Link href="/login" className="login-brand" aria-label="Global Portfolio Intelligence">
-          <Image src="/brand/portfolio-intelligence-mark.svg" alt="" width={30} height={30} priority />
-          <span>Global Portfolio Intelligence</span>
-        </Link>
-        <section className="login-card">
-          <h1>Log in</h1>
-          <form onSubmit={submit} className="login-form">
-          <label>
-            Email
-            <input name="email" type="email" autoComplete="email" required />
-          </label>
-          <label>
-            Password
-            <input name="password" type="password" autoComplete="current-password" maxLength={128} required />
-          </label>
-          {mfaRequired && (
-            <label>
-              Verification or recovery code
-              <input
-                name="mfaCode"
-                type="text"
-                autoComplete="one-time-code"
-                maxLength={64}
-                autoFocus
-                required
-              />
-            </label>
-          )}
-          {mfaRequired && <p className="login-help">Enter the six-digit code from your authenticator app, or one unused recovery code.</p>}
-          {error && <p className="login-error" role="alert">{error}</p>}
-          <button type="submit" disabled={submitting}>
-            {submitting ? 'Verifying…' : mfaRequired ? 'Verify and log in' : 'Log in'}
-          </button>
-          </form>
-        </section>
-        <p className="login-signup">Don’t have an account? <Link href="/register">Sign up</Link></p>
-      </div>
-    </main>
-  );
+  return <main className="login"><div className="brand">GPI <span>FOUNDATION / 01</span></div><h1>Discovery starts<br />with evidence.</h1>
+    <p>USA / SEC · Brazil / CVM<br />Financial analysis and valuation by FilingLens.</p>
+    <form onSubmit={submit} className="card"><h2>Sign in to your workspace</h2><label>Email<input name="email" type="email" autoComplete="username" required maxLength={254} /></label>
+      <label>Password<input name="password" type="password" autoComplete="current-password" required maxLength={128} /></label>
+      {mfa && <label>Authenticator or recovery code<input name="mfaCode" autoComplete="one-time-code" required maxLength={64} /></label>}
+      {error && <p role="alert">{error}</p>}<button disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+      <small>Existing accounts are retained. New access is provisioned by the administrator.</small></form></main>;
 }

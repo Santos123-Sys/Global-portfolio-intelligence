@@ -12,8 +12,6 @@ import {
   totpCodeAt,
   verifyTotpCode,
 } from '../src/lib/totp';
-import { externalAgenticUrl, manifestHash } from '../src/lib/integrations/agentic-adapter';
-import { AgenticRunRequest, type PortfolioAnalysisManifest } from '../src/lib/integrations/agentic-contract';
 
 describe('dashboard authentication primitives', () => {
   it('hashes and verifies a password without storing the original', async () => {
@@ -92,68 +90,5 @@ describe('browser security policy', () => {
     expect(policy).not.toContain("script-src 'self' 'unsafe-inline'");
     expect(policy).toContain("object-src 'none'");
     expect(policy).toContain("frame-ancestors 'none'");
-  });
-});
-
-describe('external agentic integration contract', () => {
-  it('accepts the dashboard run-request shape', () => {
-    const parsed = AgenticRunRequest.parse({
-      accountId: '8c9e6679-7425-40de-944b-e07fc1f90ae7',
-      thesis: {
-        versionId: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
-        criteria: {
-          version: 1,
-          portfolios: [{
-            role: 'swiss_quality',
-            currency: 'CHF',
-            objective: 'Stable compounding',
-            inclusionCriteria: ['Durable moat'],
-            exclusionCriteria: ['Financial distress'],
-          }],
-          globalConstraints: ['No leverage'],
-        },
-      },
-      securities: [{
-        ticker: 'NESN',
-        exchange: 'XSWX',
-        portfolioId: '550e8400-e29b-41d4-a716-446655440000',
-      }],
-      portfolios: [{
-        id: '550e8400-e29b-41d4-a716-446655440000',
-        name: 'Swiss Quality',
-        baseCurrency: 'CHF',
-        investmentObjective: 'Stable compounding',
-      }],
-      groundingBundles: [{
-        portfolioId: '550e8400-e29b-41d4-a716-446655440000',
-        bundle: {
-          ticker: 'NESN',
-          companyName: 'Nestle',
-          exchange: 'XSWX',
-          currency: 'CHF',
-          sector: 'Consumer staples',
-          country: 'CH',
-          computedMetrics: { 'position:weight:position-1': 0.12 },
-          dataAsOf: '2026-08-26T00:00:00.000Z',
-          fundamentals: { 'fundamental:free_cash_flow:observation-1': 12.3 },
-        },
-      }],
-    });
-    expect(parsed.securities[0].exchange).toBe('XSWX');
-  });
-
-  it('builds private Railway URLs without losing the base path', () => {
-    expect(externalAgenticUrl('http://agentic-system.railway.internal:8080', '/v1/analysis-runs'))
-      .toBe('http://agentic-system.railway.internal:8080/v1/analysis-runs');
-  });
-
-  it('changes the idempotency hash when a manifest changes', () => {
-    const manifest = {
-      schemaVersion: '1.0',
-      generatedAt: '2026-08-26T12:00:00.000Z',
-      thesisVersion: 1,
-      portfolios: [],
-    } as unknown as PortfolioAnalysisManifest;
-    expect(manifestHash(manifest)).not.toBe(manifestHash({ ...manifest, thesisVersion: 2 }));
   });
 });

@@ -1,1 +1,0 @@
-ALTER TABLE "ai_analyses" ADD COLUMN "research_framework" jsonb;

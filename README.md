@@ -1,219 +1,57 @@
-# Portfolio Intelligence
+# GPI — Discovery & Research Foundation
 
-AI-assisted investment management for two equity portfolios and a fixed-income sleeve, built on a deterministic quantitative engine.
+GPI filters candidates and challenges evidence. **FilingLens owns financial facts, calculated indicators and valuation.** Coverage is limited to USA/SEC and Brazil/CVM. Swiss coverage, internal valuation, portfolio calculations and automatic trading are removed from the active application.
 
-**Stack:** Next.js 16 · TypeScript · Drizzle ORM · PostgreSQL · Railway
+This replaces the previous application; it is not the previous dashboard with an additional panel. Existing login security (revocable sessions, scrypt, MFA, tenant membership, CSRF and CSP) is retained. Existing database records are not deleted. Source history is preserved in `recovery/pre-foundation-main-2026-10-09`.
 
-The repository is now one npm-workspace system. The Next.js service owns the
-dashboard, deterministic portfolio calculations, authentication and persistence;
-the private agentic API/worker services own thesis extraction, security reasoning,
-synthesis and PDF generation. All language-model stages use one configurable
-OpenAI model.
+## Run locally
 
----
+Node 22+, PostgreSQL, and runtime secrets are required. Copy `.env.example` to `.env.local` for Next.js; command-line scripts need those variables exported or `node --env-file=.env.local --import tsx ...`.
 
-## The one principle everything else follows
-
-**The AI never calculates. The calculation engine never interprets.**
-
-Every number is produced by deterministic TypeScript in `src/lib/quant/` and stored in Postgres. The external agentic service receives those values as grounding, returns validated structured interpretation, and is never permitted to compute a weight, return, Sharpe ratio, or VaR figure.
-
-This is enforced in three places, not just asked for in a prompt:
-
-1. `src/lib/quant/` imports nothing from the agentic integration or `src/lib/fx/`.
-2. `validateGrounding()` rejects any analysis citing a metric that was not supplied — catching the specific failure mode of a fluent, plausible analysis referencing a Sharpe ratio nobody computed.
-3. The output schema requires a non-empty `groundedIn` array. An analysis grounded in nothing is an opinion, and opinions are not stored as analysis.
-
----
-
-## The currency rule (ADR-002)
-
-Risk and performance are computed **per portfolio, in native currency**, and never blended. A CHF Sharpe and a BRL Sharpe do not combine into one number.
-
-`assertSingleCurrency()` throws if asked to weight positions across currencies. Not because the result would be wrong, but because it would be *meaningless* — and plausible-looking meaningless numbers are exactly what this architecture exists to prevent.
-
-The sole exception is the display total on the Overview page: converted live at ECB reference rates, rendered with its disclaimer, never persisted, never feeding another figure. It lives alone in `src/lib/fx/displayTotal()` so the rule stays enforceable by inspection.
-
----
-
-## Setup
-
-```bash
-npm install
-cp .env.example .env.local
+```sh
+npm ci
 npm run db:migrate
-npm run admin:create              # requires INITIAL_ADMIN_EMAIL/PASSWORD
-npm run seed                      # optional, fresh empty demo account only
+npm run admin:create:if-configured
 npm run dev
+# In a separate process with the same database/configuration:
+npm run worker
 ```
 
-Then trigger a first computation:
+The migration is additive and repeatable. It creates the identity tables if absent and the new `gpi_foundation_workspaces` / `gpi_foundation_jobs` tables. It does not drop legacy tables, change passwords, or rewrite legacy research.
 
-```bash
-curl http://localhost:3000/api/cron/refresh
-```
+## Implemented
 
-Run the tests:
+- Investor profile: selected markets, growth threshold, evidence age, optional liquidity requirement.
+- Sourced seventeen-listing starter watchlist, JSON import, canonical CIK/CNPJ identities or explicit unmapped state. It is **not** a complete market universe. Brazil mappings require verification; no CNPJ guesses are shipped.
+- Profile-driven staged screening with source-linked PASS / FAIL / UNKNOWN / NOT_REQUESTED. Revenue growth is received from FilingLens, never calculated here. Requested liquidity or unsupported income/preservation inputs remain unknown.
+- Persistent, account-scoped screen/research jobs; idempotency conflict detection, three-active-job and twenty-five-daily-job caps, worker leases and fenced terminal writes. Worker loss fails expired work rather than replaying a potentially charged model call.
+- Research evidence packs with bull/countercase questions, optional single-call qualitative draft, fact-ID validation and mandatory human review. Source values, dates and units are rendered separately without recomputation.
+- Secure public FilingLens v1 reader: HTTPS, GET only, digest/issuer/source validation, bounded response size, two attempts under one deadline. Private uploads and valuation commands are not accessed.
 
-```bash
+## Deliberate gaps
+
+The FilingLens producer contract was prepared in earlier local work but **is not deployed or modified by this replacement**. Live readings require its separately approved release and dedicated token. GPI honestly reports disabled/unavailable until then. No imaginary valuation endpoint is used.
+
+Automatic SEC/CVM universe refresh, full liquidity/trend/relative-strength screens, dividend/stability indicators, document retrieval and automated claim-entailment checks remain future work. Optional model output is a hypothesis for human review; valid citations do not prove truth. No production latency or reliability claim is inferred from offline tests.
+
+## Verify and release
+
+```sh
+npm run lint
+npm run typecheck
 npm test
+npm run build:worker
+npm run build
+npx playwright install chromium
+npm run test:e2e
 ```
 
----
+Unit, embedded PostgreSQL, route-security and browser tests are included. Browser tests use synthetic evidence and mock only the signed-in data service; they do not establish real FilingLens connectivity.
 
-## Deploying to Railway
+Railway configuration: dashboard uses `railway.dashboard.json`; one worker uses `railway.foundation-worker.json`. **Before merging to an auto-deployed branch**, stop retired agentic-api / old worker / filings-python services and reconfigure the worker build/start commands. Preserve PostgreSQL, user credentials and dashboard secrets. This repository change does not perform the Railway cutover.
 
-The recommended Railway project contains three application services, two isolated
-PostgreSQL resources and one private bucket:
+Rollback by reverting the replacement commit or redeploying the recovery branch. New tables can remain: there is no destructive down-migration. Do not force-push or drop the database.
 
-```text
-dashboard (public Next.js) ──private HTTP──> agentic-api (private)
-        │                                      │
- dashboard-postgres                     agentic-postgres
-                                               │
-                                        agentic-worker ──> OpenAI
-                                               │
-                                        agentic-artifacts bucket
-```
+See [architecture and delivery status](docs/foundation-architecture.md) and [ZIP provenance](docs/zip-provenance.md).
 
-The project-level deployment definition lives in `.railway/railway.ts`. It
-declares the three application services, both isolated PostgreSQL resources,
-the private report bucket, Railpack builds, committed migrations, health checks,
-restart policies and cross-service variables. Do not expose either agentic
-service to the browser.
-
-The root `railway.*.json` files are retained only while the already-running
-dashboard is migrated away from Railway's deprecated per-service Config as Code.
-Do not attach them to new services. Review a Railway IaC plan before applying;
-an unexpected delete or database replacement is a stop condition.
-
-For the first deployment, temporarily configure `INITIAL_ADMIN_EMAIL`,
-`INITIAL_ADMIN_PASSWORD` and optionally `INITIAL_ADMIN_NAME`. The dashboard
-pre-deploy step creates the first owner after migrations without Railway CLI or
-SSH. Remove all `INITIAL_ADMIN_*` variables immediately after the successful
-deployment. For the optional market refresh, create a Railway Cron service from
-this repository with command `npm run cron:refresh` and a weekday schedule such
-as `0 21 * * 1-5` UTC.
-
-See `docs/RAILWAY-DEPLOYMENT.md` for the exact variable and service checklist.
-
-### Authentication and cybersecurity
-
-The dashboard uses email/password authentication with salted, memory-hard
-scrypt hashes, revocable `HttpOnly` sessions, an eight-hour idle timeout,
-database-backed login throttling and optional authenticator-app MFA. New
-passwords are 15–128 characters; recovery codes are stored only as one-way
-digests. Account owners can change their password or enroll MFA at
-`/account/security`.
-
-Browser responses include CSP, HSTS in production, anti-framing, MIME-sniffing,
-referrer and permissions headers. Cross-origin mutations are rejected and all
-queries use Drizzle's parameterized query builder. Dependency advisories, tests,
-type checks and the production build run in `.github/workflows/security.yml` as
-the `verify` job. Requiring it before merge is a repository setting rather than a
-file; `CONTRIBUTING.md` records the exact rule.
-
-Application code cannot supply an edge WAF or volumetric DDoS absorption. The
-required Cloudflare/Railway controls and incident checklist are documented in
-`docs/CYBERSECURITY.md`.
-
----
-
-## Layout
-
-```
-src/lib/quant/       Deterministic engine. No LLM calls. 32 tests.
-  types.ts           RiskMetric — every metric carries its full methodology
-  returns.ts         Simple, TWR (sub-period linked), MWR (bisection XIRR)
-  risk.ts            Volatility, Sharpe, drawdown, VaR (historical + parametric)
-  weights.ts         Position/sector/country weights, HHI, currency guard
-
-src/lib/fx/          The ONLY place currencies mix. ECB rates + displayTotal().
-packages/agentic-contract Shared strict Zod contract and cross-system validators
-services/agentic/      Authenticated API, PostgreSQL worker, OpenAI pipeline, PDF and storage
-src/lib/integrations   Dashboard grounding builder, HTTP client and manifest adapter
-src/lib/connectors/  PriceProvider interface + deterministic stub (ADR-005 open)
-src/lib/discovery-workflow.ts  Provider-backed shortlist, approval and one-at-a-time analysis
-src/lib/quant/dcf.ts  Human-confirmed, deterministic two-stage FCFF valuation
-src/lib/services/    Recompute chain, distributed job lock
-src/lib/db/          Drizzle schema, ownership model and revocable sessions
-src/app/api/         Session-protected dashboard and integration routes
-tests/               Deterministic quant, FX, contract and authentication tests
-```
-
-### Frontend pages
-
-The seven pages in the Master Build Specification use authenticated APIs for
-interactive views. Read-only supporting pages may use owner-scoped Server
-Components; every query is bound to the current session:
-
-| Route | Purpose |
-|---|---|
-| `/` | Overview — native-currency totals, headline risk metrics per portfolio |
-| `/allocation` | Sector / country / asset-class weight breakdown, one portfolio at a time |
-| `/positions` | Sortable, filterable position table across portfolios |
-| `/portfolio-setup` | Authenticated portfolio and holding creation; analysis-readiness status |
-| `/security/[ticker]` | Market & fundamentals, position, AI analysis, grounding audit trail |
-| `/research` | Unified research inbox — candidate analyses, new/changed research, and thesis violations |
-| `/risk` | Every risk metric, drillable into full methodology, plus the VaR/normality caveat |
-| `/governance` | Portfolio guardrails, investment-control review, and recent decision history |
-
-The main workflow remains `/investment-thesis` → `/ai-stock-discovery` →
-`/positions`; Discovery owns human candidate decisions and analysis/valuation.
-The Research & Analysis Inbox combines the former `/candidates` and
-`/intelligence` views, while linking decision actions back to Discovery. Those
-two old paths redirect to `/research`. The searchable append-only decision log
-remains available from Investment Control to platform administrators.
-
-Supporting routes retain focused or operational work: `/research-history` is
-the administrator's cross-workflow activity view, `/agentic-system` is the
-optional existing-holdings analysis tool, and `/securities` is the portfolio
-security directory linked from Positions. The security master and run/decision
-records remain in the data model; consolidating their screens does not remove
-them. `/portfolio-setup`, `/portfolio`, `/risk-kpis`, and `/ai-insights` remain
-compatibility/support routes pending usage telemetry and redirect tests.
-
----
-
-## Design decisions worth knowing before you edit
-
-**Why no QuantStats or Riskfolio-Lib.** The original architecture recommended them. Two things changed that: the move to TypeScript removed them as options, and the explainability requirement made them a poor fit anyway — they return bare floats, so every call would have been wrapped to attach methodology metadata. The primitives are ~150 lines of arithmetic and are fully tested here. A useful side effect: the `cvxpy` compilation risk that hung over the Python design is simply gone.
-
-**Why bisection instead of Newton-Raphson for XIRR.** Newton converges faster but can diverge on irregular cash-flow patterns — which is precisely what a real portfolio produces. Bisection cannot fail to converge inside its bracket. Slower, and the right trade for a number a human will act on.
-
-**Why a `job_locks` table instead of `pg_try_advisory_lock`.** Advisory locks are session-scoped and release when the connection closes. Serverless connections close constantly, often mid-job. A row with an explicit TTL survives that.
-
-**Why the dashboard process does not execute agent jobs.** Reasoning jobs are owned by
-the private agentic worker workspace. The dashboard starts a run over private
-HTTP, stores its external identifier, validates the callback manifest and imports
-it transactionally. This preserves the database and quantitative boundaries while
-keeping deployment and schema evolution in one repository.
-
----
-
-## What is NOT finished
-
-Stated plainly, because a spec that overstates completeness is worse than no spec.
-
-- **Live discovery requires a paid/configured data source.** The EODHD adapter now covers the XSWX/BVMF screener universe, historical prices and normalized fundamentals. The deterministic stub remains for development but discovery and candidate analysis refuse to use it. Production needs `MARKET_DATA_PROVIDER=eodhd` and a plan-appropriate `MARKET_DATA_API_KEY`; provider licensing and exchange-level fundamentals coverage remain the operator's responsibility.
-- **Risk-free rates are hardcoded** in `recompute.ts`. Sharpe is directionally useful and not yet trustworthy in absolute terms.
-- **TWR ignores cash flows.** The function supports them; the recompute service doesn't yet pass transactions in. Until it does, TWR equals cumulative return. The metric carries a caveat saying so.
-- **Railway resources are declared but not yet applied to the live project.** `.railway/railway.ts` defines the integrated API, worker, two databases, private bucket and service wiring. A live Railway plan must be reconciled with the existing dashboard before it is applied, and the shared `OPENAI_API_KEY` must be supplied outside Git.
-- **Railway production credentials are not in Git.** PostgreSQL, session, service and cron secrets must be configured in Railway before deployment.
-
----
-
-## Documents
-
-| File | Contents |
-|---|---|
-| `docs/decision-log.md` | ADR-001 → ADR-013, full reasoning and trade-offs. ADR-013 records Railway as the platform |
-| `docs/architecture.md` | Components, data flow, dashboard IA, phasing |
-| `docs/V0-DASHBOARD-BRIEF.md` | **Paste this into v0** — frontend spec only |
-| `docs/AGENTIC-SYSTEM-HANDOFF.md` | Implemented 16-point dashboard/agentic contract reference |
-| `docs/AGENT-OPERATIONS-BUDGETS.md` | Aggregate session ceilings, telemetry, and the evidence gate for a second worker pool |
-| `docs/RAILWAY-DEPLOYMENT.md` | Railway services, variables, migration and bootstrap checklist |
-| `docs/MARKET-DATA.md` | Provider options and how to confirm SIX/B3 coverage before trusting one |
-| `docs/DOCUMENT-INTELLIGENCE.md` | Company document ingestion, grounded RAG, schedules, monitoring, deployment, and rollback |
-| `docs/superseded/` | The Python/Replit design and the original platform comparison, retained for their reasoning. Not live guidance. |
-| `CONTRIBUTING.md` | The architectural invariants that must not be broken |
+Local evidence: [verification results](docs/verification-results.md). These checks do not substitute for the production cutover gates.

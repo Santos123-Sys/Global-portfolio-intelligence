@@ -1,0 +1,163 @@
+{
+  "asOf": "2026-09-25",
+  "limitations": [
+    "Pinned starter watchlist, not a complete equity universe.",
+    "Brazil CNPJ mappings are deliberately absent until independently verified.",
+    "SEC mappings retained from the prior sourced snapshot; no new live identity verification claimed."
+  ],
+  "candidates": [
+    {
+      "key": "BVMF:PETR3",
+      "ticker": "PETR3",
+      "exchange": "BVMF",
+      "market": "br",
+      "name": "PETROLEO BRASILEIRO S A PETROBRAS",
+      "issuer": null,
+      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/5493000J801JZRCMFE49"
+    },
+    {
+      "key": "BVMF:PETR4",
+      "ticker": "PETR4",
+      "exchange": "BVMF",
+      "market": "br",
+      "name": "PETROLEO BRASILEIRO S A PETROBRAS",
+      "issuer": null,
+      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/5493000J801JZRCMFE49"
+    },
+    {
+      "key": "BVMF:VALE3",
+      "ticker": "VALE3",
+      "exchange": "BVMF",
+      "market": "br",
+      "name": "VALE S.A.",
+      "issuer": null,
+      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/254900SMTWBX7RU2SR20"
+    },
+    {
+      "key": "BVMF:ITUB4",
+      "ticker": "ITUB4",
+      "exchange": "BVMF",
+      "market": "br",
+      "name": "ITAÚ UNIBANCO HOLDING S.A.",
+      "issuer": null,
+      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/5493002W2IVG62O3ZJ94"
+    },
+    {
+      "key": "BVMF:BBDC4",
+      "ticker": "BBDC4",
+      "exchange": "BVMF",
+      "market": "br",
+      "name": "BANCO BRADESCO S.A.",
+      "issuer": null,
+      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/549300CTUU1RFXHQJE44"
+    },
+    {
+      "key": "BVMF:BBAS3",
+      "ticker": "BBAS3",
+      "exchange": "BVMF",
+      "market": "br",
+      "name": "BANCO DO BRASIL SA",
+      "issuer": null,
+      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/QE0Q0253K88YAGNPE356"
+    },
+    {
+      "key": "BVMF:ABEV3",
+      "ticker": "ABEV3",
+      "exchange": "BVMF",
+      "market": "br",
+      "name": "AMBEV S.A.",
+      "issuer": null,
+      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/549300TH5Q6VRP8OT012"
+    },
+    {
+      "key": "BVMF:WEGE3",
+      "ticker": "WEGE3",
+      "exchange": "BVMF",
+      "market": "br",
+      "name": "WEG SA",
+      "issuer": null,
+      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/254900NKQV127YFRO022"
+    },
+    {
+      "key": "XNAS:AAPL",
+      "ticker": "AAPL",
+      "exchange": "XNAS",
+      "market": "us",
+      "name": "Apple Inc.",
+      "issuer": null,
+      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+    },
+    {
+      "key": "XNAS:MSFT",
+      "ticker": "MSFT",
+      "exchange": "XNAS",
+      "market": "us",
+      "name": "MICROSOFT CORPORATION",
+      "issuer": null,
+      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/INR2EJN1ERAN0W5ZP974"
+    },
+    {
+      "key": "XNAS:NVDA",
+      "ticker": "NVDA",
+      "exchange": "XNAS",
+      "market": "us",
+      "name": "NVIDIA CORPORATION",
+      "issuer": null,
+      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/549300S4KLFTLO7GSQ80"
+    },
+    {
+      "key": "XNAS:GOOGL",
+      "ticker": "GOOGL",
+      "exchange": "XNAS",
+      "market": "us",
+      "name": "ALPHABET INC.",
+      "issuer": null,
+      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/5493006MHB84DD0ZWV18"
+    },
+    {
+      "key": "XNAS:GOOG",
+      "ticker": "GOOG",
+      "exchange": "XNAS",
+      "market": "us",
+      "name": "ALPHABET INC.",
+      "issuer": null,
+      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/5493006MHB84DD0ZWV18"
+    },
+    {
+      "key": "XNAS:AMZN",
+      "ticker": "AMZN",
+      "exchange": "XNAS",
+      "market": "us",
+      "name": "AMAZON.COM, INC.",
+      "issuer": null,
+      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/ZXTILKJKG63JELOEG630"
+    },
+    {
+      "key": "XNYS:JPM",
+      "ticker": "JPM",
+      "exchange": "XNYS",
+      "market": "us",
+      "name": "JPMORGAN CHASE & CO.",
+      "issuer": null,
+      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/8I5DZWZKVSZI1NUHU748"
+    },
+    {
+      "key": "XNYS:XOM",
+      "ticker": "XOM",
+      "exchange": "XNYS",
+      "market": "us",
+      "name": "ExxonMobil Holdings Corporation",
+      "issuer": null,
+      "identitySourceUrl": "https://www.sec.gov/Archives/edgar/data/2115436/000119312526291990/d71068d8k12b.htm"
+    },
+    {
+      "key": "XNYS:JNJ",
+      "ticker": "JNJ",
+      "exchange": "XNYS",
+      "market": "us",
+      "name": "Johnson & Johnson",
+      "issuer": null,
+      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/549300G0CFPGEF6X2043"
+    }
+  ]
+}

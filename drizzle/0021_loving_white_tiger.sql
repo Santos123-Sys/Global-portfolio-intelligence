@@ -1,1 +1,0 @@
-ALTER TABLE "price_history" ADD COLUMN "volume" numeric(24, 4);

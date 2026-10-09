@@ -1,1 +1,0 @@
-ALTER TABLE "discovery_candidates" ADD COLUMN "analysis_error_message" text;
