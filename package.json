@@ -25,13 +25,13 @@
     "start:worker": "node dist/foundation-worker.mjs"
   },
   "dependencies": {
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "^0.45.3",
     "next": "^16.4.0",
     "postgres": "^3.4.9",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "swr": "^2.5.1",
-    "tsx": "^4.19.2",
+    "tsx": "^4.23.15",
     "zod": "^3.24.1"
   },
   "overrides": {
@@ -42,8 +42,8 @@
     "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.56.1",
     "@types/node": "^22.10.5",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "esbuild": "^0.28.2",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.4.0",
