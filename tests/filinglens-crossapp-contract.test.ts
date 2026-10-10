@@ -30,7 +30,7 @@ function syntheticFinance(jurisdiction: 'us' | 'br') {
 }
 
 function fetchSnapshot(value: unknown) {
-  return vi.fn(async () => new Response(JSON.stringify(value), {
+  return vi.fn(async (_input: Request | string | URL, _init?: RequestInit) => new Response(JSON.stringify(value), {
     status: 200, headers: { 'content-type': 'application/json' },
   }));
 }
@@ -46,9 +46,9 @@ describe('FilingLens v1 consumer contract', () => {
     expect(mockFetch).toHaveBeenCalledOnce();
     const [url, options] = mockFetch.mock.calls[0];
     expect(String(url)).toContain('/api/integration/v1/issuers/' + jurisdiction + '/' + snapshot.issuer.registryId);
-    expect(options.method).toBe('GET');
-    expect(options.headers.Authorization).toBe('Bearer ' + token);
-    expect(options.redirect).toBe('error');
+    expect(options?.method).toBe('GET');
+    expect(options?.headers).toMatchObject({ Authorization: 'Bearer ' + token });
+    expect(options?.redirect).toBe('error');
   });
 
   it('rejects altered numerical content even when the payload remains structurally valid', async () => {
