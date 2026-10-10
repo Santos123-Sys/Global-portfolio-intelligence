@@ -51,13 +51,13 @@ async function authorizeSensitiveAction(req: Request, currentPassword: string) {
       ),
     };
   }
-  const [user] = await db.select().from(users).where(eq(users.id, session.auth.userId)).limit(1);
+  const [user] = await db.select().from(users).where(eq(users.id, session.auth.actorUserId)).limit(1);
   if (!user || !(await verifyPassword(currentPassword, user.passwordHash))) {
     await recordLoginFailure(session.auth.email, req);
     await recordAuthenticationEvent({
       req,
       email: session.auth.email,
-      userId: session.auth.userId,
+      userId: session.auth.actorUserId,
       eventType: 'mfa_management',
       outcome: 'failure',
     });
@@ -77,7 +77,7 @@ export async function GET(req: Request) {
     enabledAt: users.mfaEnabledAt,
     pendingSecret: users.mfaPendingSecretEncrypted,
     recoveryHashes: users.mfaRecoveryCodeHashes,
-  }).from(users).where(eq(users.id, session.auth.userId)).limit(1);
+  }).from(users).where(eq(users.id, session.auth.actorUserId)).limit(1);
   return NextResponse.json({
     enabled: Boolean(user?.enabledAt),
     setupPending: Boolean(user?.pendingSecret),

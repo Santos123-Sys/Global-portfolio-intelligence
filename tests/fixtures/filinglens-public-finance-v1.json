@@ -1,0 +1,107 @@
+{
+  "raw": {
+    "jurisdiction": "us",
+    "registryId": "0000000001",
+    "provider": "sec_edgar",
+    "metrics": [
+      {
+        "key": "revenue",
+        "year": 2024,
+        "value": 100,
+        "unit": "USD",
+        "period": "2024-12-31",
+        "status": "single_source",
+        "source": {
+          "provider": "sec_edgar",
+          "url": "https://data.sec.gov/fixture",
+          "form": "10-K",
+          "period": "2024-12-31",
+          "retrievedAt": "2026-01-01"
+        }
+      },
+      {
+        "key": "revenue",
+        "year": 2025,
+        "value": 120,
+        "unit": "USD",
+        "period": "2025-12-31",
+        "status": "single_source",
+        "source": {
+          "provider": "sec_edgar",
+          "url": "https://data.sec.gov/fixture",
+          "form": "10-K",
+          "period": "2025-12-31",
+          "retrievedAt": "2026-01-01"
+        }
+      }
+    ]
+  },
+  "snapshot": {
+    "schemaVersion": "filinglens-public-finance-v1",
+    "snapshotId": "flpub1_65554299f10b9103ad9e4bca5a7adcd87037a72334ffff4c431298c9babaf82a",
+    "contentHash": "d94ac41f50d1e49fa515765ce66f588a7f38d5f2e52b8228743b653854273a4b",
+    "archiveHash": "65554299f10b9103ad9e4bca5a7adcd87037a72334ffff4c431298c9babaf82a",
+    "archivedOn": "2026-10-09",
+    "visibility": "public_regulatory",
+    "issuer": {
+      "jurisdiction": "us",
+      "registryId": "0000000001"
+    },
+    "provider": "sec_edgar",
+    "facts": [
+      {
+        "id": "ababd1c0cd7a196a30f6b2cf3b0384aedc752744f1271e5488ef809bdaa3fbb1",
+        "metric": "revenue",
+        "value": "100",
+        "unit": "USD",
+        "currency": "USD",
+        "fiscalYear": 2024,
+        "periodKind": "FY",
+        "periodEnd": "2024-12-31",
+        "periodLabel": "2024-12-31",
+        "status": "single_source",
+        "sources": [
+          {
+            "url": "https://data.sec.gov/fixture",
+            "provider": "sec_edgar",
+            "form": "10-K",
+            "retrievedAt": "2026-01-01"
+          }
+        ]
+      },
+      {
+        "id": "26e7295db3fdffa2e7b955cda99b054cf91a1a04c500bd62f247527943108521",
+        "metric": "revenue",
+        "value": "120",
+        "unit": "USD",
+        "currency": "USD",
+        "fiscalYear": 2025,
+        "periodKind": "FY",
+        "periodEnd": "2025-12-31",
+        "periodLabel": "2025-12-31",
+        "status": "single_source",
+        "sources": [
+          {
+            "url": "https://data.sec.gov/fixture",
+            "provider": "sec_edgar",
+            "form": "10-K",
+            "retrievedAt": "2026-01-01"
+          }
+        ]
+      }
+    ],
+    "screening": {
+      "revenueGrowthYoYPct": 20,
+      "basis": "annual_same_currency_unit",
+      "inputFactIds": [
+        "26e7295db3fdffa2e7b955cda99b054cf91a1a04c500bd62f247527943108521",
+        "ababd1c0cd7a196a30f6b2cf3b0384aedc752744f1271e5488ef809bdaa3fbb1"
+      ],
+      "periodEnd": "2025-12-31",
+      "calculatorVersion": "revenue-yoy-v1"
+    },
+    "limitations": [
+      "Synthetic contract fixture; not real issuer data."
+    ]
+  }
+}
