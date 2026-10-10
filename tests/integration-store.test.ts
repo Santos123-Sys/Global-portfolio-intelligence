@@ -19,6 +19,7 @@ vi.mock('postgres', () => {
 import { enqueue, claimJob, finishJob } from '../src/lib/foundation/store';
 import { reviewResearch, listReviews } from '../src/lib/integrations/review-store';
 import { defaultProfile } from '../src/lib/foundation/contracts';
+import type { Workspace as WorkspaceData } from '../src/lib/foundation/contracts';
 
 const owner = '550e8400-e29b-41d4-a716-446655440000';
 const other = '550e8400-e29b-41d4-a716-446655440001';
@@ -26,11 +27,11 @@ const account = '550e8400-e29b-41d4-a716-446655440010';
 const otherAccount = '550e8400-e29b-41d4-a716-446655440011';
 const candidate = {key:'XNAS:TEST',ticker:'TEST',name:'Synthetic issuer',market:'us',exchange:'XNAS',
   issuer:{jurisdiction:'us',registryId:'0000000001'},identitySourceUrl:'https://data.sec.gov/fixture'};
-const workspace = {version:1,profile:defaultProfile,candidates:[candidate]};
+const workspace: WorkspaceData = {version:1,profile:defaultProfile,candidates:[candidate]};
 const payload = (jobId: string) => ({sourceResearchJobId:jobId,decision:'request_analysis',
   rationale:'The filing evidence warrants independent analysis.',confirmIssuerMapping:true,
   idempotencyKey:'550e8400-e29b-41d4-a716-446655440055'});
-async function completedResearch(custom = workspace) {
+async function completedResearch(custom: WorkspaceData = workspace) {
   const enqueued = await enqueue(owner, {kind:'research',candidateKey:'XNAS:TEST',workspace:custom,
     idempotencyKey:crypto.randomUUID()});
   const job = (await claimJob())!;
@@ -64,8 +65,10 @@ describe('durable GPI research review handoffs',()=>{
     expect(value.delivered).toBe(false);expect(value.review.issuer?.verification).toBe('analyst_confirmed');
     expect((await listReviews(owner))).toHaveLength(1);expect(await listReviews(other)).toHaveLength(0);
     const events=await state.db!.query('SELECT event,delivery_status,attempt_count FROM gpi_integration_outbox');
-    expect(events.rows).toHaveLength(1);expect(events.rows[0].delivery_status).toBe('pending');
-    expect((events.rows[0].event as {eventType:string}).eventType).toBe('candidate.reviewed.v1');
+    expect(events.rows).toHaveLength(1);
+    const firstEvent = events.rows[0] as {delivery_status: string; event: {eventType: string}};
+    expect(firstEvent.delivery_status).toBe('pending');
+    expect(firstEvent.event.eventType).toBe('candidate.reviewed.v1');
   });
   it('reuses idempotency keys and rejects changed requests',async()=>{
     const id=await completedResearch();const request=payload(id);
