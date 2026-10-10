@@ -86,8 +86,8 @@ export const PortfolioExposureV1 = z.object({
   source: z.literal('portfolio-risk-studio'),
   status: z.enum(['ready', 'stale', 'partial', 'unknown']),
   holdingsCount: z.number().int().min(0).max(10000),
-  sectorWeights: z.record(z.string().regex(/^0(\.\d+)?|1(\.0+)?$/)),
-  countryWeights: z.record(z.string().regex(/^0(\.\d+)?|1(\.0+)?$/)),
+  sectorWeights: z.record(z.string().regex(/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/)),
+  countryWeights: z.record(z.string().regex(/^(?:0(?:\.\d+)?|1(?:\.0+)?)$/)),
   methodologyVersion: z.string().min(1).max(100),
 }).strict();
 
