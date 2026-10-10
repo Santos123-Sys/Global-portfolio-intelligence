@@ -11,6 +11,14 @@ import seed from '../../data/usa-cvm-universe.json';
 type Job = { id: string; kind: 'screen' | 'research'; status: string; created_at: string; error_code: string | null;
   output: { kind: 'screen'; screens: ScreenResult[] } | { kind: 'research'; report: ReturnType<typeof researchWorkbench>; modelStatus: string } | null };
 type State = { workspace: WorkspaceData; jobs: Job[]; integrations: { finance: string; researchModel: string } };
+type Handoff = { reviewId: string; candidateKey: string; decision: string; reviewedAt: string;
+  exportStatus: string; issuer: { issuerId: string } | null };
+type HandoffState = { reviews: Handoff[]; delivery: string };
+async function fetchHandoffs(url: string): Promise<HandoffState> {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error('Handoff history unavailable');
+  return res.json();
+}
 async function fetchState(url: string): Promise<State> {
   const res = await fetch(url, { cache: 'no-store' }); const data = await res.json();
   if (res.status === 401) throw new Error('Sign-in required; return to /login');
@@ -21,6 +29,10 @@ export default function Workbench() {
   const { data, error, mutate } = useSWR<State>('/api/foundation', fetchState, { refreshInterval: 5000, shouldRetryOnError: false });
   const [tab, setTab] = useState('Candidates'); const [message, setMessage] = useState(''); const [busy, setBusy] = useState(false);
   const [edit, setEdit] = useState<WorkspaceData | null>(null); const [json, setJson] = useState('');
+  const { data: handoffs, mutate: refreshHandoffs } = useSWR<HandoffState>('/api/integration/v1/reviews', fetchHandoffs,
+    { refreshInterval: 10000, shouldRetryOnError: false });
+  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
+  const [mappingChecks, setMappingChecks] = useState<Record<string, boolean>>({});
   const workspace = edit ?? data?.workspace ?? Workspace.parse({ version: 1, profile: defaultProfile, candidates: seed.candidates });
   const jobs = data?.jobs ?? []; const latestScreen = jobs.find(j => j.status === 'complete' && j.output?.kind === 'screen');
   const screens = latestScreen?.output?.kind === 'screen' ? latestScreen.output.screens : [];
@@ -36,13 +48,31 @@ export default function Workbench() {
     const result = await call('POST', { kind, candidateKey, idempotencyKey: crypto.randomUUID(), workspace });
     if (result) { setMessage('Job queued. The worker will retain a source-linked evidence snapshot.'); setTab('Activity'); }
   }
+  async function recordReview(jobId: string, decision: 'request_analysis' | 'watchlist' | 'reject') {
+    const rationale = (reviewNotes[jobId] ?? '').trim();
+    if (rationale.length < 20) { setMessage('Review justification requires at least 20 characters.'); return; }
+    setBusy(true); setMessage('');
+    try {
+      const res = await fetch('/api/integration/v1/reviews', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sourceResearchJobId: jobId, decision, rationale,
+          confirmIssuerMapping: mappingChecks[jobId] === true, idempotencyKey: crypto.randomUUID() }),
+      });
+      const value = await res.json();
+      if (!res.ok) throw new Error(value.error ?? 'Review unavailable');
+      await refreshHandoffs();
+      setMessage('Human review saved in GPI. External delivery is disabled until providers are ready.');
+      setTab('Handoffs');
+    } catch (e) { setMessage(e instanceof Error ? e.message : 'Review failed'); }
+    finally { setBusy(false); }
+  }
   return <div className="app"><header className="topbar"><div className="brand">GPI<span>DISCOVERY & RESEARCH</span></div>
     <div className="actions"><span className="muted">Foundation / 01</span><button className="secondary" onClick={async () => { await fetch('/api/auth/session', { method: 'DELETE' }); router.replace('/login'); router.refresh(); }}>Sign out</button></div></header>
     <section className="hero"><div><div className="eyebrow">FOCUSED EQUITY INTELLIGENCE</div><h1>Find candidates.<br />Challenge the evidence.</h1><p className="muted">GPI screens and researches. FilingLens owns the numbers and valuation.</p></div>
       <div className="scope"><span className="badge">USA / SEC</span><span className="badge">BRAZIL / CVM</span><span className="badge">NO AUTOMATIC TRADES</span></div></section>
     {error && <div role="alert" className="notice">{error.message}. The starter watchlist below is not a completed screening run.</div>}
     {message && <div role="status" className="notice">{message}</div>}
-    <nav className="tabs" role="tablist" aria-label="Research workspace">{['Candidates', 'Investor profile', 'Research', 'Activity'].map(t => <button role="tab" key={t} aria-selected={tab === t} onClick={() => setTab(t)}>{t}</button>)}</nav>
+    <nav className="tabs" role="tablist" aria-label="Research workspace">{['Candidates', 'Investor profile', 'Research', 'Handoffs', 'Activity'].map(t => <button role="tab" key={t} aria-selected={tab === t} onClick={() => setTab(t)}>{t}</button>)}</nav>
     {tab === 'Candidates' && <div className="grid"><section className="card"><div className="section-head"><h2>Candidate watchlist</h2><button disabled={busy || !data} onClick={() => launch('screen')}>Run screening</button></div>
       <p className="muted">A sourced starter list, not the full market universe. Unmapped issuers stay unknown.</p>
       <div className="table-wrap"><table><thead><tr><th>COMPANY / LISTING</th><th>MARKET</th><th>LATEST RUN</th><th>RESEARCH</th></tr></thead><tbody>{workspace.candidates.map(c => {
@@ -69,7 +99,32 @@ export default function Workbench() {
         <div className="columns">{(['bull', 'bear'] as const).map(side => <div key={side}><h3>{side === 'bull' ? 'Positive case' : 'Countercase'}</h3>{r.questions[side].map(q => <p key={q}>{q}</p>)}
           {r.draft?.[side].map((claim, i) => <div className="claim" key={i}><p>{claim.text}</p><small>Falsifier: {claim.falsifier}</small><small className="break">Evidence: {claim.evidenceIds.join(', ')}</small></div>)}</div>)}</div>
         <h3>FilingLens evidence</h3>{r.screen.finance.status !== 'ready' ? <div className="notice">{r.screen.finance.reason}</div> : <><small className="break">Snapshot: {r.screen.finance.snapshot.snapshotId}</small><div className="table-wrap"><table><thead><tr><th>METRIC</th><th>PERIOD</th><th>SOURCE VALUE / UNIT</th><th>STATUS / SOURCE</th></tr></thead><tbody>{r.screen.finance.snapshot.facts.map(f => <tr key={f.id}><td>{f.metric}</td><td>{f.periodEnd ?? f.periodLabel ?? f.fiscalYear}</td><td><span>{f.value ?? 'Unknown'} {f.unit ?? ''}</span>{f.currency !== f.unit && <small>{f.currency ?? 'Currency not supplied'}</small>}</td><td>{f.status}{f.sources.map((s, i) => <small key={i}><a href={s.url} target="_blank" rel="noreferrer">Regulator source</a></small>)}</td></tr>)}</tbody></table></div></>}
-        <div className="callout">{r.valuation.reason}</div>{r.limitations.map((l, i) => <small key={i}>• {l}</small>)}</article>; })}</section>}
+        <div className="callout">{r.valuation.reason}</div>{r.limitations.map((l, i) => <small key={i}>• {l}</small>)}
+        <section className="callout"><h3>Human thesis review · GPI only</h3>
+          <p>Reviewing creates a local audit record, not a FilingLens job, portfolio holding or trade.</p>
+          <label>Analyst rationale<textarea aria-label={'Review rationale ' + j.id}
+            value={reviewNotes[j.id] ?? ''} maxLength={2000}
+            onChange={e => setReviewNotes(v => ({ ...v, [j.id]: e.target.value }))} /></label>
+          <label><input type="checkbox" checked={mappingChecks[j.id] === true}
+            onChange={e => setMappingChecks(v => ({ ...v, [j.id]: e.target.checked }))} />
+            I checked this issuer's CIK/CNPJ and the official source before requesting further analysis.
+          </label>
+          <div className="actions">
+            <button disabled={busy} onClick={() => recordReview(j.id, 'request_analysis')}>Queue analysis handoff locally</button>
+            <button className="secondary" disabled={busy} onClick={() => recordReview(j.id, 'watchlist')}>Keep on watchlist</button>
+            <button className="secondary" disabled={busy} onClick={() => recordReview(j.id, 'reject')}>Reject idea</button>
+          </div>
+        </section></article>; })}</section>}
+    {tab === 'Handoffs' && <section className="card"><div className="section-head">
+      <h2>Reviewed investment handoffs</h2><button className="secondary" onClick={() => refreshHandoffs()}>Refresh</button>
+      </div><p className="muted">These records stay inside GPI. Other systems cannot receive them until authorized endpoints and tenant scopes are verified.</p>
+      <p className="muted">Delivery: {handoffs?.delivery ?? 'not connected'}</p>
+      {!handoffs?.reviews.length && <p>No human-reviewed handoffs yet.</p>}
+      <div className="table-wrap"><table><thead><tr><th>CANDIDATE</th><th>REVIEW DECISION</th><th>ISSUER</th><th>DATE</th><th>DELIVERY</th></tr></thead><tbody>
+        {handoffs?.reviews.map(h => <tr key={h.reviewId}><td>{h.candidateKey}</td><td>{h.decision}</td>
+          <td>{h.issuer?.issuerId ?? 'Unmapped'}</td><td>{new Date(h.reviewedAt).toLocaleString()}</td><td>{h.exportStatus}</td></tr>)}
+      </tbody></table></div>
+    </section>}
     {tab === 'Activity' && <section className="card"><div className="section-head"><h2>Durable job activity</h2><button className="secondary" onClick={() => mutate()}>Refresh</button></div><p className="muted">Jobs require the foundation worker. A stopped worker leaves jobs queued; it does not simulate completion.</p>
       {!jobs.length && <p>No jobs yet.</p>}<div className="table-wrap"><table><thead><tr><th>RUN</th><th>TYPE</th><th>STATUS</th><th>CREATED / ERROR</th></tr></thead><tbody>{jobs.map(j => <tr key={j.id}><td><code>{j.id}</code></td><td>{j.kind}</td><td><span className={`badge ${j.status}`}>{j.status}</span></td><td>{new Date(j.created_at).toLocaleString()}<small>{j.error_code ?? ''}</small></td></tr>)}</tbody></table></div></section>}
     <footer>USA and Brazil CVM only · No Swiss coverage · No internal financial calculators · No automatic trading</footer></div>;
