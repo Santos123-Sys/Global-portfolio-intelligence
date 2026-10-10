@@ -6,11 +6,13 @@ import { Workspace, defaultProfile, type Profile } from '@/lib/foundation/contra
 import type { Workspace as WorkspaceData } from '@/lib/foundation/contracts';
 import type { ScreenResult } from '@/lib/foundation/screening';
 import type { researchWorkbench } from '@/lib/foundation/research';
+import type { FilingLensReadState } from '@/lib/integrations/filinglens-client';
 import seed from '../../data/usa-cvm-universe.json';
 
 type Job = { id: string; kind: 'screen' | 'research'; status: string; created_at: string; error_code: string | null;
   output: { kind: 'screen'; screens: ScreenResult[] } | { kind: 'research'; report: ReturnType<typeof researchWorkbench>; modelStatus: string } | null };
 type State = { workspace: WorkspaceData; jobs: Job[]; integrations: { finance: string; researchModel: string } };
+type FinancePreview = { candidateKey: string; finance: FilingLensReadState };
 async function fetchState(url: string): Promise<State> {
   const res = await fetch(url, { cache: 'no-store' }); const data = await res.json();
   if (res.status === 401) throw new Error('Sign-in required; return to /login');
@@ -21,6 +23,8 @@ export default function Workbench() {
   const { data, error, mutate } = useSWR<State>('/api/foundation', fetchState, { refreshInterval: 5000, shouldRetryOnError: false });
   const [tab, setTab] = useState('Candidates'); const [message, setMessage] = useState(''); const [busy, setBusy] = useState(false);
   const [edit, setEdit] = useState<WorkspaceData | null>(null); const [json, setJson] = useState('');
+  const [financePreview, setFinancePreview] = useState<FinancePreview | null>(null);
+  const [financeBusy, setFinanceBusy] = useState<string | null>(null);
   const workspace = edit ?? data?.workspace ?? Workspace.parse({ version: 1, profile: defaultProfile, candidates: seed.candidates });
   const jobs = data?.jobs ?? []; const latestScreen = jobs.find(j => j.status === 'complete' && j.output?.kind === 'screen');
   const screens = latestScreen?.output?.kind === 'screen' ? latestScreen.output.screens : [];
@@ -31,6 +35,17 @@ export default function Workbench() {
     try { const res = await fetch('/api/foundation', { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
       const result = await res.json(); if (!res.ok) throw new Error(result.error ?? 'Request unavailable'); await mutate(); return result;
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Request failed'); return null; } finally { setBusy(false); }
+  }
+  async function viewFilingLens(candidateKey: string) {
+    setFinanceBusy(candidateKey); setFinancePreview(null);
+    try {
+      const response = await fetch(`/api/integrations/filinglens/issuer?candidateKey=${encodeURIComponent(candidateKey)}`, { cache: 'no-store' });
+      const result = await response.json();
+      if (!result.finance) throw new Error(result.error ?? 'FilingLens preview is unavailable');
+      setFinancePreview(result as FinancePreview);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'FilingLens preview is unavailable');
+    } finally { setFinanceBusy(null); }
   }
   async function launch(kind: 'screen' | 'research', candidateKey?: string) {
     const result = await call('POST', { kind, candidateKey, idempotencyKey: crypto.randomUUID(), workspace });
@@ -45,11 +60,24 @@ export default function Workbench() {
     <nav className="tabs" role="tablist" aria-label="Research workspace">{['Candidates', 'Investor profile', 'Research', 'Activity'].map(t => <button role="tab" key={t} aria-selected={tab === t} onClick={() => setTab(t)}>{t}</button>)}</nav>
     {tab === 'Candidates' && <div className="grid"><section className="card"><div className="section-head"><h2>Candidate watchlist</h2><button disabled={busy || !data} onClick={() => launch('screen')}>Run screening</button></div>
       <p className="muted">A sourced starter list, not the full market universe. Unmapped issuers stay unknown.</p>
-      <div className="table-wrap"><table><thead><tr><th>COMPANY / LISTING</th><th>MARKET</th><th>LATEST RUN</th><th>RESEARCH</th></tr></thead><tbody>{workspace.candidates.map(c => {
+      <div className="table-wrap"><table><thead><tr><th>COMPANY / LISTING</th><th>MARKET</th><th>LATEST RUN</th><th>FILINGLENS</th><th>RESEARCH</th></tr></thead><tbody>{workspace.candidates.map(c => {
         const screen = screens.find(s => s.candidate.key === c.key); return <tr key={c.key}><td><strong>{c.ticker}</strong><small>{c.name}</small><a href={c.identitySourceUrl} target="_blank" rel="noreferrer">Identity source</a></td>
           <td>{c.market === 'us' ? 'SEC' : 'CVM'}<small>{c.exchange}</small></td><td><span className={`badge ${screen?.status ?? 'UNKNOWN'}`}>{screen?.status ?? 'NOT SCREENED'}</span>{screen?.decisions.filter(d => d.status === 'UNKNOWN' || d.status === 'FAIL').map(d => <small key={d.stage}>{d.stage}: {d.reason}</small>)}</td>
+          <td><button className="secondary" disabled={Boolean(financeBusy) || !data} onClick={() => viewFilingLens(c.key)}>{financeBusy === c.key ? 'Loading facts…' : 'View financial facts'}</button></td>
           <td><button className="secondary" disabled={busy || !data} onClick={() => launch('research', c.key)}>Evidence pack</button></td></tr>; })}</tbody></table></div>
-      {!workspace.candidates.length && <p>No candidates. Import a USA/CVM list below.</p>}</section><aside><section className="card"><h2>Authority boundary</h2><p>Financial facts and derived indicators come from FilingLens. GPI does not compute valuation, portfolio weights or risk metrics.</p>
+      {!workspace.candidates.length && <p>No candidates. Import a USA/CVM list below.</p>}
+      {financePreview && <div className="callout" aria-live="polite"><h3>FilingLens · {financePreview.candidateKey}</h3>
+        {financePreview.finance.status !== 'ready' ? <p>Financial evidence unavailable: {financePreview.finance.reason}. Missing data does not pass screening.</p> : <>
+          <p><strong>Public regulatory facts</strong> · {financePreview.finance.snapshot.issuer.jurisdiction.toUpperCase()} {financePreview.finance.snapshot.issuer.registryId}</p>
+          <small>Archived {financePreview.finance.snapshot.archivedOn} · Snapshot {financePreview.finance.snapshot.snapshotId}</small>
+          <div className="table-wrap"><table><thead><tr><th>METRIC</th><th>PERIOD</th><th>REPORTED VALUE / UNIT</th><th>EVIDENCE</th></tr></thead><tbody>
+            {financePreview.finance.snapshot.facts.slice(0, 30).map(fact => <tr key={fact.id}><td>{fact.metric}<small>{fact.status}</small></td><td>{fact.periodEnd ?? fact.periodLabel ?? fact.fiscalYear}</td>
+              <td>{fact.value ?? 'Unknown'} {fact.unit ?? ''}</td><td>{fact.sources.map((source, index) => <small key={index}><a href={source.url} target="_blank" rel="noreferrer">Regulator source</a></small>)}</td></tr>)}</tbody></table></div>
+          {financePreview.finance.snapshot.facts.length > 30 && <small>Showing 30 of {financePreview.finance.snapshot.facts.length} facts. Run an evidence pack for the full source set.</small>}
+          {financePreview.finance.snapshot.limitations.map((limitation, i) => <small key={i}>{limitation}</small>)}
+          <small>FilingLens provides all figures; GPI does not recalculate them. No valuation is approved by this preview.</small>
+        </>}
+      </div>}</section><aside><section className="card"><h2>Authority boundary</h2><p>Financial facts and derived indicators come from FilingLens. GPI does not compute valuation, portfolio weights or risk metrics.</p>
         <div className="callout">Finance reads: <strong>{data?.integrations.finance ?? 'not verified'}</strong><br />Research drafts: <strong>{data?.integrations.researchModel ?? 'not verified'}</strong></div><small>Configured does not mean connected. Each job validates issuer identity, source domains, schema and payload hash.</small></section>
       <section className="card"><h2>Manage the watchlist</h2><p className="muted">Import listing identities, not financial figures. CIK/CNPJ mappings must be independently checked.</p>
         <details><summary>Import candidate JSON</summary><textarea aria-label="Candidate JSON" value={json} onChange={e => setJson(e.target.value)} placeholder='[{"key":"XNAS:…","name":"…","ticker":"…","exchange":"XNAS","market":"us","issuer":null,"identitySourceUrl":"https://…"}]' />
