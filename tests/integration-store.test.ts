@@ -18,15 +18,15 @@ vi.mock('postgres', () => {
 });
 import { enqueue, claimJob, finishJob } from '../src/lib/foundation/store';
 import { reviewResearch, listReviews } from '../src/lib/integrations/review-store';
-import { defaultProfile } from '../src/lib/foundation/contracts';
+import { Candidate, defaultProfile } from '../src/lib/foundation/contracts';
 import type { Workspace as WorkspaceData } from '../src/lib/foundation/contracts';
 
 const owner = '550e8400-e29b-41d4-a716-446655440000';
 const other = '550e8400-e29b-41d4-a716-446655440001';
 const account = '550e8400-e29b-41d4-a716-446655440010';
 const otherAccount = '550e8400-e29b-41d4-a716-446655440011';
-const candidate = {key:'XNAS:TEST',ticker:'TEST',name:'Synthetic issuer',market:'us',exchange:'XNAS',
-  issuer:{jurisdiction:'us',registryId:'0000000001'},identitySourceUrl:'https://data.sec.gov/fixture'};
+const candidate = Candidate.parse({key:'XNAS:TEST',ticker:'TEST',name:'Synthetic issuer',market:'us',exchange:'XNAS',
+  issuer:{jurisdiction:'us',registryId:'0000000001'},identitySourceUrl:'https://data.sec.gov/fixture'});
 const workspace: WorkspaceData = {version:1,profile:defaultProfile,candidates:[candidate]};
 const payload = (jobId: string) => ({sourceResearchJobId:jobId,decision:'request_analysis',
   rationale:'The filing evidence warrants independent analysis.',confirmIssuerMapping:true,
