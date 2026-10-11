@@ -53,3 +53,5 @@ Verification includes signature/tamper/expiry checks, review gates, provider aut
 
 The cross-application approval verification runs actual password/session, account authorization, GPI handoff and import routes, FilingLens deterministic publication/read routes, and durable risk feedback storage. It uses two isolated PGlite SQL engines, a MySQL-compatible connection transport adapter, and synthetic market/financial inputs. CI checks out the pinned FilingLens implementation. Authentication and API routes are not mocked; market transport is synthetic. This is API integration verification, not evidence of a signed-in production browser journey.
 
+Risk Studio exposes rate-limited public reference readers at `/api/fx?from=BRL&to=CHF&date=YYYY-MM-DD` (bounded to the most recent 1,200 days) and `/api/classification?symbol=AAPL` (only configured verified issuer identities). They return public source data and provenance, never holdings, account records or approved private valuations. Live release checks use these readers to verify source availability; the portfolio computation endpoint still requires its dedicated server token.
+

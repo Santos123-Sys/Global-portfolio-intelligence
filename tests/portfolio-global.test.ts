@@ -1,10 +1,16 @@
 import {describe,it,expect,vi,afterEach} from 'vitest';
-import {fxOn,convertSeries,fxHistory,globalContext,integrationAnalysis,secClassification,cvmClassification,parseCsv,classificationExposures} from '../ops/portfolio-risk-function';
+import {fxOn,convertSeries,fxHistory,globalContext,integrationAnalysis,secClassification,cvmClassification,parseCsv,classificationExposures,integratedServe} from '../ops/portfolio-risk-function';
 import {RiskResult} from '../src/lib/integrations/portfolio-feedback';
 afterEach(()=>vi.unstubAllGlobals());
 const scope={workspaceId:'550e8400-e29b-41d4-a716-446655440000',portfolioId:'550e8400-e29b-41d4-a716-446655440001',runId:'550e8400-e29b-41d4-a716-446655440002'};
 const series=(symbol:string,currency:string)=>({symbol,currency,provider:'Synthetic test only',priceBasis:'adjusted close',cached:false,stale:false,rows:Array.from({length:100},(_,i)=>({date:new Date(Date.UTC(2026,5,i+1)).toISOString().slice(0,10),price:100+i,close:100+i}))});
 describe('dated FX and sourced issuer exposures',()=>{
+ it('rejects invalid public reference inputs before transport and protects private computations',async()=>{
+  const transport=vi.fn();vi.stubGlobal('fetch',transport);vi.stubGlobal('Bun',{env:{PORTFOLIO_RISK_API_TOKEN:'private-test-token-'.repeat(3)}});
+  for(const query of ['from=BAD&to=USD','from=USD&to=CHF&date=2099-01-01','from=USD&to=CHF&date=2026-02-31'])expect((await integratedServe(new Request('https://risk.example/api/fx?'+query))).status).toBe(422);
+  expect((await integratedServe(new Request('https://risk.example/v1/portfolio-analyze',{method:'POST'}))).status).toBe(401);
+  expect(transport).not.toHaveBeenCalled();
+ });
  it('uses backward reference dates, rejects stale/future/unverified FX and normalizes pence',()=>{
   const rows=[{date:'2026-07-03',rate:.2},{date:'2026-07-06',rate:.3}];
   expect(fxOn(rows,'2026-07-05','BRL','USD')).toEqual(rows[0]);

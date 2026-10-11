@@ -50,7 +50,7 @@ async function fxHistory(from,to,start,end){
  return cachedReference(url,async()=>{
   const data=JSON.parse(new TextDecoder().decode(await sourceBytes(url,350000)));
   if(!Array.isArray(data)||!data.length||data.length>1200||data.some(r=>r.base!==from||r.quote!==to||!/^\d{4}-\d{2}-\d{2}$/.test(r.date)||r.date<first||r.date>end||!Number.isFinite(r.rate)||r.rate<=0)||new Set(data.map(r=>r.date)).size!==data.length)throw Error('Invalid FX source');
-  return data.sort((a,b)=>a.date.localeCompare(b.date));
+  return Object.assign(data.sort((a,b)=>a.date.localeCompare(b.date)),{retrievedAt:new Date().toISOString()});
  });
 }
 function fxOn(rows,date,from,to){
@@ -114,7 +114,7 @@ async function globalContext(b,rawLookup){
  const lookup=new Map([...rawLookup].map(([symbol,s])=>[symbol,convertSeries(s,base,fx)]));
  const classifications=[],refs=[...(b.issuers||[])],deadline=AbortSignal.timeout(18000);
  await Promise.all([0,1].map(async()=>{while(refs.length&&!deadline.aborted){const ref=refs.shift();try{classifications.push(await issuerClassification(ref,deadline))}catch{/* Keep missing coverage explicit; never infer a classification. */}}}));
- const fxSources=currencies.filter(c=>c!==base).map(c=>({from:c,to:base,provider:'ECB via Frankfurter',sourceUrl:'https://api.frankfurter.dev/v2/providers/ecb/rates',retrievedAt:new Date().toISOString(),firstDate:fx.get(c)[0].date,lastDate:fx.get(c).at(-1).date,rows:fx.get(c).length}));
+ const fxSources=currencies.filter(c=>c!==base).map(c=>({from:c,to:base,provider:'ECB via Frankfurter',sourceUrl:'https://api.frankfurter.dev/v2/providers/ecb/rates',retrievedAt:fx.get(c).retrievedAt,firstDate:fx.get(c)[0].date,lastDate:fx.get(c).at(-1).date,rows:fx.get(c).length}));
  return {lookup,fx,classifications,fxSources};
 }
 function integrationAnalysis(b,lookup,context={}){
@@ -138,6 +138,20 @@ function integrationAnalysis(b,lookup,context={}){
 }
 async function integratedServe(req){
  const u=new URL(req.url);
+ if(u.pathname==='/api/fx'&&req.method==='GET'){
+  if(limited(req))return fail('Rate limited',429);
+  try{const from=(u.searchParams.get('from')||'').toUpperCase(),to=(u.searchParams.get('to')||'').toUpperCase(),date=u.searchParams.get('date')||new Date().toISOString().slice(0,10);
+   if(!supportedCurrencies.has(from)||!supportedCurrencies.has(to)||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date))||new Date(date).toISOString().slice(0,10)!==date||date<new Date(Date.now()-1200*86400000).toISOString().slice(0,10)||date>new Date().toISOString().slice(0,10))return fail('Invalid reference currencies/date',422);
+   const rows=await fxHistory(from,to,date,date),rate=fxOn(rows,date,from,to);
+   return reply({from,to,requestedDate:date,date:rate.date,rate:rate.rate,provider:from===to?'Identity conversion':'ECB via Frankfurter',sourceUrl:from===to?null:'https://api.frankfurter.dev/v2/providers/ecb/rates',retrievedAt:rows.retrievedAt||new Date().toISOString()});
+  }catch{return fail('FX reference unavailable',503)}
+ }
+ if(u.pathname==='/api/classification'&&req.method==='GET'){
+  if(limited(req))return fail('Rate limited',429);
+  try{const symbol=ticker(u.searchParams.get('symbol')),identity=filingLensIdentity(symbol.endsWith('.SA')?symbol.slice(0,-3):symbol);
+   return reply(await issuerClassification({symbol,issuerId:identity.jurisdiction+':'+identity.registryId},AbortSignal.timeout(18000)));
+  }catch{return fail('Verified issuer classification unavailable',404)}
+ }
  if(u.pathname==='/v1/portfolio-analyze'){
   if(req.method!=='POST')return fail('Method not allowed',405);
   if(!riskAuthorized(req))return fail('Unauthorized',401);
