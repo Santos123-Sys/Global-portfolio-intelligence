@@ -11,7 +11,19 @@ const pct=(n:number|null|undefined)=>n==null?'Unknown':(n*100).toFixed(2)+'%';
 export function PortfolioHub({candidates,onResearch}:{candidates:Candidate[];onResearch:(candidateKey:string,question:string)=>void}){
  const {data,error,mutate}=useSWR<Data>('/api/integration/v1/portfolio-feedback',read,{shouldRetryOnError:false});
  const [key,setKey]=useState(candidates[0]?.key??''),[confirmed,setConfirmed]=useState(false),[handoff,setHandoff]=useState(''),[csv,setCsv]=useState(''),[name,setName]=useState('My portfolio'),[range,setRange]=useState('1y'),[rf,setRf]=useState('0'),[consent,setConsent]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[version,setVersion]=useState('');
- useEffect(()=>{const h=new URLSearchParams(window.location.hash.slice(1));if(h.get('valuation')){setVersion(h.get('valuation')!);setKey(h.get('candidate')??'');window.history.replaceState(null,'',window.location.pathname);}},[]);
+ useEffect(()=>{
+  const h=new URLSearchParams(window.location.hash.slice(1));
+  if(h.get('valuation')){setVersion(h.get('valuation')!);setKey(h.get('candidate')??'');}
+  if(h.has('portfolio'))try{
+   const encoded=h.get('portfolio')!;if(encoded.length>5000)throw Error();
+   const positions:unknown=JSON.parse(atob(encoded));
+   if(!Array.isArray(positions)||!positions.length||positions.length>10||
+    positions.some(p=>!p||typeof p.symbol!=='string'||!/^[A-Z0-9.-]{1,15}$/.test(p.symbol)||!Number.isFinite(p.shares)||p.shares<=0||p.shares>1e9))throw Error();
+   setCsv(positions.map(p=>p.symbol+','+p.shares).join('\n'));setName('Portfolio Studio holdings');setConsent(false);
+   setMessage('Holdings received from Portfolio Studio. Review the symbols and quantities before sharing.');
+  }catch{setMessage('Invalid portfolio handoff. Enter the holdings manually.');}
+  if(h.has('valuation')||h.has('portfolio'))window.history.replaceState(null,'',window.location.pathname);
+ },[]);
  async function post(url:string,body:unknown){setBusy(true);setMessage('');try{const r=await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});const b=await r.json();if(!r.ok)throw Error(b.error);await mutate();return b;}catch(e){setMessage(e instanceof Error?e.message:'Request failed');return null;}finally{setBusy(false);}}
  async function launch(){const r=await post('/api/integration/v1/handoff',{candidateKey:key,confirmed});if(r)setHandoff(r.url);}
  async function run(){try{const positions=csv.trim().split(/\r?\n/).filter(Boolean).map(row=>{const [symbol,shares]=row.split(',');return {symbol:symbol.trim().toUpperCase(),shares:Number(shares)};});

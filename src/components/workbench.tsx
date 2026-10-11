@@ -39,7 +39,7 @@ export default function Workbench() {
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
   const [mappingChecks, setMappingChecks] = useState<Record<string, boolean>>({});
   const [portfolioQuestion,setPortfolioQuestion]=useState<{candidateKey:string;question:string}>();
-  useEffect(()=>{if(new URLSearchParams(window.location.hash.slice(1)).has('valuation'))setTab('Portfolio');},[]);
+  useEffect(()=>{const hash=new URLSearchParams(window.location.hash.slice(1));if(hash.has('valuation')||hash.has('portfolio'))setTab('Portfolio');},[]);
   const workspace = edit ?? data?.workspace ?? Workspace.parse({ version: 1, profile: defaultProfile, candidates: seed.candidates });
   const jobs = data?.jobs ?? []; const latestScreen = jobs.find(j => j.status === 'complete' && j.output?.kind === 'screen');
   const screens = latestScreen?.output?.kind === 'screen' ? latestScreen.output.screens : [];
