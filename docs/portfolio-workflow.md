@@ -33,7 +33,7 @@ Public financial snapshot repair: explicit CIK/CNPJ regulator lookups now archiv
 
 ## Deployment
 
-Railway Function source is versioned at `ops/portfolio-risk-function.ts` in GPI. Read the deployed source before updating; deploy the complete reviewed file. App authentication and persistent storage remain in GPI.
+Railway Function sources are versioned at `ops/portfolio-risk-function.ts` and `ops/portfolio-risk-web-function.ts` in GPI. Read the deployed source before updating; deploy the complete reviewed file. The existing transaction-accounting frontend retains its browser dataset and offers an explicit current-holdings handoff to GPI. Synthetic demos are blocked; only symbols/quantities enter the handoff, and GPI requires a separate review before submitting them. App authentication and persistent received snapshots remain in GPI.
 
 New server-only variables:
 - GPI/FilingLens: `INTEGRATION_SIGNING_SECRET` (shared random value, minimum 32 characters).
@@ -43,7 +43,7 @@ New server-only variables:
 - Risk Studio: `GPI_API_URL`.
 Never place these values in source, client bundles, logs or browser storage. Signed short-lived capabilities are the only client-visible authorization artifacts.
 
-Additive GPI migration 004 creates received snapshot and approved valuation tables, plus a nullable corpus handoff capability. FilingLens creates its dedicated immutable valuation table on first protected access. Existing documents and application records are preserved.
+Additive GPI migration 004 creates received snapshot and approved valuation tables, plus a nullable corpus handoff capability. FilingLens uses its existing privileged schema migrator and `ops/phase3-reviewed-valuations.sql` to create the immutable valuation table. The application database user retains only data privileges and never creates tables. Annual regulator labels such as FY2025 remain labels, with no invented calendar period end. Existing documents and application records are preserved.
 
 Verification includes signature/tamper/expiry checks, review gates, provider auth, return reconciliation, allocation caps, real PostgreSQL-compatible migration replay, account isolation and idempotency. Production deployment status and live checks must be recorded separately from local tests.
 
