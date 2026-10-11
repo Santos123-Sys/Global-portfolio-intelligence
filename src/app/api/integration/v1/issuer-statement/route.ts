@@ -34,7 +34,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ status: "issuer_primary_not_supported" }, { status: 404, headers });
     const snapshot = await readIssuerStatement({
       baseUrl: process.env.FILINGLENS_API_URL ?? "",
-      token: process.env.FILINGLENS_READ_API_TOKEN ?? "",
+      token: process.env.FILINGLENS_ISSUER_PRIMARY_API_TOKEN ?? "",
     });
     return NextResponse.json({ status: "ready", snapshot }, { headers });
   } catch (error) {
