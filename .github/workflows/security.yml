@@ -39,6 +39,17 @@ jobs:
       - run: npm run typecheck
       - run: npm run build:worker
       - run: npm test
+      - name: Check out the pinned FilingLens approval implementation
+        uses: actions/checkout@v4
+        with:
+          repository: Santos123-Sys/FilingLens
+          ref: 028aa11b3aad40b035aca87a80b89d8d387de02b
+          path: .cross-app/filinglens
+          persist-credentials: false
+      - name: Install FilingLens verification dependencies
+        run: npm ci --prefix .cross-app/filinglens
+      - name: Verify real signed-in cross-application approval flow
+        run: FILINGLENS_TEST_ROOT="$GITHUB_WORKSPACE/.cross-app/filinglens" npm test -- tests/approval-flow.integration.test.ts
       - run: npm run build
       - name: Install browser for workflow smoke test
         run: npx playwright install --with-deps chromium

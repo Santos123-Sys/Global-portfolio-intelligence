@@ -25,7 +25,11 @@ Bun.serve({
     catch(e){ return Response.json({error:"Quantitative analysis backend unavailable"},{status:503,headers}); }
   }
   if (u.pathname !== "/" && u.pathname !== "/index.html") return new Response("Not found",{status:404,headers});
-  return new Response(html,{headers:{...headers,"content-type":"text/html; charset=utf-8"}});
+  return new Response(html
+   .replace("if(state.base!=='USD'){alert('The connected risk workflow currently supports USD only.');return;}", "")
+   .replace("portfolio:btoa(JSON.stringify(positions))", "portfolio:btoa(JSON.stringify(positions)),baseCurrency:state.base")
+   .replace("current holding symbols and quantities?", "current holding symbols, quantities and base currency?"),
+   {headers:{...headers,"content-type":"text/html; charset=utf-8"}});
  }
 });
 

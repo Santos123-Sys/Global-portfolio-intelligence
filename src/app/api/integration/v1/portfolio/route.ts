@@ -11,6 +11,6 @@ export async function GET(req:Request){
  if(!z.string().uuid().safeParse(id).success||(runId&&!z.string().uuid().safeParse(runId).success))return NextResponse.json({error:'Invalid portfolio/run reference'},{status:422,headers});
  try{const rows=await listPortfolioFeedback(s.auth.userId,s.auth.accountId),row=rows.find(r=>r.id===id);
  if(!row||runId&&row.analysis.runId!==runId)return NextResponse.json({error:'Portfolio snapshot not found'},{status:404,headers});
- return NextResponse.json({status:'ready',analysis:row.analysis,source:'portfolio-risk-studio',coverage:{sector:'unclassified',country:'unclassified',baseCurrency:'USD'},storedAt:row.sharedAt},{headers});
+ return NextResponse.json({status:'ready',analysis:row.analysis,source:'portfolio-risk-studio',coverage:{sector:row.analysis.exposures?.sectorCoverage??0,country:row.analysis.exposures?.countryCoverage??0,countryBasis:'principal-office',baseCurrency:row.analysis.baseCurrency??'USD'},storedAt:row.sharedAt},{headers});
  }catch{return NextResponse.json({status:'unavailable'},{status:503,headers});}
 }
