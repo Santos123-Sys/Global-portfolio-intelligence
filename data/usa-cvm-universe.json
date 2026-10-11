@@ -84,8 +84,11 @@
       "exchange": "XNAS",
       "market": "us",
       "name": "Apple Inc.",
-      "issuer": null,
-      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394"
+      "issuer": {
+        "jurisdiction": "us",
+        "registryId": "0000320193"
+      },
+      "identitySourceUrl": "https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm"
     },
     {
       "key": "XNAS:MSFT",
