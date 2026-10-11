@@ -35,7 +35,7 @@ provenance/SEC verification labels.
 - `FILINGLENS_ISSUER_PRIMARY_READ_ENABLED=false` by default on GPI.
 - `FILINGLENS_ISSUER_PRIMARY_ENABLED=false` by default on FilingLens.
 - `FILINGLENS_API_URL`: exact HTTPS FilingLens public origin.
-- `FILINGLENS_READ_API_TOKEN`: same server-only token on both services.
+- `FILINGLENS_ISSUER_PRIMARY_API_TOKEN`: same server-only token on both services.
 - `FILINGLENS_READ_ENABLED=false` remains regulator-facts-only, independent.
 
 No API token is sent to the browser or included in candidate records.
