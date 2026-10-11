@@ -30,8 +30,9 @@ External copies already downloaded cannot be revoked.
 
 Limits: 8 MB per file; 2 million extracted characters; 1,000 PDF pages; 120 documents
 and 160 MB original+text per owner; 12 MB text per retrieval window. Narrow the year
-range when a window exceeds the bound. Extraction rejects scanned/empty PDFs
-requiring OCR rather than silently manufacturing text. OCR itself is not added.
+range when a window exceeds the bound. FilingLens now attempts bounded OCR on
+image-only PDFs up to 30 pages; failures stay visible rather than silently
+manufacturing text. Mixed text/image PDFs still require manual coverage review.
 
 ## Retrieval choice and evaluation
 
