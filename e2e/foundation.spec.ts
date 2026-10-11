@@ -26,7 +26,9 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
   await page.route('**/api/foundation',async route=>{
     const req=route.request();if(req.method()==='POST'){
       const body=req.postDataJSON();writes.push(body.kind);
-      const output=body.kind==='screen'?{kind:'screen',screens:[screen]}:{kind:'research',modelStatus:'disabled_or_no_evidence',report:{candidate,screen,draft:null,questions:{bull:['Which facts support growth?'],bear:['Which facts challenge growth?'],review:[]},valuation:{reason:'Valuation must be performed in FilingLens.'},limitations:['Human review required.']}};
+      const deepResearch=body.brief?{architecture:'bounded-research-manager-v1',promptVersion:'test-version',brief:body.brief,status:'model_disabled',plan:null,evidence:[],findings:[],gaps:['Full filing text is not connected.'],trace:[],modelCalls:0,stopReason:'model_disabled'}:null;
+      if(body.brief){expect(body.candidateKey).toBe(candidate.key);expect(body.brief).toMatchObject({question:'What evidence challenges the growth thesis?',startYear:2024,endYear:2025,language:'en'});}
+      const output=body.kind==='screen'?{kind:'screen',screens:[screen]}:{kind:'research',modelStatus:'disabled_or_no_evidence',report:{candidate,screen,draft:null,deepResearch,questions:{bull:['Which facts support growth?'],bear:['Which facts challenge growth?'],review:[]},valuation:{reason:'Valuation must be performed in FilingLens.'},limitations:['Human review required.']}};
       jobs.unshift({id:body.idempotencyKey,kind:body.kind,status:'complete',created_at:'2026-10-09T00:00:00Z',error_code:null,output});
       await route.fulfill({status:202,json:{id:body.idempotencyKey,status:'queued'}});
     }else if(req.method()==='PUT'){writes.push('profile');await route.fulfill({json:{workspace:req.postDataJSON()}});}
@@ -40,7 +42,15 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
   await expect(page.getByText('Valuation must be performed in FilingLens.',{exact:true})).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
   await page.screenshot({path:`/tmp/gpi-foundation-${width}.png`,fullPage:true});
+  await page.getByRole('tab',{name:'Research Hub',exact:true}).click();
+  await page.getByLabel('Research company').selectOption(candidate.key);
+  await page.getByLabel('Research question').fill('What evidence challenges the growth thesis?');
+  await page.getByRole('button',{name:'Start focused research',exact:true}).click();
+  await page.getByRole('tab',{name:'Research',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Managed research · model_disabled'})).toBeVisible();
+  await expect(page.getByText('Full filing text is not connected.',{exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
   await page.getByRole('tab',{name:'Investor profile',exact:true}).click();await page.getByLabel('Profile name').fill('New profile');
   await page.getByRole('button',{name:'Save profile',exact:true}).click();await expect(page.getByRole('status')).toContainText('Investor profile saved');
-  expect(writes).toEqual(['screen','research','profile']);
+  expect(writes).toEqual(['screen','research','research','profile']);
 });

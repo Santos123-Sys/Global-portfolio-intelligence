@@ -6,6 +6,7 @@ import { screenCandidate } from './screening';
 import type { ScreenResult } from './screening';
 import { researchWorkbench } from './research';
 import { generateResearchDraft } from './model';
+import { runResearchManager } from '../research/manager';
 
 export async function financeForCandidate(candidate: Candidate): Promise<FilingLensReadState> {
   if (!candidate.issuer || process.env.FILINGLENS_READ_ENABLED !== 'true') return loadFilingLensFinance(candidate);
@@ -15,21 +16,29 @@ export async function financeForCandidate(candidate: Candidate): Promise<FilingL
     }) };
   } catch (e) { return { status: 'unavailable', reason: e instanceof FilingLensReadError ? e.code : 'finance_read_failed' }; }
 }
-export async function executeJob(value: unknown, readFinance = financeForCandidate, draft = generateResearchDraft) {
+export async function executeJob(value: unknown, readFinance = financeForCandidate, draft = generateResearchDraft, manager = runResearchManager) {
   const job = JobRequest.parse(value);
   const started = Date.now();
   const trace = { architecture: 'usa-cvm-foundation-v1', startedAt: new Date(started).toISOString(),
-    maximumCandidates: 20, modelCallsAllowed: job.kind === 'research' && process.env.RESEARCH_MODEL_ENABLED === 'true' ? 1 : 0 };
+    maximumCandidates: 20, modelCallsAllowed: job.kind === 'research' && process.env.RESEARCH_MODEL_ENABLED === 'true'
+      ? (job.brief ? (process.env.RESEARCH_MANAGER_ENABLED === 'true' ? 3 : 0) : 1) : 0 };
   const candidates = job.kind === 'research' ? job.workspace.candidates.filter(c => c.key === job.candidateKey) : job.workspace.candidates;
   const screens: ScreenResult[] = [];
   for (const c of candidates) {
     if (Date.now() - started > 145_000) throw new Error('run_budget_exhausted');
-    const finance = job.workspace.profile.markets.includes(c.market) ? await readFinance(c) :
+    // Direct research is not vetoed by the user's screening preferences.
+    const finance = (job.kind === 'research' || job.workspace.profile.markets.includes(c.market)) ? await readFinance(c) :
       { status: 'unsupported_market' as const, reason: 'Candidate excluded by the selected profile.' };
     screens.push(screenCandidate(c, job.workspace.profile, finance));
   }
   if (job.kind === 'screen') return { kind: 'screen' as const, screens, trace: { ...trace, elapsedMs: Date.now() - started }, stopReason: 'screen_complete' };
   const screen = screens[0];
+  if (job.brief) {
+    const deepResearch = await manager(screen, job.brief);
+    return { kind: 'research' as const, report: researchWorkbench(screen, null, deepResearch), modelStatus: deepResearch.status,
+      trace: { ...trace, architecture: deepResearch.architecture, modelCalls: deepResearch.modelCalls, elapsedMs: Date.now() - started },
+      stopReason: deepResearch.stopReason };
+  }
   let generated = null; let modelStatus = 'disabled_or_no_evidence';
   try { generated = await draft(screen); if (generated) modelStatus = 'draft_requires_review'; }
   catch { modelStatus = 'model_failed_evidence_pack_retained'; }

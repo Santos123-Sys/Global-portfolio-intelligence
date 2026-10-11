@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { FilingLensIssuer } from '../integrations/filinglens-contract';
+import { ResearchBrief } from '../research/contracts';
 export const Market = z.enum(['us', 'br']);
 export const Candidate = z.object({
   key: z.string().regex(/^[A-Z0-9.:-]{1,60}$/), name: z.string().trim().min(1).max(160),
@@ -26,7 +27,8 @@ export const Workspace = z.object({ version: z.literal(1), profile: Profile, can
   .refine(items => new Set(items.map(c => c.key)).size === items.length, 'Duplicate listing keys') }).strict();
 export type Workspace = z.infer<typeof Workspace>;
 export const JobRequest = z.object({ kind: z.enum(['screen', 'research']), candidateKey: z.string().max(60).optional(),
-  idempotencyKey: z.string().uuid(), workspace: Workspace }).strict().superRefine((j, ctx) => {
+  brief: ResearchBrief.optional(), idempotencyKey: z.string().uuid(), workspace: Workspace }).strict().superRefine((j, ctx) => {
+  if (j.brief && j.kind !== 'research') ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Research briefs require a research job' });
   if (j.kind === 'screen' && (!j.workspace.candidates.length || j.workspace.candidates.length > 20))
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Screen batches require one to twenty candidates' });
   if (j.kind === 'research' && !j.workspace.candidates.some(c => c.key === j.candidateKey))
