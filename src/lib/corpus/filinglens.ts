@@ -6,7 +6,7 @@ export async function corpusRequest(path:'extract'|'acquire'|'presentation',body
   const token=process.env.FILINGLENS_CORPUS_TOKEN;
   if(base.protocol!=='https:'||base.username||base.password||base.pathname!=='/'||base.search||base.hash||!token||token.length<32)throw new Error('corpus_unconfigured');
   return fetch(new URL(`/api/integration/v1/documents/${path}`,base),{method:'POST',redirect:'error',
-    headers:{'content-type':'application/json',authorization:`Bearer ${token}`},body:JSON.stringify(body),signal:AbortSignal.timeout(path==='acquire'?90_000:45_000)});
+    headers:{'content-type':'application/json',authorization:`Bearer ${token}`},body:JSON.stringify(body),signal:AbortSignal.timeout(path==='acquire'?90_000:path==='extract'?105_000:45_000)});
 }
 export async function corpusJson(path:'extract'|'acquire',body:unknown) {
   const res=await corpusRequest(path,body);
