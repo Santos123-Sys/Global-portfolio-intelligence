@@ -46,10 +46,13 @@ async function fxHistory(from,to,start,end){
  if(from===to)return [];
  if(!supportedCurrencies.has(from)||!supportedCurrencies.has(to))throw Error('Unsupported verified currency');
  const first=new Date(Date.parse(start+'T00:00:00Z')-7*86400000).toISOString().slice(0,10);
+ const earliest=new Date(Date.parse(first+'T00:00:00Z')-7*86400000).toISOString().slice(0,10);
  const url='https://api.frankfurter.dev/v2/providers/ecb/rates?base='+from+'&quotes='+to+'&from='+first+'&to='+end;
  return cachedReference(url,async()=>{
   const data=JSON.parse(new TextDecoder().decode(await sourceBytes(url,350000)));
-  if(!Array.isArray(data)||!data.length||data.length>1200||data.some(r=>r.base!==from||r.quote!==to||!/^\d{4}-\d{2}-\d{2}$/.test(r.date)||r.date<first||r.date>end||!Number.isFinite(r.rate)||r.rate<=0)||new Set(data.map(r=>r.date)).size!==data.length)throw Error('Invalid FX source');
+  // Frankfurter may include the previous business-day observation for a weekend
+  // start. Keep its real date; fxOn still enforces the seven-day age limit.
+  if(!Array.isArray(data)||!data.length||data.length>1200||data.some(r=>r.base!==from||r.quote!==to||!/^\d{4}-\d{2}-\d{2}$/.test(r.date)||r.date<earliest||r.date>end||!Number.isFinite(r.rate)||r.rate<=0)||new Set(data.map(r=>r.date)).size!==data.length)throw Error('Invalid FX source');
   return Object.assign(data.sort((a,b)=>a.date.localeCompare(b.date)),{retrievedAt:new Date().toISOString()});
  });
 }
