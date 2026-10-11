@@ -4,11 +4,12 @@ import type { Candidate } from '@/lib/foundation/contracts';
 import { ResearchBrief } from '@/lib/research/contracts';
 import type { ResearchRun } from '@/lib/research/contracts';
 
-export function ResearchHub({ candidates, disabled, onLaunch }: {
+export function ResearchHub({ candidates, disabled, onLaunch, initial }: {
   candidates: Candidate[]; disabled: boolean; onLaunch: (key: string, brief: ResearchBrief) => Promise<void>;
+  initial?:{candidateKey:string;question:string};
 }) {
-  const [key, setKey] = useState('');
-  const [question, setQuestion] = useState('');
+  const [key, setKey] = useState(initial?.candidateKey??'');
+  const [question, setQuestion] = useState(initial?.question??'');
   const [startYear, setStartYear] = useState(2024), [endYear, setEndYear] = useState(2025);
   const [language, setLanguage] = useState<'en' | 'pt'>('en');
   const [error, setError] = useState('');

@@ -27,6 +27,7 @@ export async function GET(req: Request) {
     const valuation = await readApprovedValuation(valuationVersionId, identity.issuer.issuerId, {
       baseUrl: process.env.FILINGLENS_API_URL ?? '',
       token: process.env.FILINGLENS_VALUATION_READ_API_TOKEN ?? '',
+      workspaceId:session.auth.accountId,
     });
     return NextResponse.json({ status: 'ready', valuation }, { headers });
   } catch (e) {
