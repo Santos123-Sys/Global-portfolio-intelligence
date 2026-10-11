@@ -21,9 +21,16 @@ export async function GET(req: Request) {
     const candidate = workspace.candidates.find(c => c.key === candidateKey);
     if (!candidate) return NextResponse.json({ error: "Candidate not found in your workspace" }, { status: 404, headers });
     const resolved = resolveIssuer(candidate);
-    if (resolved.status !== "source_linked")
+    // Compatibility for the exact, old shipped Apple starter entry. The SEC
+    // CIK is bound to the publisher's fixed Apple disclosure contract; never
+    // derive a registry ID from an arbitrary ticker or submitted user string.
+    const legacyApple = candidate.key === "XNAS:AAPL" && candidate.ticker === "AAPL" &&
+      candidate.name === "Apple Inc." && candidate.exchange === "XNAS" &&
+      candidate.market === "us" && !candidate.issuer &&
+      candidate.identitySourceUrl === "https://api.gleif.org/api/v1/lei-records/HWUPKR0MPOU8FGXBT394";
+    if (resolved.status !== "source_linked" && !legacyApple)
       return NextResponse.json({ status: "identity_unmapped" }, { status: 409, headers });
-    if (resolved.issuer.issuerId !== "us:0000320193")
+    if (!legacyApple && (resolved.status !== "source_linked" || resolved.issuer.issuerId !== "us:0000320193"))
       return NextResponse.json({ status: "issuer_primary_not_supported" }, { status: 404, headers });
     const snapshot = await readIssuerStatement({
       baseUrl: process.env.FILINGLENS_API_URL ?? "",
