@@ -31,7 +31,7 @@ const supportedCurrencies=new Set(['USD','BRL','EUR','CHF','GBP','CAD','AUD','JP
 const referenceCache=new Map(),referenceInflight=new Map();
 async function sourceBytes(url,max,headers={},signal){
  const r=await fetch(url,{redirect:'error',headers:{accept:'application/json','user-agent':'FilingLens Portfolio Intelligence e.gustavo.tss@gmail.com',...headers},signal:signal?AbortSignal.any([signal,AbortSignal.timeout(12000)]):AbortSignal.timeout(12000)});
- if(!r.ok)throw Error('Reference source unavailable');
+ if(!r.ok)throw Error('Reference source HTTP '+r.status);
  const reader=r.body.getReader(),chunks=[];let size=0;
  try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>max){await reader.cancel();throw Error('Reference source exceeds limit')}chunks.push(value)}}finally{reader.releaseLock()}
  const out=new Uint8Array(size);let offset=0;for(const c of chunks){out.set(c,offset);offset+=c.length}return out;
@@ -144,13 +144,13 @@ async function integratedServe(req){
    if(!supportedCurrencies.has(from)||!supportedCurrencies.has(to)||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date))||new Date(date).toISOString().slice(0,10)!==date||date<new Date(Date.now()-1200*86400000).toISOString().slice(0,10)||date>new Date().toISOString().slice(0,10))return fail('Invalid reference currencies/date',422);
    const rows=await fxHistory(from,to,date,date),rate=fxOn(rows,date,from,to);
    return reply({from,to,requestedDate:date,date:rate.date,rate:rate.rate,provider:from===to?'Identity conversion':'ECB via Frankfurter',sourceUrl:from===to?null:'https://api.frankfurter.dev/v2/providers/ecb/rates',retrievedAt:rows.retrievedAt||new Date().toISOString()});
-  }catch{return fail('FX reference unavailable',503)}
+  }catch(error){console.warn('[reference] FX unavailable: '+String(error?.message||'unknown').slice(0,250));return fail('FX reference unavailable',503)}
  }
  if(u.pathname==='/api/classification'&&req.method==='GET'){
   if(limited(req))return fail('Rate limited',429);
   try{const symbol=ticker(u.searchParams.get('symbol')),identity=filingLensIdentity(symbol.endsWith('.SA')?symbol.slice(0,-3):symbol);
    return reply(await issuerClassification({symbol,issuerId:identity.jurisdiction+':'+identity.registryId},AbortSignal.timeout(18000)));
-  }catch{return fail('Verified issuer classification unavailable',404)}
+  }catch(error){console.warn('[reference] Classification unavailable: '+String(error?.message||'unknown').slice(0,250));return fail('Verified issuer classification unavailable',404)}
  }
  if(u.pathname==='/v1/portfolio-analyze'){
   if(req.method!=='POST')return fail('Method not allowed',405);
