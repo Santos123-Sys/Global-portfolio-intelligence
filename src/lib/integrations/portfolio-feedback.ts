@@ -25,6 +25,10 @@ export const RiskResult=z.object({
  impliedValuePerShare:number.positive(),price:number.positive(),valueGap:number,valuationAsOf:z.string()})).max(10),
  feedback:z.array(z.object({kind:z.enum(['concentration','drawdown','data_quality','valuation_gap']),message:z.string().max(500)})).max(30),
 }).strip().superRefine((v,c)=>{
+ if(new Set(v.holdings.map(h=>h.symbol)).size!==v.holdings.length ||
+  new Set(v.returns.contributions.map(h=>h.symbol)).size!==v.returns.contributions.length ||
+  v.returns.contributions.some(h=>!v.holdings.some(p=>p.symbol===h.symbol)))
+  c.addIssue({code:z.ZodIssueCode.custom,message:'Invalid holdings/attribution identity'});
  if(Math.abs(v.holdings.reduce((s,h)=>s+h.weight,0)-1)>1e-6)c.addIssue({code:z.ZodIssueCode.custom,message:'Invalid weights'});
  if(v.returns.contributions.length!==v.holdings.length||Math.abs(v.returns.contributions.reduce((s,h)=>s+h.contribution,0)-v.returns.lookbackReturn)>1e-6)c.addIssue({code:z.ZodIssueCode.custom,message:'Invalid attribution'});
  if(v.allocation&&Math.abs(v.allocation.weights.reduce((s,h)=>s+h.weight,0)-1)>1e-5)c.addIssue({code:z.ZodIssueCode.custom,message:'Invalid allocation'});
@@ -66,6 +70,8 @@ export async function runPortfolio(owner:string,workspace:string,raw:unknown,fet
  const result=await readBoundedJson(new Request('https://response.invalid',{method:'POST',headers:{'content-type':response.headers.get('content-type')??''},body:response.body,duplex:'half'} as RequestInit),128_000);
  if(!result.ok)throw Error('invalid_provider_response');
  const analysis=RiskResult.parse(result.value);
+ if(analysis.valuationDiagnostics.some(v=>!applicable.some(a=>a.symbol===v.symbol&&a.valuationVersionId===v.valuationVersionId&&Number(a.impliedValuePerShare)===v.impliedValuePerShare)) ||
+   analysis.valuationDiagnostics.length!==applicable.length)throw Error('identity_mismatch');
  if(analysis.workspaceId!==workspace||analysis.portfolioId!==input.idempotencyKey||
  analysis.holdings.length!==input.positions.length||analysis.holdings.some(h=>!input.positions.some(p=>p.symbol===h.symbol&&p.shares===h.shares)))throw Error('identity_mismatch');
  const payload={name:input.name,analysis,authority:'portfolio-risk-studio',sharedAt:new Date().toISOString()};

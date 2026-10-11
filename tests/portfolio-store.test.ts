@@ -35,6 +35,8 @@ describe('account-scoped received risk snapshots',()=>{
  it('does not save failure or mismatched provider scope',async()=>{
   const input={idempotencyKey:crypto.randomUUID(),name:'Bad scope',confirmed:true,positions:[{symbol:'AAPL',shares:3}],range:'1y',riskFreeRate:0};
   await expect(runPortfolio(owner,account,input,async()=>Response.json({error:'unavailable'},{status:503}))).rejects.toThrow('risk_provider_unavailable');
+  const [stored]=await listPortfolioFeedback(owner,account);
+  await expect(runPortfolio(owner,account,input,async()=>Response.json({...stored.analysis,workspaceId:otherAccount,portfolioId:input.idempotencyKey}))).rejects.toThrow('identity_mismatch');
   expect(await listPortfolioFeedback(owner,account)).toHaveLength(1);
  });
 });
