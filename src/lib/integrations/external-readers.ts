@@ -8,7 +8,7 @@ export class ProviderReadError extends Error {
   }
 }
 
-type ProviderConfig = { baseUrl: string; token: string; fetch?: typeof fetch };
+type ProviderConfig = { baseUrl: string; token: string; workspaceId?: string; fetch?: typeof fetch };
 
 /** One bounded, read-only request. Provider failure cannot become a synthetic fact. */
 async function externalJson(path: string, config: ProviderConfig): Promise<unknown> {
@@ -22,7 +22,8 @@ async function externalJson(path: string, config: ProviderConfig): Promise<unkno
   let response: Response;
   try {
     response = await (config.fetch ?? fetch)(url, { method: 'GET', cache: 'no-store', redirect: 'error',
-      signal, headers: { 'accept': 'application/json', Authorization: 'Bearer ' + config.token } });
+      signal, headers: { 'accept': 'application/json', Authorization: 'Bearer ' + config.token,
+        ...(config.workspaceId?{'X-Workspace-Id':config.workspaceId}:{}) } });
   } catch { throw new ProviderReadError('request_failed'); }
   if (!response.ok) {
     await response.body?.cancel();

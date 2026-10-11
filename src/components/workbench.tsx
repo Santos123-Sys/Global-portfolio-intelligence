@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState,useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { Workspace, defaultProfile, type Profile } from '@/lib/foundation/contracts';
@@ -10,6 +10,7 @@ import seed from '../../data/usa-cvm-universe.json';
 import { IssuerStatementPreview } from './issuer-statement-preview';
 import { ResearchHub, ResearchManagerReport } from './research-hub';
 import { CorpusLibrary } from './corpus-library';
+import { PortfolioHub } from './portfolio-hub';
 import type { ResearchBrief } from '@/lib/research/contracts';
 
 type Job = { id: string; kind: 'screen' | 'research'; status: string; created_at: string; error_code: string | null;
@@ -37,6 +38,8 @@ export default function Workbench() {
     { refreshInterval: 10000, shouldRetryOnError: false });
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
   const [mappingChecks, setMappingChecks] = useState<Record<string, boolean>>({});
+  const [portfolioQuestion,setPortfolioQuestion]=useState<{candidateKey:string;question:string}>();
+  useEffect(()=>{if(new URLSearchParams(window.location.hash.slice(1)).has('valuation'))setTab('Portfolio');},[]);
   const workspace = edit ?? data?.workspace ?? Workspace.parse({ version: 1, profile: defaultProfile, candidates: seed.candidates });
   const jobs = data?.jobs ?? []; const latestScreen = jobs.find(j => j.status === 'complete' && j.output?.kind === 'screen');
   const screens = latestScreen?.output?.kind === 'screen' ? latestScreen.output.screens : [];
@@ -76,8 +79,9 @@ export default function Workbench() {
       <div className="scope"><span className="badge">USA / SEC</span><span className="badge">BRAZIL / CVM</span><span className="badge">NO AUTOMATIC TRADES</span></div></section>
     {error && <div role="alert" className="notice">{error.message}. The starter watchlist below is not a completed screening run.</div>}
     {message && <div role="status" className="notice">{message}</div>}
-    <nav className="tabs" role="tablist" aria-label="Research workspace">{['Candidates', 'Investor profile', 'Research Hub', 'Research', 'Handoffs', 'Activity'].map(t => <button role="tab" key={t} aria-selected={tab === t} onClick={() => setTab(t)}>{t}</button>)}</nav>
-    {tab === 'Research Hub' && <><ResearchHub candidates={workspace.candidates} disabled={busy || !data}
+    <nav className="tabs" role="tablist" aria-label="Research workspace">{['Candidates', 'Investor profile', 'Research Hub', 'Research', 'Handoffs', 'Portfolio', 'Activity'].map(t => <button role="tab" key={t} aria-selected={tab === t} onClick={() => setTab(t)}>{t}</button>)}</nav>
+    {tab === 'Portfolio' && <PortfolioHub candidates={workspace.candidates} onResearch={(candidateKey,question)=>{setPortfolioQuestion({candidateKey,question});setTab('Research Hub');}}/>}
+    {tab === 'Research Hub' && <><ResearchHub initial={portfolioQuestion} candidates={workspace.candidates} disabled={busy || !data}
       onLaunch={async (key, brief) => launch('research', key, brief)} /><CorpusLibrary candidates={workspace.candidates}/></>}
     {tab === 'Candidates' && <div className="grid"><section className="card"><div className="section-head"><h2>Candidate watchlist</h2><button disabled={busy || !data} onClick={() => launch('screen')}>Run screening</button></div>
       <p className="muted">A sourced starter list, not the full market universe. Unmapped issuers stay unknown.</p>

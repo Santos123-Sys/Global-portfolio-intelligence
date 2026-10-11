@@ -16,6 +16,7 @@ export async function financeForCandidate(candidate: Candidate): Promise<FilingL
   try {
     return { status: 'ready', snapshot: await readFilingLensSnapshot(candidate.issuer, {
       baseUrl: process.env.FILINGLENS_API_URL ?? '', token: process.env.FILINGLENS_READ_API_TOKEN ?? '',
+      timeoutMs:30_000,
     }) };
   } catch (e) { return { status: 'unavailable', reason: e instanceof FilingLensReadError ? e.code : 'finance_read_failed' }; }
 }
