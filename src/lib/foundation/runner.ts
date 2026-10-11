@@ -7,6 +7,9 @@ import type { ScreenResult } from './screening';
 import { researchWorkbench } from './research';
 import { generateResearchDraft } from './model';
 import { runResearchManager } from '../research/manager';
+import { acquireMissing } from '../corpus/acquire';
+import { readDocuments } from '../corpus/store';
+import { retrieveDocuments } from '../corpus/documents';
 
 export async function financeForCandidate(candidate: Candidate): Promise<FilingLensReadState> {
   if (!candidate.issuer || process.env.FILINGLENS_READ_ENABLED !== 'true') return loadFilingLensFinance(candidate);
@@ -16,7 +19,7 @@ export async function financeForCandidate(candidate: Candidate): Promise<FilingL
     }) };
   } catch (e) { return { status: 'unavailable', reason: e instanceof FilingLensReadError ? e.code : 'finance_read_failed' }; }
 }
-export async function executeJob(value: unknown, readFinance = financeForCandidate, draft = generateResearchDraft, manager = runResearchManager) {
+export async function executeJob(value: unknown, readFinance = financeForCandidate, draft = generateResearchDraft, manager = runResearchManager, owner?:string) {
   const job = JobRequest.parse(value);
   const started = Date.now();
   const trace = { architecture: 'usa-cvm-foundation-v1', startedAt: new Date(started).toISOString(),
@@ -34,7 +37,15 @@ export async function executeJob(value: unknown, readFinance = financeForCandida
   if (job.kind === 'screen') return { kind: 'screen' as const, screens, trace: { ...trace, elapsedMs: Date.now() - started }, stopReason: 'screen_complete' };
   const screen = screens[0];
   if (job.brief) {
-    const deepResearch = await manager(screen, job.brief);
+    let narrative:Parameters<typeof manager>[2] = {};
+    if(owner && screen.candidate.issuer && process.env.FILINGLENS_CORPUS_ENABLED==='true') {
+      const acquisitionGaps=job.brief.acquireMissing?await acquireMissing(owner,screen.candidate,job.brief):[];
+      const issuer=`${screen.candidate.issuer.jurisdiction}:${screen.candidate.issuer.registryId}`;
+      try{const documents=await readDocuments(owner,issuer,job.brief.startYear,job.brief.endYear);
+        narrative={narrative:retrieveDocuments(documents,issuer,job.brief),acquisitionGaps};
+      }catch{narrative={acquisitionGaps:[...acquisitionGaps,'Document library unavailable.']};}
+    }
+    const deepResearch = await manager(screen, job.brief, narrative);
     return { kind: 'research' as const, report: researchWorkbench(screen, null, deepResearch), modelStatus: deepResearch.status,
       trace: { ...trace, architecture: deepResearch.architecture, modelCalls: deepResearch.modelCalls, elapsedMs: Date.now() - started },
       stopReason: deepResearch.stopReason };

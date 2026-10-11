@@ -15,7 +15,7 @@ export const PLANNER_PROMPT = `${boundary}
 ROLE: research manager. Turn the brief into up to four distinct, decision-relevant questions.
 Cover the proposed explanation and a plausible counter-explanation. Revenue alone cannot establish a moat or pricing power.
 Available tools are read-only and scoped by the server to this issuer and requested fiscal years:
-search_evidence(query): lexical search of validated FilingLens financial records, NOT a web search.
+search_evidence(query): lexical search of validated financial records and retrieved document passages, NOT an unrestricted web search.
 inspect_coverage(): list available fiscal years/metrics and missing-document capabilities.
 You cannot spawn agents or request other tools. No arbitrary URLs, SQL, files, or commands.
 Return {"questions":[string],"tools":[{"tool":"search_evidence","query":string}|{"tool":"inspect_coverage"}]}.
@@ -26,7 +26,7 @@ ROLE: equity research analyst. Answer the brief only to the extent the retrieved
 Distinguish observations directly evidenced by records from hypotheses needing additional documents.
 Actively challenge the positive case. Do not invent a supporting or challenging finding merely to fill a template.
 Every finding must cite retrieved evidence IDs with exact verbatim excerpts of at least ten characters.
-Excerpts come from server-produced record text, not original filing prose; do not invent page or section locators.
+Structured-record excerpts come from server-produced record text. Document passages retain extracted-text character offsets and provenance, never invented PDF pages. Uploaded identity/year labels are user assertions; CVM table exports and catalog metadata are not complete narrative filings.
 Narrative text and falsifiers must be qualitative: no numbers, percentages, currency symbols, or URLs.
 For moat, strategy, governance, or causal claims without narrative documents, report a gap rather than assert a fact.
 Use the requested language for narrative; retain source excerpts unchanged.

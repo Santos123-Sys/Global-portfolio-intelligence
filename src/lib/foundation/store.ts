@@ -55,14 +55,21 @@ export async function claimJob(): Promise<JobRow | null> {
   await sql()`UPDATE gpi_foundation_jobs SET status='failed',error_code='queue_wait_expired',finished_at=now()
     WHERE status='queued' AND created_at < now()-interval '1 hour'`;
   const rows = await sql()<JobRow[]>`UPDATE gpi_foundation_jobs SET status='running',started_at=now(),
-    lease_until=now()+interval '180 seconds',lease_token=${token}
+    lease_until=now()+interval '600 seconds',lease_token=${token}
     WHERE id=(SELECT id FROM gpi_foundation_jobs WHERE status='queued' ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1)
     RETURNING *`;
   return rows[0] ?? null;
 }
 export async function finishJob(job: JobRow, output: unknown, errorCode: string | null = null) {
-  const rows = await sql()`UPDATE gpi_foundation_jobs SET status=${errorCode ? 'failed' : 'complete'},
-    output=${output === null ? null : sql().json(output as postgres.JSONValue)},error_code=${errorCode},finished_at=now(),lease_until=null
-    WHERE id=${job.id} AND status='running' AND lease_token=${job.lease_token} AND lease_until > now() RETURNING id`;
-  return rows.length === 1; // Fences stale workers from overwriting a newer terminal state.
+  return sql().begin(async tx=>{
+    await tx`SELECT pg_advisory_xact_lock(hashtextextended(${job.owner_id},1))`;
+    const result=output as {report?:{deepResearch?:{evidence?:Array<{documentId?:string}>}}}|null;
+    const ids=[...new Set(result?.report?.deepResearch?.evidence?.flatMap(e=>e.documentId?[e.documentId]:[])??[])];
+    for(const id of ids){const present=await tx`SELECT id FROM gpi_documents WHERE owner_id=${job.owner_id} AND id=${id}`;
+      if(!present.length){output=null;errorCode='source_deleted';break;}}
+    const rows = await tx`UPDATE gpi_foundation_jobs SET status=${errorCode ? 'failed' : 'complete'},
+      output=${output === null ? null : tx.json(output as postgres.JSONValue)},error_code=${errorCode},finished_at=now(),lease_until=null
+      WHERE id=${job.id} AND status='running' AND lease_token=${job.lease_token} AND lease_until > now() RETURNING id`;
+    return rows.length === 1;
+  });
 }

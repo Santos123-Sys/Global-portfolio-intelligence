@@ -23,6 +23,12 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
   const finance={status:'ready',snapshot:fixture.snapshot};
   const screen={candidate,status:'PASS',finance,screenedAt:'2026-10-09T00:00:00Z',policyVersion:'usa-cvm-foundation-v1',decisions:[]};
   const jobs:unknown[]=[];const writes:string[]=[];
+  const documents:unknown[]=[];
+  await page.route('**/api/corpus**',async route=>{
+    if(route.request().url().includes('/handoff'))return route.fulfill({json:{url:'https://filinglens.example/#gpi='+'a'.repeat(64)}});
+    if(route.request().method()==='POST'){const d=route.request().postDataJSON();expect(d.company).toBe(candidate.key);documents.push({id:'a'.repeat(64),path:`Synthetic/2025/10-K/${d.name}`,provenance:'user_upload'});return route.fulfill({status:201,json:{document:documents[0]}});}
+    return route.fulfill({json:{documents}});
+  });
   await page.route('**/api/foundation',async route=>{
     const req=route.request();if(req.method()==='POST'){
       const body=req.postDataJSON();writes.push(body.kind);
@@ -43,6 +49,11 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
   await page.screenshot({path:`/tmp/gpi-foundation-${width}.png`,fullPage:true});
   await page.getByRole('tab',{name:'Research Hub',exact:true}).click();
+  await page.getByLabel('Library company').selectOption(candidate.key);
+  await page.getByLabel('Import files',{exact:true}).setInputFiles({name:'evidence.txt',mimeType:'text/plain',buffer:Buffer.from('Synthetic source only. '.repeat(20))});
+  await expect(page.getByRole('link',{name:'Synthetic/2025/10-K/evidence.txt'})).toBeVisible();
+  await page.getByRole('button',{name:'Prepare FilingLens analysis for selected year'}).click();
+  await expect(page.getByRole('link',{name:'Open document bundle in FilingLens (single use, ten minutes)'})).toHaveAttribute('href','https://filinglens.example/#gpi='+'a'.repeat(64));
   await page.getByLabel('Research company').selectOption(candidate.key);
   await page.getByLabel('Research question').fill('What evidence challenges the growth thesis?');
   await page.getByRole('button',{name:'Start focused research',exact:true}).click();

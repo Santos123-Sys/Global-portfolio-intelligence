@@ -5,6 +5,7 @@ export const ResearchBrief = z.object({
   startYear: z.number().int().min(2000).max(2200),
   endYear: z.number().int().min(2000).max(2200),
   language: z.enum(['en', 'pt']),
+  acquireMissing: z.boolean().optional(),
 }).strict().refine(b => b.endYear >= b.startYear && b.endYear - b.startYear <= 10,
   'Use an ordered research window of at most eleven fiscal years');
 export type ResearchBrief = z.infer<typeof ResearchBrief>;
@@ -34,7 +35,8 @@ export const Critique = z.object({ reviews: z.array(z.object({
 }).strict()).max(6) }).strict();
 export type Evidence = {
   id: string; metric: string; fiscalYear: number; text: string; sourceUrl: string;
-  sourceKind: 'public_regulatory' | 'issuer_published_unaudited_pdf';
+  sourceKind: 'public_regulatory' | 'issuer_published_unaudited_pdf' | 'regulator_download' | 'user_upload' | 'issuer_download';
+  documentId?: string; locator?: string;
 };
 export type ResearchRun = {
   architecture: 'bounded-research-manager-v1'; promptVersion: string;
