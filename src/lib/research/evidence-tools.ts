@@ -42,7 +42,7 @@ export function coverageGaps(evidence: Evidence[], brief: ResearchBrief): string
   const missing = Array.from({ length: brief.endYear - brief.startYear + 1 }, (_, i) => brief.startYear + i).filter(y => !present.has(y));
   return [
     ...(missing.length ? [`No usable financial records for requested fiscal years: ${missing.join(', ')}.`] : []),
-    'This slice reads financial records only. Full filing text, document folders and web acquisition are not connected.',
+    evidence.some(e=>e.documentId) ? 'Narrative passages are retrieved from the scoped document library. Quotes use extracted-text offsets; uploaded issuer/period labels require review.' : 'No matching document passages were retrieved. Import company/year filings or acquire official sources.',
     'Record availability is not proof of complete statements, comparable periods or support for causal explanations.',
     ...(evidence.some(e => e.sourceKind === 'issuer_published_unaudited_pdf')
       ? ['Issuer-published unaudited evidence is a separate source tier, not SEC CompanyFacts verification.'] : []),

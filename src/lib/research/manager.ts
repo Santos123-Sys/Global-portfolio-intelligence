@@ -43,7 +43,7 @@ export function validateFindings(value: unknown, evidence: Evidence[]) {
 
 /** Bounded supervisor: the model proposes a plan; application code owns authority and termination. */
 export async function runResearchManager(screen: ScreenResult, input: ResearchBrief, options: {
-  call?: ModelCall; readIssuer?: typeof readIssuerStatement;
+  call?: ModelCall; readIssuer?: typeof readIssuerStatement; narrative?: Evidence[]; acquisitionGaps?: string[];
 } = {}): Promise<ResearchRun> {
   const brief = ResearchBrief.parse(input);
   const started = Date.now();
@@ -61,8 +61,9 @@ export async function runResearchManager(screen: ScreenResult, input: ResearchBr
         run.trace.push({ stage: 'issuer_statement', status: 'received', elapsedMs: Date.now() - t });
       } catch { run.trace.push({ stage: 'issuer_statement', status: 'unavailable', elapsedMs: Date.now() - t }); }
     }
-    run.evidence = collectEvidence(screen, brief, issuer);
-    run.gaps = coverageGaps(run.evidence, brief);
+    run.evidence = [...collectEvidence(screen, brief, issuer), ...(options.narrative ?? [])];
+    if(new Set(run.evidence.map(e=>e.id)).size!==run.evidence.length)throw new Error('duplicate_evidence');
+    run.gaps = [...coverageGaps(run.evidence, brief),...(options.acquisitionGaps??[])];
     if (!run.evidence.length) return run;
     if (process.env.RESEARCH_MANAGER_ENABLED !== 'true' || process.env.RESEARCH_MODEL_ENABLED !== 'true') {
       run.status = 'model_disabled'; run.stopReason = 'model_disabled'; return run;

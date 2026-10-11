@@ -9,6 +9,7 @@ import type { researchWorkbench } from '@/lib/foundation/research';
 import seed from '../../data/usa-cvm-universe.json';
 import { IssuerStatementPreview } from './issuer-statement-preview';
 import { ResearchHub, ResearchManagerReport } from './research-hub';
+import { CorpusLibrary } from './corpus-library';
 import type { ResearchBrief } from '@/lib/research/contracts';
 
 type Job = { id: string; kind: 'screen' | 'research'; status: string; created_at: string; error_code: string | null;
@@ -76,8 +77,8 @@ export default function Workbench() {
     {error && <div role="alert" className="notice">{error.message}. The starter watchlist below is not a completed screening run.</div>}
     {message && <div role="status" className="notice">{message}</div>}
     <nav className="tabs" role="tablist" aria-label="Research workspace">{['Candidates', 'Investor profile', 'Research Hub', 'Research', 'Handoffs', 'Activity'].map(t => <button role="tab" key={t} aria-selected={tab === t} onClick={() => setTab(t)}>{t}</button>)}</nav>
-    {tab === 'Research Hub' && <ResearchHub candidates={workspace.candidates} disabled={busy || !data}
-      onLaunch={async (key, brief) => launch('research', key, brief)} />}
+    {tab === 'Research Hub' && <><ResearchHub candidates={workspace.candidates} disabled={busy || !data}
+      onLaunch={async (key, brief) => launch('research', key, brief)} /><CorpusLibrary candidates={workspace.candidates}/></>}
     {tab === 'Candidates' && <div className="grid"><section className="card"><div className="section-head"><h2>Candidate watchlist</h2><button disabled={busy || !data} onClick={() => launch('screen')}>Run screening</button></div>
       <p className="muted">A sourced starter list, not the full market universe. Unmapped issuers stay unknown.</p>
       <div className="table-wrap"><table><thead><tr><th>COMPANY / LISTING</th><th>MARKET</th><th>LATEST RUN</th><th>RESEARCH</th></tr></thead><tbody>{workspace.candidates.map(c => {
@@ -101,7 +102,7 @@ export default function Workbench() {
     {tab === 'Research' && <section className="card"><h2>Evidence-based research</h2><p className="muted">Evidence packs remain available without an LLM. Optional drafts are unapproved hypotheses, not recommendations.</p>
       {!reports.length && <div className="callout">Choose “Evidence pack” on a candidate to start.</div>}{reports.map(j => { if (j.output?.kind !== 'research') return null; const r = j.output.report; return <article className="evidence" key={j.id}>
         <div className="section-head"><h3>{r.candidate.ticker} · {r.candidate.name}</h3><span className="badge">HUMAN REVIEW REQUIRED</span></div><small>{j.output.modelStatus} · <code>{j.id}</code></small>
-        {r.deepResearch && <ResearchManagerReport run={r.deepResearch} />}
+        {r.deepResearch && <ResearchManagerReport run={r.deepResearch} jobId={j.id} />}
         <div className="columns">{(['bull', 'bear'] as const).map(side => <div key={side}><h3>{side === 'bull' ? 'Positive case' : 'Countercase'}</h3>{r.questions[side].map(q => <p key={q}>{q}</p>)}
           {r.draft?.[side].map((claim, i) => <div className="claim" key={i}><p>{claim.text}</p><small>Falsifier: {claim.falsifier}</small><small className="break">Evidence: {claim.evidenceIds.join(', ')}</small></div>)}</div>)}</div>
         <h3>FilingLens evidence</h3>{r.screen.finance.status !== 'ready' ? <div className="notice">{r.screen.finance.reason}</div> : <><small className="break">Snapshot: {r.screen.finance.snapshot.snapshotId}</small><div className="table-wrap"><table><thead><tr><th>METRIC</th><th>PERIOD</th><th>SOURCE VALUE / UNIT</th><th>STATUS / SOURCE</th></tr></thead><tbody>{r.screen.finance.snapshot.facts.map(f => <tr key={f.id}><td>{f.metric}</td><td>{f.periodEnd ?? f.periodLabel ?? f.fiscalYear}</td><td><span>{f.value ?? 'Unknown'} {f.unit ?? ''}</span>{f.currency !== f.unit && <small>{f.currency ?? 'Currency not supplied'}</small>}</td><td>{f.status}{f.sources.map((s, i) => <small key={i}><a href={s.url} target="_blank" rel="noreferrer">Regulator source</a></small>)}</td></tr>)}</tbody></table></div></>}

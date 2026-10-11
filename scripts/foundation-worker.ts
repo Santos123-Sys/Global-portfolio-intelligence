@@ -11,7 +11,7 @@ try {
       const job = await claimJob();
       if (!job) { await delay(2000); continue; }
       try {
-        const output = await executeJob(job.input);
+        const output = await executeJob(job.input,undefined,undefined,undefined,job.owner_id);
         const saved = await finishJob(job, output);
         console.log(JSON.stringify({ runId: job.id, status: saved ? 'complete' : 'lease_lost', elapsedMs: output.trace.elapsedMs, stopReason: output.stopReason }));
       } catch { await finishJob(job, null, 'run_failed'); console.error(JSON.stringify({ runId: job.id, status: 'failed' })); }
