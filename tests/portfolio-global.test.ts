@@ -48,6 +48,10 @@ describe('dated FX and sourced issuer exposures',()=>{
   expect(classificationExposures([{symbol:'X',weight:1,quoteCurrency:'USD'}],[]).country).toEqual([{label:'Unclassified',weight:1}]);
  });
  it('bounds and validates the public FX response, failing closed on provider errors',async()=>{
+  // A weekend range start can include the prior published business-day rate.
+  vi.stubGlobal('fetch',vi.fn(async()=>Response.json([{date:'2026-06-26',base:'BRL',quote:'USD',rate:.19},{date:'2026-07-03',base:'BRL',quote:'USD',rate:.2}])));
+  const weekend=await fxHistory('BRL','USD','2026-07-05','2026-07-05');
+  expect(weekend).toHaveLength(2);expect(fxOn(weekend,'2026-07-05','BRL','USD').date).toBe('2026-07-03');
   vi.stubGlobal('fetch',vi.fn(async()=>Response.json([{date:'2026-07-03',base:'JPY',quote:'CHF',rate:.006}])));
   expect(await fxHistory('JPY','CHF','2026-07-03','2026-07-05')).toHaveLength(1);
   vi.stubGlobal('fetch',vi.fn(async()=>Response.json([{date:'2026-07-06',base:'EUR',quote:'CAD',rate:1.5}])));
