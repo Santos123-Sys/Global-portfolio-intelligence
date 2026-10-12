@@ -40,7 +40,7 @@ export function PortfolioHub({candidates,onResearch}:{candidates:Candidate[];onR
    setMessage('Holdings received from Portfolio Studio. Review the symbols and quantities before sharing.');
   }catch{setMessage('Invalid portfolio handoff. Enter the holdings manually.');}
   if(h.has('valuation')||h.has('portfolio'))window.history.replaceState(null,'',window.location.pathname);
- },[]);
+ },[mutate]);
  async function post(url:string,body:unknown){setBusy(true);setMessage('');try{const r=await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});const b=await r.json();if(!r.ok)throw Error(b.error);await mutate();return b;}catch(e){setMessage(e instanceof Error?e.message:'Request failed');return null;}finally{setBusy(false);}}
  async function launch(){const r=await post('/api/integration/v1/handoff',{candidateKey:key,confirmed});if(r)setHandoff(r.url);}
  async function run(){try{const positions=csv.trim().split(/\r?\n/).filter(Boolean).map(row=>{const fields=row.split(',');if(fields.length!==2)throw Error();const [symbol,shares]=fields;return {symbol:symbol.trim().toUpperCase(),shares:Number(shares)};});
