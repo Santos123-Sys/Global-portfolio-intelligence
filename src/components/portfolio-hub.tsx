@@ -14,7 +14,22 @@ export function PortfolioHub({candidates,onResearch}:{candidates:Candidate[];onR
  const [key,setKey]=useState(candidates[0]?.key??''),[confirmed,setConfirmed]=useState(false),[handoff,setHandoff]=useState(''),[csv,setCsv]=useState(''),[name,setName]=useState('My portfolio'),[range,setRange]=useState('1y'),[rf,setRf]=useState('0'),[consent,setConsent]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[version,setVersion]=useState('');
  useEffect(()=>{
   const h=new URLSearchParams(window.location.hash.slice(1));
-  if(h.get('valuation')){setVersion(h.get('valuation')!);setKey(h.get('candidate')??'');}
+  if(h.get('valuation')){
+   const valuationVersionId=h.get('valuation')??'',candidateKey=h.get('candidate')??'';
+   setVersion(valuationVersionId);setKey(candidateKey);
+   // Recover automatically if the signed service-to-service delivery was unavailable.
+   // The existing authenticated mutation re-verifies account and issuer before saving.
+   if(/^flv1_[a-f0-9]{64}$/.test(valuationVersionId)&&/^[A-Z0-9.:-]{1,60}$/.test(candidateKey)){
+    void fetch('/api/integration/v1/portfolio-feedback',{method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({action:'import_valuation',candidateKey,valuationVersionId})})
+      .then(async response=>{const result=await response.json().catch(()=>({}));
+        if(!response.ok)throw Error(result.error||'Valuation synchronization pending');
+        setMessage('Reviewed FilingLens valuation synchronized with this GPI workspace.');
+        await mutate();})
+      .catch(()=>setMessage('Automatic valuation retrieval is pending. Use the import button to retry.'));
+   }
+  }
   if(h.has('portfolio'))try{
    const encoded=h.get('portfolio')!;if(encoded.length>5000)throw Error();
    const positions:unknown=JSON.parse(atob(encoded));
@@ -25,7 +40,7 @@ export function PortfolioHub({candidates,onResearch}:{candidates:Candidate[];onR
    setMessage('Holdings received from Portfolio Studio. Review the symbols and quantities before sharing.');
   }catch{setMessage('Invalid portfolio handoff. Enter the holdings manually.');}
   if(h.has('valuation')||h.has('portfolio'))window.history.replaceState(null,'',window.location.pathname);
- },[]);
+ },[mutate]);
  async function post(url:string,body:unknown){setBusy(true);setMessage('');try{const r=await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});const b=await r.json();if(!r.ok)throw Error(b.error);await mutate();return b;}catch(e){setMessage(e instanceof Error?e.message:'Request failed');return null;}finally{setBusy(false);}}
  async function launch(){const r=await post('/api/integration/v1/handoff',{candidateKey:key,confirmed});if(r)setHandoff(r.url);}
  async function run(){try{const positions=csv.trim().split(/\r?\n/).filter(Boolean).map(row=>{const fields=row.split(',');if(fields.length!==2)throw Error();const [symbol,shares]=fields;return {symbol:symbol.trim().toUpperCase(),shares:Number(shares)};});
@@ -38,8 +53,8 @@ export function PortfolioHub({candidates,onResearch}:{candidates:Candidate[];onR
  <label><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> I confirmed this company’s CIK/CNPJ mapping.</label>
  <button disabled={!confirmed||busy} onClick={()=>void launch()}>Open FilingLens handoff</button>
  {handoff&&<p><a href={handoff} target="_blank" rel="noreferrer">Open FilingLens for this company (two-hour workspace authorization)</a></p>}
- <h3>2. Import the reviewed valuation</h3><input aria-label="Approved valuation version" value={version} onChange={e=>setVersion(e.target.value)} placeholder="flv1_…"/>
- <button disabled={!version||busy} onClick={()=>void post('/api/integration/v1/portfolio-feedback',{action:'import_valuation',candidateKey:key,valuationVersionId:version})}>Import from FilingLens</button>
+ <h3>2. Synchronized reviewed valuations</h3><p>FilingLens now notifies GPI after approved publication. Returning from FilingLens also retries automatically when delivery was delayed. Manual import remains available for recovery.</p><input aria-label="Approved valuation version" value={version} onChange={e=>setVersion(e.target.value)} placeholder="flv1_…"/>
+ <button disabled={!version||busy} onClick={()=>void post('/api/integration/v1/portfolio-feedback',{action:'import_valuation',candidateKey:key,valuationVersionId:version})}>Retry valuation import</button>
  <ul>{data?.valuations.map(v=><li key={v.valuation.valuationVersionId}>{v.candidateKey}: {v.valuation.currency} {v.valuation.impliedValuePerShare}/share · reviewed {new Date(v.valuation.approvedAt).toLocaleDateString()}</li>)}</ul>
  <h3>3. Allocate and monitor</h3><input aria-label="Portfolio name" value={name} onChange={e=>setName(e.target.value)}/>
  <textarea aria-label="Portfolio holdings" value={csv} onChange={e=>setCsv(e.target.value)} placeholder={'AAPL,12\nMSFT,8\nNVDA,5'}/>
