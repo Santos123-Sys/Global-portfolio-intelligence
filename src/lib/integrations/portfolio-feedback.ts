@@ -61,11 +61,16 @@ export async function listPortfolioFeedback(owner:string,workspace:string){
 export async function listValuations(owner:string,workspace:string){
  return (await sql()`SELECT candidate_key,payload FROM gpi_approved_valuations WHERE owner_id=${owner} AND workspace_id=${workspace} ORDER BY created_at DESC LIMIT 100`).map(r=>({candidateKey:r.candidate_key,valuation:ValuationVersionV1.parse(r.payload)}));
 }
-export async function importValuation(owner:string,workspace:string,candidateKey:string,versionId:string){
+export async function importValuation(owner:string,workspace:string,candidateKey:string,versionId:string,expected?:{reviewerId:string;nonce:string}){
  const w=await loadWorkspace(owner),candidate=w.candidates.find(c=>c.key===candidateKey);
  if(!candidate)throw Error('candidate_not_found');
  const identity=resolveIssuer(candidate);if(identity.status!=='source_linked')throw Error('issuer_unmapped');
  const valuation=await readApprovedValuation(versionId,identity.issuer.issuerId,{baseUrl:process.env.FILINGLENS_API_URL??'',token:process.env.FILINGLENS_VALUATION_READ_API_TOKEN??'',workspaceId:workspace});
+ if(expected){
+  if(valuation.approvedBy!==expected.reviewerId)throw Error('reviewer_mismatch');
+  const derivedId='flv1_'+createHash('sha256').update(expected.nonce+':'+valuation.method).digest('hex');
+  if(derivedId!==valuation.valuationVersionId)throw Error('handoff_valuation_mismatch');
+ }
  await sql()`INSERT INTO gpi_approved_valuations(id,owner_id,workspace_id,candidate_key,payload) VALUES(${versionId},${owner},${workspace},${candidateKey},${sql().json(valuation)})
  ON CONFLICT(workspace_id,id) DO NOTHING`;
  return valuation;
