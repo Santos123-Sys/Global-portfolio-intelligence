@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { ScreenResult } from '../foundation/screening';
 import type { IssuerStatementV1 } from '../integrations/issuer-statement-client';
 import { ToolRequest, type Evidence, type ResearchBrief } from './contracts';
+import {lexicalTokens,queryTerms} from './lexical';
 
 /** Inputs are server-validated FilingLens responses, never a browser-supplied fact pack. */
 export function collectEvidence(screen: ScreenResult, brief: ResearchBrief, issuer?: IssuerStatementV1 | null): Evidence[] {
@@ -52,10 +53,12 @@ export function coverageGaps(evidence: Evidence[], brief: ResearchBrief): string
 /** No generic fetch/SQL/shell/file tool. Arguments cannot change company, dates or permissions. */
 export function executeEvidenceTool(value: unknown, evidence: Evidence[], brief: ResearchBrief) {
   const request = ToolRequest.parse(value);
+  const scoped=evidence.filter(row=>row.fiscalYear>=brief.startYear&&row.fiscalYear<=brief.endYear);
   if (request.tool === 'inspect_coverage') return { tool: request.tool, evidence: [] as Evidence[],
-    gaps: coverageGaps(evidence, brief), metrics: [...new Set(evidence.map(e => e.metric))] };
-  const terms = request.query.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
-  const ranked = evidence.map(row => ({ row, score: terms.reduce((n, term) => n + Number(row.text.toLocaleLowerCase().includes(term)), 0) }))
+    gaps: coverageGaps(scoped, brief), metrics: [...new Set(scoped.map(e => e.metric))] };
+  const terms = queryTerms(request.query);
+  const ranked = scoped.map(row => {const tokens=new Set(lexicalTokens(row.text));
+    return {row,score:terms.reduce((n,term)=>n+Number(tokens.has(term)),0)};})
     .filter(hit => hit.score > 0).sort((a, b) => b.score - a.score || a.row.id.localeCompare(b.row.id));
   return { tool: request.tool, evidence: ranked.slice(0, 24).map(hit => hit.row), gaps: [] as string[], metrics: [] as string[] };
 }

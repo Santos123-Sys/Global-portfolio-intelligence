@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { Evidence, ResearchBrief } from '../research/contracts';
+import {lexicalTokens as tokens,queryTerms} from '../research/lexical';
 
 export const DocumentMeta = z.object({
   id: z.string().regex(/^[a-f0-9]{64}$/), issuerId: z.string().regex(/^(us:\d{10}|br:\d{14})$/),
@@ -20,7 +21,6 @@ export function documentMeta(input: Omit<DocumentMeta,'id'|'path'>): DocumentMet
   return DocumentMeta.parse({ ...input, id, name: safeName(input.name),
     path: `${safeName(input.company)}--${input.issuerId.replace(':','-')}/${input.year}/${safeName(input.form)}/${id.slice(0,12)}-${safeName(input.name)}` });
 }
-const tokens = (s: string):string[] => s.normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().match(/[\p{L}\p{N}]{2,}/gu) ?? [];
 /** Stable exact spans in the complete named extraction; no invented PDF page numbers. */
 export function chunkDocument(doc: CorpusDocument) {
   const result: Evidence[] = [];
@@ -42,14 +42,13 @@ export function verifyDocument(metadata:DocumentMeta,text?:string,original?:Buff
   if(text!==undefined&&(digest(text)!==m.textSha256||!text.trim()||text.length>2_000_000))throw Error('document_text_integrity');
   if(original!==undefined&&(digest(original)!==m.sha256||original.length!==m.bytes))throw Error('document_original_integrity');
 }
-const stopwords=new Set('a an and are as at be by do does for from how in is it of on or that the their this to was were what when where which who why with would about has have had not can de da das do dos e em o os as um uma por para com que qual quais como sao se na no nas nos ao aos'.split(' '));
 /** BM25 over scoped exact spans; no semantic search, query rewriting or model call. */
 export function retrieveDocuments(docs:CorpusDocument[],issuerId:string,brief:ResearchBrief):Evidence[]{
   const eligible=docs.filter(d=>d.metadata.issuerId===issuerId&&d.metadata.year>=brief.startYear&&d.metadata.year<=brief.endYear);
   // Fail closed per document: corrupt derivatives must never become model context.
   const valid=eligible.filter(d=>{try{verifyDocument(d.metadata,d.text);return true;}catch{return false;}});
   const chunks=valid.flatMap(chunkDocument);
-  const terms=[...new Set(tokens(brief.question).filter(t=>!stopwords.has(t)))].slice(0,32);
+  const terms=queryTerms(brief.question);
   if(!terms.length||!chunks.length)return [];
   const words=chunks.map(c=>tokens(c.text));
   const counts=words.map(row=>{const m=new Map<string,number>();for(const t of row)m.set(t,(m.get(t)??0)+1);return m;});

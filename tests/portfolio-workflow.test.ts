@@ -28,6 +28,9 @@ describe('three-app workflow security and deterministic mathematics',()=>{
   expect(result.allocation!.weights.reduce((s,w)=>s+w.weight,0)).toBeCloseTo(1,7);
   expect(()=>RiskResult.parse({...result,returns:{...result.returns,lookbackReturn:100}})).toThrow();
   expect(result.methodology).toContain('not realized');
+  for(const sources of [[],[result.sources[0],result.sources[0]],result.sources.map((s,i)=>i===0?{...s,symbol:'UNRELATED'}:s)])
+   expect(()=>RiskResult.parse({...result,sources})).toThrow('source provenance');
+  expect(()=>RiskResult.parse({...result,asOf:'2026-02-30'})).toThrow();
   expect(()=>RiskResult.parse({...result,metrics:{...result.metrics,marketValue:1}})).toThrow('Portfolio value reconciliation failed');
   const changed=result.holdings.map((h,i)=>({...h,weight:i===0?.5:i===1?.25:.25}));
   expect(()=>RiskResult.parse({...result,holdings:changed})).toThrow('Portfolio value reconciliation failed');

@@ -40,7 +40,13 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
     }else if(req.method()==='PUT'){writes.push('profile');await route.fulfill({json:{workspace:req.postDataJSON()}});}
     else await route.fulfill({json:{workspace,jobs,integrations:{finance:'configured_read_attempts',researchModel:'disabled'}}});
   });
-  await page.route('**/api/integration/v1/portfolio-feedback',route=>route.fulfill({json:{runs:[],valuations:[],providerConfigured:true}}));
+  const identityWarning='AAPL: a saved valuation was excluded because its canonical issuer no longer matches. Reimport a reviewed valuation for this issuer.';
+  await page.route('**/api/integration/v1/portfolio-feedback',route=>route.fulfill({json:{runs:[{
+    id:'550e8400-e29b-41d4-a716-446655440099',name:'Synthetic saved fixture',sharedAt:'2026-10-15T00:00:00Z',integrationWarnings:[identityWarning],
+    analysis:{asOf:'2026-10-15',baseCurrency:'USD',holdings:[{symbol:'AAPL',shares:12,price:100,value:1200,weight:1,riskContribution:null,quoteCurrency:'USD',localPrice:100,fxRate:1,fxDate:'2026-10-15'}],
+      metrics:{volatility:.2,var95:.03,maxDrawdown:-.1},returns:{lookbackReturn:.05,contributions:[{symbol:'AAPL',contribution:.05}]},
+      valuationDiagnostics:[],allocation:null,feedback:[],warnings:[],fxSources:[],methodology:'Synthetic browser fixture.'}
+  }],valuations:[],providerConfigured:true}}));
   await page.route('**/api/workspace?**',route=>route.fulfill({json:{version:'investment-workspace.v1',candidateKey:new URL(route.request().url()).searchParams.get('company'),issuerId:'us:0000320193',financialOrigin:'https://filinglens.example',checkedAt:'2026-10-15T00:00:00.000Z',documents:{status:'empty',count:0,ruleVersion:'corpus-integrity.v1'},valuations:{status:'empty',count:0},portfolio:{status:'empty',count:0}}}));
   await page.goto('/');await expect(page.getByRole('heading',{name:'Investment workspace',exact:true})).toBeVisible();
   await page.getByRole('tab',{name:'Candidates',exact:true}).click();await expect(page.getByRole('heading',{name:'Candidate watchlist'})).toBeVisible();
@@ -68,6 +74,7 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
   await page.getByRole('button',{name:'Save profile',exact:true}).click();await expect(page.getByRole('status')).toContainText('Investor profile saved');
   expect(writes).toEqual(['screen','research','research','profile']);
   await page.getByRole('tab',{name:'Portfolio',exact:true}).click();
+  await expect(page.getByRole('list',{name:'Integration review required'})).toContainText(identityWarning);
   await page.getByLabel('Portfolio holdings',{exact:true}).fill('AAPL,12');
   const consent=page.getByRole('checkbox',{name:'Share these holdings with Portfolio Risk Studio and retain the results in this GPI account.'});
   const calculate=page.getByRole('button',{name:'Calculate and save risk feedback'});
