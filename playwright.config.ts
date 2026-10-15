@@ -14,6 +14,7 @@ export default defineConfig({
       DATABASE_URL: 'postgresql://browser:browser@127.0.0.1:5432/browser',
       RESEARCH_MODEL_ENABLED: 'false',
       FILINGLENS_READ_ENABLED: 'false',
+      FILINGLENS_API_URL: 'https://filinglens.example/',
     },
   },
 });

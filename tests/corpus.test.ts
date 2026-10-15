@@ -27,7 +27,7 @@ describe('complete document retrieval and locators',()=>{
     expect(retrieveDocuments([{metadata,text}],metadata.issuerId,{...brief,question:'xyzzzz nonexistent'})).toEqual([]);
   });
   it('normalizes Portuguese accents without changing quotes',()=>{
-    const results=retrieveDocuments([{metadata,text:'Concentração dos fornecedores é um risco operacional.'}],metadata.issuerId,{...brief,question:'concentracao fornecedores'});
+    const results=retrieveDocuments([{metadata:documentMeta({...metadata,textSha256:digest('Concentração dos fornecedores é um risco operacional.')}),text:'Concentração dos fornecedores é um risco operacional.'}],metadata.issuerId,{...brief,question:'concentracao fornecedores'});
     expect(results[0].text).toContain('Concentração');
   });
   it('keeps folders traversal safe and hashes stable across duplicate ingestion',()=>{

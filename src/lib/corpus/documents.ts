@@ -34,12 +34,31 @@ export function chunkDocument(doc: CorpusDocument) {
   }
   return result;
 }
-/** Lexical TF/IDF over complete documents. Authorization filtering occurs in the store before this call. */
-export function retrieveDocuments(docs: CorpusDocument[], issuerId:string, brief:ResearchBrief): Evidence[] {
-  const chunks=docs.filter(d=>d.metadata.issuerId===issuerId&&d.metadata.year>=brief.startYear&&d.metadata.year<=brief.endYear).flatMap(chunkDocument);
-  const terms=[...new Set(tokens(brief.question))].slice(0,32);
-  const sets=chunks.map(c=>tokens(c.text));
-  const df=new Map(terms.map(t=>[t,sets.filter(s=>s.includes(t)).length]));
-  return chunks.map((c,i)=>({c,score:terms.reduce((n,t)=>{const tf=sets[i].filter(w=>w===t).length;return n+(tf? (1+Math.log(tf))*Math.log(1+chunks.length/(1+(df.get(t)??0))):0);},0)}))
-    .filter(r=>r.score>0).sort((a,b)=>b.score-a.score||a.c.id.localeCompare(b.c.id)).slice(0,10).map(r=>r.c);
+/** Rules are versioned separately from issuer labels, which remain user assertions. */
+export const CORPUS_RULE_VERSION='corpus-integrity.v1';
+export function verifyDocument(metadata:DocumentMeta,text?:string,original?:Buffer){
+  const m=DocumentMeta.parse(metadata);
+  if(documentMeta(m).id!==m.id)throw Error('document_identity_mismatch');
+  if(text!==undefined&&(digest(text)!==m.textSha256||!text.trim()||text.length>2_000_000))throw Error('document_text_integrity');
+  if(original!==undefined&&(digest(original)!==m.sha256||original.length!==m.bytes))throw Error('document_original_integrity');
+}
+const stopwords=new Set('a an and are as at be by do does for from how in is it of on or that the their this to was were what when where which who why with would about has have had not can de da das do dos e em o os as um uma por para com que qual quais como sao se na no nas nos ao aos'.split(' '));
+/** BM25 over scoped exact spans; no semantic search, query rewriting or model call. */
+export function retrieveDocuments(docs:CorpusDocument[],issuerId:string,brief:ResearchBrief):Evidence[]{
+  const eligible=docs.filter(d=>d.metadata.issuerId===issuerId&&d.metadata.year>=brief.startYear&&d.metadata.year<=brief.endYear);
+  // Fail closed per document: corrupt derivatives must never become model context.
+  const valid=eligible.filter(d=>{try{verifyDocument(d.metadata,d.text);return true;}catch{return false;}});
+  const chunks=valid.flatMap(chunkDocument);
+  const terms=[...new Set(tokens(brief.question).filter(t=>!stopwords.has(t)))].slice(0,32);
+  if(!terms.length||!chunks.length)return [];
+  const words=chunks.map(c=>tokens(c.text));
+  const counts=words.map(row=>{const m=new Map<string,number>();for(const t of row)m.set(t,(m.get(t)??0)+1);return m;});
+  const avg=words.reduce((s,row)=>s+row.length,0)/words.length||1;
+  const df=new Map(terms.map(t=>[t,counts.filter(m=>m.has(t)).length]));
+  const ranked=chunks.map((c,i)=>({c,score:terms.reduce((score,t)=>{
+    const tf=counts[i].get(t)??0;if(!tf)return score;
+    const idf=Math.log(1+(chunks.length-(df.get(t)??0)+.5)/((df.get(t)??0)+.5));
+    return score+idf*tf*2.2/(tf+1.2*(.25+.75*words[i].length/avg));
+  },0)})).filter(r=>r.score>0).sort((a,b)=>b.score-a.score||a.c.id.localeCompare(b.c.id));
+  return ranked.slice(0,10).map(r=>r.c);
 }

@@ -41,6 +41,10 @@ export const RiskResult=z.object({
  if(Math.abs(v.holdings.reduce((s,h)=>s+h.weight,0)-1)>1e-6)c.addIssue({code:z.ZodIssueCode.custom,message:'Invalid weights'});
  if(v.returns.contributions.length!==v.holdings.length||Math.abs(v.returns.contributions.reduce((s,h)=>s+h.contribution,0)-v.returns.lookbackReturn)>1e-6)c.addIssue({code:z.ZodIssueCode.custom,message:'Invalid attribution'});
  if(v.allocation&&(Math.abs(v.allocation.weights.reduce((s,h)=>s+h.weight,0)-1)>1e-5||v.allocation.weights.length!==v.holdings.length||new Set(v.allocation.weights.map(h=>h.symbol)).size!==v.allocation.weights.length||v.allocation.weights.some(h=>!v.holdings.some(p=>p.symbol===h.symbol))))c.addIssue({code:z.ZodIssueCode.custom,message:'Invalid allocation'});
+ const total=v.holdings.reduce((sum,h)=>sum+h.value,0);
+ if(!Number.isFinite(total)||total<=0||v.holdings.some(h=>Math.abs(h.value-h.shares*h.price)>Math.max(h.value*1e-8,1e-8)||Math.abs(h.weight-h.value/total)>1e-6)||
+   v.metrics.marketValue==null||Math.abs(v.metrics.marketValue-total)>Math.max(total*1e-8,1e-8))
+   c.addIssue({code:z.ZodIssueCode.custom,message:'Portfolio value reconciliation failed'});
  if(v.exposures){
   for(const field of ['sector','country','currency'] as const){const rows=v.exposures[field];if(new Set(rows.map(r=>r.label)).size!==rows.length||Math.abs(rows.reduce((s,r)=>s+r.weight,0)-1)>1e-6)c.addIssue({code:z.ZodIssueCode.custom,message:'Invalid exposure totals'});}
   if(!v.classifications||new Set(v.classifications.map(r=>r.symbol)).size!==v.classifications.length||v.classifications.some(r=>!v.holdings.some(h=>h.symbol===r.symbol)))c.addIssue({code:z.ZodIssueCode.custom,message:'Invalid classification identity'});

@@ -10,6 +10,7 @@ import seed from '../../data/usa-cvm-universe.json';
 import { IssuerStatementPreview } from './issuer-statement-preview';
 import { ResearchHub, ResearchManagerReport } from './research-hub';
 import { CorpusLibrary } from './corpus-library';
+import {InvestmentWorkspace} from './investment-workspace';
 import { PortfolioHub } from './portfolio-hub';
 import type { ResearchBrief } from '@/lib/research/contracts';
 
@@ -32,7 +33,8 @@ async function fetchState(url: string): Promise<State> {
 export default function Workbench() {
   const router = useRouter();
   const { data, error, mutate } = useSWR<State>('/api/foundation', fetchState, { refreshInterval: 5000, shouldRetryOnError: false });
-  const [tab, setTab] = useState('Candidates'); const [message, setMessage] = useState(''); const [busy, setBusy] = useState(false);
+  const [workspaceCompany,setWorkspaceCompany]=useState('');
+  const [tab, setTab] = useState('Workspace'); const [message, setMessage] = useState(''); const [busy, setBusy] = useState(false);
   const [edit, setEdit] = useState<WorkspaceData | null>(null); const [json, setJson] = useState('');
   const { data: handoffs, mutate: refreshHandoffs } = useSWR<HandoffState>('/api/integration/v1/reviews', fetchHandoffs,
     { refreshInterval: 10000, shouldRetryOnError: false });
@@ -73,13 +75,14 @@ export default function Workbench() {
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Review failed'); }
     finally { setBusy(false); }
   }
-  return <div className="app"><header className="topbar"><div className="brand">GPI<span>DISCOVERY & RESEARCH</span></div>
-    <div className="actions"><span className="muted">Foundation / 01</span><button className="secondary" onClick={async () => { await fetch('/api/auth/session', { method: 'DELETE' }); router.replace('/login'); router.refresh(); }}>Sign out</button></div></header>
-    <section className="hero"><div><div className="eyebrow">FOCUSED EQUITY INTELLIGENCE</div><h1>Find candidates.<br />Challenge the evidence.</h1><p className="muted">GPI screens and researches. FilingLens owns the numbers and valuation.</p></div>
+  return <div className="app"><header className="topbar"><div className="brand">GPI<span>INVESTMENT WORKSPACE</span></div>
+    <div className="actions"><span className="muted">Research · Financials · Risk</span><button className="secondary" onClick={async () => { await fetch('/api/auth/session', { method: 'DELETE' }); router.replace('/login'); router.refresh(); }}>Sign out</button></div></header>
+    <section className="hero"><div><div className="eyebrow">FOCUSED EQUITY INTELLIGENCE</div><h1>Research companies.<br />Review value and risk.</h1><p className="muted">One workspace for research, FilingLens financial analysis and Portfolio Risk Studio analytics.</p></div>
       <div className="scope"><span className="badge">USA / SEC</span><span className="badge">BRAZIL / CVM</span><span className="badge">NO AUTOMATIC TRADES</span></div></section>
     {error && <div role="alert" className="notice">{error.message}. The starter watchlist below is not a completed screening run.</div>}
     {message && <div role="status" className="notice">{message}</div>}
-    <nav className="tabs" role="tablist" aria-label="Research workspace">{['Candidates', 'Investor profile', 'Research Hub', 'Research', 'Handoffs', 'Portfolio', 'Activity'].map(t => <button role="tab" key={t} aria-selected={tab === t} onClick={() => setTab(t)}>{t}</button>)}</nav>
+    <nav className="tabs" role="tablist" aria-label="Research workspace">{['Workspace', 'Candidates', 'Investor profile', 'Research Hub', 'Research', 'Handoffs', 'Portfolio', 'Activity'].map(t => <button role="tab" key={t} aria-selected={tab === t} onClick={() => setTab(t)}>{t}</button>)}</nav>
+    {tab === 'Workspace' && <InvestmentWorkspace candidates={workspace.candidates} selectedKey={workspaceCompany} onSelectCompany={setWorkspaceCompany} onResearch={(candidateKey,question)=>{setPortfolioQuestion({candidateKey,question});setTab('Research Hub');}}/>}
     {tab === 'Portfolio' && <PortfolioHub candidates={workspace.candidates} onResearch={(candidateKey,question)=>{setPortfolioQuestion({candidateKey,question});setTab('Research Hub');}}/>}
     {tab === 'Research Hub' && <><ResearchHub initial={portfolioQuestion} candidates={workspace.candidates} disabled={busy || !data}
       onLaunch={async (key, brief) => launch('research', key, brief)} /><CorpusLibrary candidates={workspace.candidates}/></>}

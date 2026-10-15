@@ -1,5 +1,5 @@
 import { sql } from '../foundation/store';
-import { DocumentMeta, type CorpusDocument } from './documents';
+import { DocumentMeta, verifyDocument, type CorpusDocument } from './documents';
 
 export async function listDocuments(owner:string,issuer:string):Promise<DocumentMeta[]> {
   const rows=await sql()`SELECT metadata FROM gpi_documents WHERE owner_id=${owner} AND issuer_id=${issuer} ORDER BY fiscal_year DESC, id`;
@@ -9,9 +9,10 @@ export async function readDocuments(owner:string,issuer:string,start:number,end:
   const size=await sql()`SELECT coalesce(sum(octet_length(text_content)),0)::bigint AS bytes FROM gpi_documents WHERE owner_id=${owner} AND issuer_id=${issuer} AND fiscal_year BETWEEN ${start} AND ${end}`;
   if(Number(size[0].bytes)>12_000_000)throw new Error('narrow_document_window');
   const rows=await sql()`SELECT metadata,text_content FROM gpi_documents WHERE owner_id=${owner} AND issuer_id=${issuer} AND fiscal_year BETWEEN ${start} AND ${end} ORDER BY fiscal_year DESC,id`;
-  return rows.map(r=>({metadata:DocumentMeta.parse(r.metadata),text:r.text_content as string}));
+  return rows.map(r=>{const metadata=DocumentMeta.parse(r.metadata),text=r.text_content as string;verifyDocument(metadata,text);return {metadata,text};});
 }
 export async function saveDocument(owner:string,metadata:DocumentMeta,original:Buffer,text:string) {
+  verifyDocument(metadata,text,original);
   await sql().begin(async tx=>{
     await tx`SELECT pg_advisory_xact_lock(hashtextextended(${owner},1))`;
     const existing=await tx`SELECT id FROM gpi_documents WHERE owner_id=${owner} AND id=${metadata.id}`;
@@ -24,7 +25,9 @@ export async function saveDocument(owner:string,metadata:DocumentMeta,original:B
 }
 export async function downloadDocument(owner:string,id:string) {
   const rows=await sql()`SELECT metadata,original FROM gpi_documents WHERE owner_id=${owner} AND id=${id}`;
-  return rows[0] ? {metadata:DocumentMeta.parse(rows[0].metadata),bytes:rows[0].original as Buffer}:null;
+  if(!rows[0])return null;
+  const metadata=DocumentMeta.parse(rows[0].metadata),bytes=Buffer.from(rows[0].original as Uint8Array);
+  verifyDocument(metadata,undefined,bytes);return {metadata,bytes};
 }
 export async function deleteDocument(owner:string,id:string) {
   await sql().begin(async tx=>{
