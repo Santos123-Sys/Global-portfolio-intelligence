@@ -5,7 +5,7 @@ import type {Candidate} from '@/lib/foundation/contracts';
 import {WorkspaceOverview,acceptedPublication} from '@/lib/workspace/contracts';
 import {CorpusLibrary} from './corpus-library';
 import {PortfolioHub} from './portfolio-hub';
-async function read(url:string){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('Workspace overview unavailable. Refresh or use the individual modules.');return WorkspaceOverview.parse(await r.json());}
+async function read(url:string){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('Workspace overview unavailable. Refresh or use the individual modules.');const body=WorkspaceOverview.parse(await r.json());if(body.candidateKey!==new URL(url,window.location.origin).searchParams.get('company'))throw Error('Company context mismatch. Refresh the workspace.');return body;}
 type AnalysisSession={url:string;expiresAt:string};
 function CompanyWorkspace({candidate,onResearch}:{candidate:Candidate;onResearch:(key:string,question:string)=>void}){
  const [step,setStep]=useState('Sources'),[confirmed,setConfirmed]=useState(false),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[session,setSession]=useState<AnalysisSession|null>(null);
@@ -72,7 +72,7 @@ function CompanyWorkspace({candidate,onResearch}:{candidate:Candidate;onResearch
 export function InvestmentWorkspace({candidates,onResearch}:{candidates:Candidate[];onResearch:(key:string,question:string)=>void}){
  const [key,setKey]=useState('');const candidate=candidates.find(c=>c.key===key)??candidates[0];
  return <section className="card"><h2>Investment workspace</h2><p>Follow one company from source evidence through reviewed valuation to portfolio risk. AI research drafts remain hypotheses until you review them.</p>
-  <label>Workspace company<select value={candidate?.key??''} onChange={e=>setKey(e.target.value)}>{candidates.map(c=><option key={c.key} value={c.key}>{c.name} · {c.ticker}</option>)}</select></label>
+  <label>Workspace company<select aria-label="Workspace company" value={candidate?.key??''} onChange={e=>setKey(e.target.value)}>{candidates.map(c=><option key={c.key} value={c.key}>{c.name} · {c.ticker}</option>)}</select></label>
   {candidate?<CompanyWorkspace key={candidate.key} candidate={candidate} onResearch={onResearch}/>:<p>Add a company to your watchlist to begin.</p>}
  </section>;
 }

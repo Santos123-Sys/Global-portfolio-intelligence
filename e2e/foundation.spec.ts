@@ -19,7 +19,7 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
   const sig=createHmac('sha256','browser-test-only-session-secret-at-least-32-characters').update(payload).digest('base64url');
   await context.addCookies([{name:'portfolio_session',value:`${payload}.${sig}`,url:'http://127.0.0.1:3100',httpOnly:true,sameSite:'Lax'}]);
   const candidate={...seed.candidates.find(c=>c.market==='us')!,issuer:fixture.snapshot.issuer};
-  const workspace={version:1,profile:defaultProfile,candidates:[candidate]};
+  const workspace={version:1,profile:defaultProfile,candidates:[candidate,{...candidate,key:'XNAS:MSFT',ticker:'MSFT',name:'Synthetic other issuer',issuer:{...candidate.issuer,registryId:'0000789019'}}]};
   const finance={status:'ready',snapshot:fixture.snapshot};
   const screen={candidate,status:'PASS',finance,screenedAt:'2026-10-09T00:00:00Z',policyVersion:'usa-cvm-foundation-v1',decisions:[]};
   const jobs:unknown[]=[];const writes:string[]=[];
@@ -41,12 +41,12 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
     else await route.fulfill({json:{workspace,jobs,integrations:{finance:'configured_read_attempts',researchModel:'disabled'}}});
   });
   await page.route('**/api/integration/v1/portfolio-feedback',route=>route.fulfill({json:{runs:[],valuations:[],providerConfigured:true}}));
-  await page.route('**/api/workspace?**',route=>route.fulfill({json:{version:'investment-workspace.v1',candidateKey:candidate.key,issuerId:'us:0000320193',financialOrigin:'https://filinglens.example',checkedAt:'2026-10-15T00:00:00.000Z',documents:{status:'empty',count:0,ruleVersion:'corpus-integrity.v1'},valuations:{status:'empty',count:0},portfolio:{status:'empty',count:0}}}));
+  await page.route('**/api/workspace?**',route=>route.fulfill({json:{version:'investment-workspace.v1',candidateKey:new URL(route.request().url()).searchParams.get('company'),issuerId:'us:0000320193',financialOrigin:'https://filinglens.example',checkedAt:'2026-10-15T00:00:00.000Z',documents:{status:'empty',count:0,ruleVersion:'corpus-integrity.v1'},valuations:{status:'empty',count:0},portfolio:{status:'empty',count:0}}}));
   await page.goto('/');await expect(page.getByRole('heading',{name:'Investment workspace',exact:true})).toBeVisible();
   await page.getByRole('tab',{name:'Candidates',exact:true}).click();await expect(page.getByRole('heading',{name:'Candidate watchlist'})).toBeVisible();
   await page.getByRole('button',{name:'Run screening'}).click();await expect(page.getByRole('heading',{name:'Durable job activity'})).toBeVisible();
   await page.getByRole('tab',{name:'Candidates',exact:true}).click();await expect(page.getByText('PASS',{exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'Evidence pack',exact:true}).click();await page.getByRole('tab',{name:'Research',exact:true}).click();
+  await page.getByRole('button',{name:'Evidence pack',exact:true}).first().click();await page.getByRole('tab',{name:'Research',exact:true}).click();
   await expect(page.getByRole('heading',{name:'FilingLens evidence'})).toBeVisible();await expect(page.getByText('120 USD',{exact:true})).toBeVisible();
   await expect(page.getByText('Valuation must be performed in FilingLens.',{exact:true})).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
@@ -103,5 +103,9 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
   await page.getByRole('button',{name:'3. Portfolio',exact:true}).click();
   await page.getByRole('button',{name:'2. Financial analysis',exact:true}).click();
   await expect(page.locator('iframe[title="FilingLens analysis for '+candidate.ticker+'"]')).toHaveAttribute('src','https://filinglens.example/#gpi='+'a'.repeat(64));
+  await page.getByLabel('Workspace company',{exact:true}).selectOption('XNAS:MSFT');
+  await expect(page.locator('iframe')).toHaveCount(0);
+  await page.getByRole('button',{name:'2. Financial analysis',exact:true}).click();
+  await expect(page.getByRole('checkbox',{name:'I verified this company’s CIK/CNPJ before opening financial analysis.'})).not.toBeChecked();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
 });
