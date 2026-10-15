@@ -37,6 +37,7 @@ describe('account-scoped received risk snapshots',()=>{
   await expect(runPortfolio(owner,account,input,async()=>Response.json({error:'unavailable'},{status:503}))).rejects.toThrow('risk_provider_unavailable');
   const [stored]=await listPortfolioFeedback(owner,account);
   await expect(runPortfolio(owner,account,input,async()=>Response.json({...stored.analysis,workspaceId:otherAccount,portfolioId:input.idempotencyKey}))).rejects.toThrow('identity_mismatch');
+  await expect(runPortfolio(owner,account,input,async()=>Response.json({...stored.analysis,portfolioId:input.idempotencyKey}))).rejects.toThrow('identity_mismatch');
   expect(await listPortfolioFeedback(owner,account)).toHaveLength(1);
  });
 });

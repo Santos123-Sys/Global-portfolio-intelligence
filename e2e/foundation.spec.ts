@@ -40,6 +40,7 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
     }else if(req.method()==='PUT'){writes.push('profile');await route.fulfill({json:{workspace:req.postDataJSON()}});}
     else await route.fulfill({json:{workspace,jobs,integrations:{finance:'configured_read_attempts',researchModel:'disabled'}}});
   });
+  await page.route('**/api/integration/v1/portfolio-feedback',route=>route.fulfill({json:{runs:[],valuations:[],providerConfigured:true}}));
   await page.goto('/');await expect(page.getByRole('heading',{name:'Candidate watchlist'})).toBeVisible();
   await page.getByRole('button',{name:'Run screening'}).click();await expect(page.getByRole('heading',{name:'Durable job activity'})).toBeVisible();
   await page.getByRole('tab',{name:'Candidates',exact:true}).click();await expect(page.getByText('PASS',{exact:true})).toBeVisible();
@@ -64,4 +65,19 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
   await page.getByRole('tab',{name:'Investor profile',exact:true}).click();await page.getByLabel('Profile name').fill('New profile');
   await page.getByRole('button',{name:'Save profile',exact:true}).click();await expect(page.getByRole('status')).toContainText('Investor profile saved');
   expect(writes).toEqual(['screen','research','research','profile']);
+  await page.getByRole('tab',{name:'Portfolio',exact:true}).click();
+  await page.getByLabel('Portfolio holdings',{exact:true}).fill('AAPL,12');
+  const consent=page.getByRole('checkbox',{name:'Share these holdings with Portfolio Risk Studio and retain the results in this GPI account.'});
+  const calculate=page.getByRole('button',{name:'Calculate and save risk feedback'});
+  for(const edit of [
+    ()=>page.getByLabel('Portfolio holdings',{exact:true}).fill('AAPL,13'),
+    ()=>page.getByLabel('Risk lookback').selectOption('3y'),
+    ()=>page.getByLabel('Annual risk-free assumption (%)').fill('4'),
+    ()=>page.getByLabel('Portfolio base currency').selectOption('BRL'),
+    ()=>page.getByLabel('Portfolio name',{exact:true}).fill('Reviewed holdings'),
+  ]){
+    await consent.check();await expect(calculate).toBeEnabled();
+    await edit();await expect(consent).not.toBeChecked();await expect(calculate).toBeDisabled();
+  }
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
 });

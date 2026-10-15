@@ -40,7 +40,7 @@ export const RiskResult=z.object({
   c.addIssue({code:z.ZodIssueCode.custom,message:'Invalid holdings/attribution identity'});
  if(Math.abs(v.holdings.reduce((s,h)=>s+h.weight,0)-1)>1e-6)c.addIssue({code:z.ZodIssueCode.custom,message:'Invalid weights'});
  if(v.returns.contributions.length!==v.holdings.length||Math.abs(v.returns.contributions.reduce((s,h)=>s+h.contribution,0)-v.returns.lookbackReturn)>1e-6)c.addIssue({code:z.ZodIssueCode.custom,message:'Invalid attribution'});
- if(v.allocation&&Math.abs(v.allocation.weights.reduce((s,h)=>s+h.weight,0)-1)>1e-5)c.addIssue({code:z.ZodIssueCode.custom,message:'Invalid allocation'});
+ if(v.allocation&&(Math.abs(v.allocation.weights.reduce((s,h)=>s+h.weight,0)-1)>1e-5||v.allocation.weights.length!==v.holdings.length||new Set(v.allocation.weights.map(h=>h.symbol)).size!==v.allocation.weights.length||v.allocation.weights.some(h=>!v.holdings.some(p=>p.symbol===h.symbol))))c.addIssue({code:z.ZodIssueCode.custom,message:'Invalid allocation'});
  if(v.exposures){
   for(const field of ['sector','country','currency'] as const){const rows=v.exposures[field];if(new Set(rows.map(r=>r.label)).size!==rows.length||Math.abs(rows.reduce((s,r)=>s+r.weight,0)-1)>1e-6)c.addIssue({code:z.ZodIssueCode.custom,message:'Invalid exposure totals'});}
   if(!v.classifications||new Set(v.classifications.map(r=>r.symbol)).size!==v.classifications.length||v.classifications.some(r=>!v.holdings.some(h=>h.symbol===r.symbol)))c.addIssue({code:z.ZodIssueCode.custom,message:'Invalid classification identity'});
@@ -91,9 +91,10 @@ export async function runPortfolio(owner:string,workspace:string,raw:unknown,fet
  const issuers=input.positions.flatMap(p=>{const matches=candidates.filter(c=>(c.market==='br'?c.ticker+'.SA':c.ticker)===p.symbol);if(matches.length!==1)return [];const identity=resolveIssuer(matches[0]);return identity.status==='source_linked'?[{symbol:p.symbol,issuerId:identity.issuer.issuerId}]:[];});
  const base=new URL(process.env.PORTFOLIO_RISK_API_URL??''),token=process.env.PORTFOLIO_RISK_API_TOKEN??'';
  if(base.protocol!=='https:'||base.pathname!=='/'||base.username||base.password||base.search||base.hash||token.length<32||/[\r\n]/.test(token))throw Error('provider_not_configured');
+ const runId=randomUUID();
  const response=await fetcher(new URL('/v1/portfolio-analyze',base),{method:'POST',redirect:'error',cache:'no-store',
  headers:{'content-type':'application/json',authorization:'Bearer '+token},
- body:JSON.stringify({...input,workspaceId:workspace,portfolioId:input.idempotencyKey,runId:randomUUID(),valuations:applicable,issuers}),signal:AbortSignal.timeout(60_000)});
+ body:JSON.stringify({...input,workspaceId:workspace,portfolioId:input.idempotencyKey,runId,valuations:applicable,issuers}),signal:AbortSignal.timeout(60_000)});
  if(!response.ok){await response.body?.cancel();throw Error('risk_provider_unavailable');}
  const result=await readBoundedJson(new Request('https://response.invalid',{method:'POST',headers:{'content-type':response.headers.get('content-type')??''},body:response.body,duplex:'half'} as RequestInit),128_000);
  if(!result.ok)throw Error('invalid_provider_response');
@@ -101,9 +102,9 @@ export async function runPortfolio(owner:string,workspace:string,raw:unknown,fet
  if(analysis.baseCurrency!==input.baseCurrency||!analysis.exposures||!analysis.classifications||!analysis.fxSources||analysis.classifications.some(c=>!issuers.some(r=>r.symbol===c.symbol&&r.issuerId===c.issuerId)))throw Error('identity_mismatch');
  if(analysis.valuationDiagnostics.some(v=>!applicable.some(a=>a.symbol===v.symbol&&a.valuationVersionId===v.valuationVersionId&&Number(a.impliedValuePerShare)===v.impliedValuePerShare)) ||
    analysis.valuationDiagnostics.length!==applicable.length)throw Error('identity_mismatch');
- if(analysis.workspaceId!==workspace||analysis.portfolioId!==input.idempotencyKey||
+ if(analysis.runId!==runId||analysis.workspaceId!==workspace||analysis.portfolioId!==input.idempotencyKey||
  analysis.holdings.length!==input.positions.length||analysis.holdings.some(h=>!input.positions.some(p=>p.symbol===h.symbol&&p.shares===h.shares)))throw Error('identity_mismatch');
- const payload={name:input.name,analysis,authority:'portfolio-risk-studio',sharedAt:new Date().toISOString()};
+ const payload={name:input.name,requestInputs:{positions:input.positions,range:input.range,riskFreeRate:input.riskFreeRate,baseCurrency:input.baseCurrency},analysis,authority:'portfolio-risk-studio',sharedAt:new Date().toISOString()};
  await sql().begin(async tx=>{
   await tx`SELECT pg_advisory_xact_lock(hashtextextended(${workspace+':risk-feedback'},0))`;
   const existing=await tx`SELECT request_hash FROM gpi_portfolio_feedback WHERE id=${input.idempotencyKey}`;
