@@ -41,7 +41,9 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
     else await route.fulfill({json:{workspace,jobs,integrations:{finance:'configured_read_attempts',researchModel:'disabled'}}});
   });
   await page.route('**/api/integration/v1/portfolio-feedback',route=>route.fulfill({json:{runs:[],valuations:[],providerConfigured:true}}));
-  await page.goto('/');await expect(page.getByRole('heading',{name:'Candidate watchlist'})).toBeVisible();
+  await page.route('**/api/workspace?**',route=>route.fulfill({json:{version:'investment-workspace.v1',candidateKey:candidate.key,issuerId:'us:0000320193',financialOrigin:'https://filinglens.example',checkedAt:'2026-10-15T00:00:00.000Z',documents:{status:'empty',count:0,ruleVersion:'corpus-integrity.v1'},valuations:{status:'empty',count:0},portfolio:{status:'empty',count:0}}}));
+  await page.goto('/');await expect(page.getByRole('heading',{name:'Investment workspace',exact:true})).toBeVisible();
+  await page.getByRole('tab',{name:'Candidates',exact:true}).click();await expect(page.getByRole('heading',{name:'Candidate watchlist'})).toBeVisible();
   await page.getByRole('button',{name:'Run screening'}).click();await expect(page.getByRole('heading',{name:'Durable job activity'})).toBeVisible();
   await page.getByRole('tab',{name:'Candidates',exact:true}).click();await expect(page.getByText('PASS',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Evidence pack',exact:true}).click();await page.getByRole('tab',{name:'Research',exact:true}).click();
@@ -79,5 +81,27 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
     await consent.check();await expect(calculate).toBeEnabled();
     await edit();await expect(consent).not.toBeChecked();await expect(calculate).toBeDisabled();
   }
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+  await page.getByRole('tab',{name:'Workspace',exact:true}).click();
+  await page.getByRole('button',{name:'2. Financial analysis',exact:true}).click();
+  const open=page.getByRole('button',{name:'Open financial analysis here'});await expect(open).toBeDisabled();
+  await page.getByRole('checkbox',{name:'I verified this company’s CIK/CNPJ before opening financial analysis.'}).check();
+  const version='flv1_'+'a'.repeat(64),imports:unknown[]=[];
+  await page.route('**/api/integration/v1/handoff',route=>route.fulfill({json:{url:'https://filinglens.example/#integration=synthetic-test-only',expiresAt:'2026-10-15T02:00:00.000Z'}}));
+  await page.route('https://filinglens.example/**',route=>route.fulfill({contentType:'text/html',body:`<button onclick='parent.postMessage({type:"filinglens.valuation.published.v1",candidateKey:"XNYS:OTHER",valuationVersionId:"${version}"},"http://127.0.0.1:3100")'>Wrong issuer</button><button onclick='parent.postMessage({type:"filinglens.valuation.published.v1",candidateKey:"${candidate.key}",valuationVersionId:"${version}"},"http://127.0.0.1:3100")'>Publish reviewed fixture</button>`}));
+  await page.route('**/api/integration/v1/portfolio-feedback',route=>{if(route.request().method()==='POST'){imports.push(route.request().postDataJSON());return route.fulfill({json:{synchronized:true}});}return route.fulfill({json:{runs:[],valuations:[],providerConfigured:true}});});
+  await open.click();
+  const frame=page.frameLocator('iframe[title="FilingLens analysis for '+candidate.ticker+'"]');
+  await frame.getByRole('button',{name:'Wrong issuer',exact:true}).click();expect(imports).toHaveLength(0);
+  await frame.getByRole('button',{name:'Publish reviewed fixture',exact:true}).click();
+  await expect(page.getByText('Reviewed valuation verified and synchronized. Review holdings before calculating risk.',{exact:true})).toBeVisible();
+  expect(imports).toEqual([{action:'import_valuation',candidateKey:candidate.key,valuationVersionId:version}]);
+  await page.getByRole('button',{name:'1. Sources',exact:true}).click();
+  await page.getByRole('button',{name:'Prepare FilingLens analysis for selected year'}).click();
+  await expect(page.getByText('Selected-year documents sent through the single-use handoff. Confirm the filing inside the financial panel.',{exact:true})).toBeVisible();
+  await expect(page.locator('iframe[title="FilingLens analysis for '+candidate.ticker+'"]')).toHaveAttribute('src','https://filinglens.example/#gpi='+'a'.repeat(64));
+  await page.getByRole('button',{name:'3. Portfolio',exact:true}).click();
+  await page.getByRole('button',{name:'2. Financial analysis',exact:true}).click();
+  await expect(page.locator('iframe[title="FilingLens analysis for '+candidate.ticker+'"]')).toHaveAttribute('src','https://filinglens.example/#gpi='+'a'.repeat(64));
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
 });

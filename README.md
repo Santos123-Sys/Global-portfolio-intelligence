@@ -55,3 +55,13 @@ Rollback by reverting the replacement commit or redeploying the recovery branch.
 See [architecture and delivery status](docs/foundation-architecture.md) and [ZIP provenance](docs/zip-provenance.md).
 
 Local evidence: [verification results](docs/verification-results.md). These checks do not substitute for the production cutover gates.
+
+### Unified investment workspace
+
+The default **Workspace** tab carries a selected company through source quality,
+FilingLens financial analysis and saved Portfolio Risk Studio results. Financial
+analysis opens inside the workspace using the existing signed handoff. Sources
+remain owner-scoped and publication still requires explicit human approval.
+Separate modules remain available as recovery paths. See
+[the architecture decision](docs/unified-workspace-decision.md) for boundaries,
+integrity rules, validation evidence and limitations.
