@@ -33,6 +33,7 @@ async function fetchState(url: string): Promise<State> {
 export default function Workbench() {
   const router = useRouter();
   const { data, error, mutate } = useSWR<State>('/api/foundation', fetchState, { refreshInterval: 5000, shouldRetryOnError: false });
+  const [workspaceCompany,setWorkspaceCompany]=useState('');
   const [tab, setTab] = useState('Workspace'); const [message, setMessage] = useState(''); const [busy, setBusy] = useState(false);
   const [edit, setEdit] = useState<WorkspaceData | null>(null); const [json, setJson] = useState('');
   const { data: handoffs, mutate: refreshHandoffs } = useSWR<HandoffState>('/api/integration/v1/reviews', fetchHandoffs,
@@ -81,7 +82,7 @@ export default function Workbench() {
     {error && <div role="alert" className="notice">{error.message}. The starter watchlist below is not a completed screening run.</div>}
     {message && <div role="status" className="notice">{message}</div>}
     <nav className="tabs" role="tablist" aria-label="Research workspace">{['Workspace', 'Candidates', 'Investor profile', 'Research Hub', 'Research', 'Handoffs', 'Portfolio', 'Activity'].map(t => <button role="tab" key={t} aria-selected={tab === t} onClick={() => setTab(t)}>{t}</button>)}</nav>
-    {tab === 'Workspace' && <InvestmentWorkspace candidates={workspace.candidates} onResearch={(candidateKey,question)=>{setPortfolioQuestion({candidateKey,question});setTab('Research Hub');}}/>}
+    {tab === 'Workspace' && <InvestmentWorkspace candidates={workspace.candidates} selectedKey={workspaceCompany} onSelectCompany={setWorkspaceCompany} onResearch={(candidateKey,question)=>{setPortfolioQuestion({candidateKey,question});setTab('Research Hub');}}/>}
     {tab === 'Portfolio' && <PortfolioHub candidates={workspace.candidates} onResearch={(candidateKey,question)=>{setPortfolioQuestion({candidateKey,question});setTab('Research Hub');}}/>}
     {tab === 'Research Hub' && <><ResearchHub initial={portfolioQuestion} candidates={workspace.candidates} disabled={busy || !data}
       onLaunch={async (key, brief) => launch('research', key, brief)} /><CorpusLibrary candidates={workspace.candidates}/></>}

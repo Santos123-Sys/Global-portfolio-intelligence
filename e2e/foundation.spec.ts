@@ -107,5 +107,10 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
   await expect(page.locator('iframe')).toHaveCount(0);
   await page.getByRole('button',{name:'2. Financial analysis',exact:true}).click();
   await expect(page.getByRole('checkbox',{name:'I verified this company’s CIK/CNPJ before opening financial analysis.'})).not.toBeChecked();
+  await page.getByRole('button',{name:'1. Sources',exact:true}).click();
+  await page.getByRole('button',{name:'Research this company',exact:true}).click();
+  await expect(page.getByLabel('Research company')).toHaveValue('XNAS:MSFT');
+  await page.getByRole('tab',{name:'Workspace',exact:true}).click();
+  await expect(page.getByLabel('Workspace company',{exact:true})).toHaveValue('XNAS:MSFT');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
 });

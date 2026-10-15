@@ -69,10 +69,10 @@ function CompanyWorkspace({candidate,onResearch}:{candidate:Candidate;onResearch
   <div hidden={step!=='Portfolio'}><PortfolioHub candidates={[candidate]} onResearch={onResearch}/></div>
  </>;
 }
-export function InvestmentWorkspace({candidates,onResearch}:{candidates:Candidate[];onResearch:(key:string,question:string)=>void}){
- const [key,setKey]=useState('');const candidate=candidates.find(c=>c.key===key)??candidates[0];
+export function InvestmentWorkspace({candidates,onResearch,selectedKey,onSelectCompany}:{candidates:Candidate[];onResearch:(key:string,question:string)=>void;selectedKey:string;onSelectCompany:(key:string)=>void}){
+ const candidate=candidates.find(c=>c.key===selectedKey)??candidates[0];
  return <section className="card"><h2>Investment workspace</h2><p>Follow one company from source evidence through reviewed valuation to portfolio risk. AI research drafts remain hypotheses until you review them.</p>
-  <label>Workspace company<select aria-label="Workspace company" value={candidate?.key??''} onChange={e=>setKey(e.target.value)}>{candidates.map(c=><option key={c.key} value={c.key}>{c.name} · {c.ticker}</option>)}</select></label>
+  <label>Workspace company<select aria-label="Workspace company" value={candidate?.key??''} onChange={e=>onSelectCompany(e.target.value)}>{candidates.map(c=><option key={c.key} value={c.key}>{c.name} · {c.ticker}</option>)}</select></label>
   {candidate?<CompanyWorkspace key={candidate.key} candidate={candidate} onResearch={onResearch}/>:<p>Add a company to your watchlist to begin.</p>}
  </section>;
 }
