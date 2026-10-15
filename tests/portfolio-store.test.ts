@@ -40,5 +40,23 @@ describe('account-scoped received risk snapshots',()=>{
   await expect(runPortfolio(owner,account,input,async()=>Response.json({...stored.analysis,portfolioId:input.idempotencyKey}))).rejects.toThrow('identity_mismatch');
   expect(await listPortfolioFeedback(owner,account)).toHaveLength(1);
  });
+ it('does not attach a stored valuation after its candidate now resolves to another issuer',async()=>{
+  const valuation={schemaVersion:'valuation.v1',valuationVersionId:'flv1_'+'a'.repeat(64),issuerId:'us:0000789019',
+   method:'dcf',scenario:'base',currency:'USD',impliedValuePerShare:'123',valuationAsOf:new Date().toISOString(),
+   approvedAt:new Date().toISOString(),approvedBy:owner,sourceSnapshotIds:['reviewed-analysis:fixture'],
+   assumptionsHash:'b'.repeat(64),approvalStatus:'approved'};
+  await state.db!.query('INSERT INTO gpi_approved_valuations(id,owner_id,workspace_id,candidate_key,payload) VALUES($1,$2,$3,$4,$5)',
+   [valuation.valuationVersionId,owner,account,'XNAS:AAPL',JSON.stringify(valuation)]);
+  const input={idempotencyKey:crypto.randomUUID(),name:'Canonical identity',confirmed:true,positions:[{symbol:'AAPL',shares:3}],range:'1y',riskFreeRate:0};
+  const lookup=new Map(['AAPL','SPY'].map(symbol=>[symbol,{symbol,provider:'Synthetic fixture',priceBasis:'adjusted close',currency:'USD',cached:false,stale:false,
+   rows:Array.from({length:100},(_,t)=>({date:new Date(Date.UTC(2026,6,t+1)).toISOString().slice(0,10),price:100+t*.1,close:100+t*.1}))}]));
+  const provider=vi.fn(async(_url:URL|RequestInfo,init?:RequestInit)=>{
+   const body=JSON.parse(String(init?.body));expect(body.issuers).toContainEqual({symbol:'AAPL',issuerId:'us:0000320193'});
+   expect(body.valuations).toEqual([]);
+   return Response.json(integrationAnalysis({...body,benchmark:'SPY'},lookup));
+  });
+  const saved=await runPortfolio(owner,account,input,provider as typeof fetch);
+  expect(saved.integrationWarnings.join(' ')).toContain('canonical issuer no longer matches');
+ });
 });
 

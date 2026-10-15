@@ -43,7 +43,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Santos123-Sys/FilingLens
-          ref: 01acc8881e130597008c1fc642388246a8780a16
+          ref: 2848e5f9d9ec1837353b891a783582aabe42f818
           path: .cross-app/filinglens
           persist-credentials: false
       - name: Install FilingLens verification dependencies

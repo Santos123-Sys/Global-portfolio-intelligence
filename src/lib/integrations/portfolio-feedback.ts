@@ -23,9 +23,9 @@ export const RiskResult=z.object({
  baseCurrency:Currency.optional(),classifications:Classifications.optional(),
  exposures:z.object({sector:Exposure,country:Exposure,currency:Exposure,sectorCoverage:number.min(0).max(1.000001),countryCoverage:number.min(0).max(1.000001),countryBasis:z.literal('principal-office')}).optional(),
  fxSources:z.array(z.object({from:Currency,to:Currency,provider:z.literal('ECB via Frankfurter'),sourceUrl:z.literal('https://api.frankfurter.dev/v2/providers/ecb/rates'),retrievedAt:z.string().datetime(),firstDate:z.string(),lastDate:z.string(),rows:number.int().positive().max(1200)})).max(18).optional(),
- retrievedAt:z.string().datetime(),asOf:z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+ retrievedAt:z.string().datetime(),asOf:date,
  holdings:z.array(Holding).min(1).max(10),metrics:z.record(number.nullable()),warnings:z.array(z.string().max(500)).max(30),
- sources:z.array(z.object({symbol:z.string(),provider:z.string().max(100),priceBasis:z.string().max(100),lastDate:z.string(),rows:number,cached:z.boolean(),stale:z.boolean()})).max(11),
+ sources:z.array(z.object({symbol:z.string(),provider:z.string().min(1).max(100),priceBasis:z.string().min(1).max(100),lastDate:date,rows:number.int().positive(),cached:z.boolean(),stale:z.boolean()})).max(11),
  methodology:z.string().max(500),returns:z.object({method:z.literal('current-holdings-reconstruction.v1'),
  lookbackReturn:number,contributions:z.array(z.object({symbol:z.string(),lookbackReturn:number,contribution:number})).max(10)}),
  allocation:z.object({method:z.literal('historical-minimum-variance.v1'),maxWeight:z.literal(.45),
@@ -34,6 +34,10 @@ export const RiskResult=z.object({
  impliedValuePerShare:number.positive(),convertedValuePerShare:number.positive().optional(),fxRate:number.positive().optional(),fxDate:z.string().optional(),price:number.positive(),valueGap:number,valuationAsOf:z.string()})).max(10),
  feedback:z.array(z.object({kind:z.enum(['concentration','drawdown','data_quality','valuation_gap']),message:z.string().max(500)})).max(30),
 }).strip().superRefine((v,c)=>{
+ if(new Set(v.sources.map(s=>s.symbol)).size!==v.sources.length||
+  v.holdings.some(h=>!v.sources.some(s=>s.symbol===h.symbol))||
+  v.sources.some(s=>(s.symbol!=='SPY'&&!v.holdings.some(h=>h.symbol===s.symbol))||s.lastDate<v.asOf))
+  c.addIssue({code:z.ZodIssueCode.custom,message:'Invalid source provenance for portfolio holdings'});
  if(new Set(v.holdings.map(h=>h.symbol)).size!==v.holdings.length ||
   new Set(v.returns.contributions.map(h=>h.symbol)).size!==v.returns.contributions.length ||
   v.returns.contributions.some(h=>!v.holdings.some(p=>p.symbol===h.symbol)))
@@ -85,14 +89,24 @@ export async function runPortfolio(owner:string,workspace:string,raw:unknown,fet
  if(previous[0]){if(previous[0].request_hash!==hash)throw Error('idempotency_conflict');return previous[0].payload;}
  const valuations=await listValuations(owner,workspace);
  const candidates=(await loadWorkspace(owner)).candidates;
- const applicable=input.positions.flatMap(p=>{
-  const matches=candidates.filter(c=>(c.market==='br'?c.ticker+'.SA':c.ticker)===p.symbol);
-  if(matches.length!==1)return [];
-  const found=valuations.find(v=>v.candidateKey===matches[0].key&&
-   Date.now()-Date.parse(v.valuation.approvedAt)<90*86400000);
-  return found?[{symbol:p.symbol,...found.valuation}]:[];
+ const bindings=input.positions.map(position=>{
+  const matches=candidates.filter(c=>(c.market==='br'?c.ticker+'.SA':c.ticker)===position.symbol);
+  if(matches.length!==1)return {position,candidate:null,identity:null};
+  const resolution=resolveIssuer(matches[0]);
+  return {position,candidate:matches[0],identity:resolution.status==='source_linked'?resolution.issuer:null};
  });
- const issuers=input.positions.flatMap(p=>{const matches=candidates.filter(c=>(c.market==='br'?c.ticker+'.SA':c.ticker)===p.symbol);if(matches.length!==1)return [];const identity=resolveIssuer(matches[0]);return identity.status==='source_linked'?[{symbol:p.symbol,issuerId:identity.issuer.issuerId}]:[];});
+ const integrationWarnings:string[]=[];
+ const applicable=bindings.flatMap(({position,candidate,identity})=>{
+  if(!candidate||!identity)return [];
+  const saved=valuations.filter(v=>v.candidateKey===candidate.key);
+  if(saved.some(v=>v.valuation.issuerId!==identity.issuerId))integrationWarnings.push(
+   `${position.symbol}: a saved valuation was excluded because its canonical issuer no longer matches. Reimport a reviewed valuation for this issuer.`);
+  const now=Date.now();
+  const found=saved.find(v=>v.valuation.issuerId===identity.issuerId&&
+   Date.parse(v.valuation.approvedAt)<=now+30000&&now-Date.parse(v.valuation.approvedAt)<90*86400000);
+  return found?[{symbol:position.symbol,...found.valuation}]:[];
+ });
+ const issuers=bindings.flatMap(({position,identity})=>identity?[{symbol:position.symbol,issuerId:identity.issuerId}]:[]);
  const base=new URL(process.env.PORTFOLIO_RISK_API_URL??''),token=process.env.PORTFOLIO_RISK_API_TOKEN??'';
  if(base.protocol!=='https:'||base.pathname!=='/'||base.username||base.password||base.search||base.hash||token.length<32||/[\r\n]/.test(token))throw Error('provider_not_configured');
  const runId=randomUUID();
@@ -108,7 +122,7 @@ export async function runPortfolio(owner:string,workspace:string,raw:unknown,fet
    analysis.valuationDiagnostics.length!==applicable.length)throw Error('identity_mismatch');
  if(analysis.runId!==runId||analysis.workspaceId!==workspace||analysis.portfolioId!==input.idempotencyKey||
  analysis.holdings.length!==input.positions.length||analysis.holdings.some(h=>!input.positions.some(p=>p.symbol===h.symbol&&p.shares===h.shares)))throw Error('identity_mismatch');
- const payload={name:input.name,requestInputs:{positions:input.positions,range:input.range,riskFreeRate:input.riskFreeRate,baseCurrency:input.baseCurrency},analysis,authority:'portfolio-risk-studio',sharedAt:new Date().toISOString()};
+ const payload={name:input.name,requestInputs:{positions:input.positions,range:input.range,riskFreeRate:input.riskFreeRate,baseCurrency:input.baseCurrency},integrationWarnings,analysis,authority:'portfolio-risk-studio',sharedAt:new Date().toISOString()};
  await sql().begin(async tx=>{
   await tx`SELECT pg_advisory_xact_lock(hashtextextended(${workspace+':risk-feedback'},0))`;
   const existing=await tx`SELECT request_hash FROM gpi_portfolio_feedback WHERE id=${input.idempotencyKey}`;

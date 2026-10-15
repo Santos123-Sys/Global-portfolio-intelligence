@@ -5,7 +5,7 @@ import type {Candidate} from '@/lib/foundation/contracts';
 import type {z} from 'zod';
 import type {RiskResult} from '@/lib/integrations/portfolio-feedback';
 type Analysis=z.infer<typeof RiskResult>;
-type Data={runs:{id:string;name:string;analysis:Analysis;requestInputs?:{range:string;riskFreeRate:number;baseCurrency:string};sharedAt:string}[];valuations:{candidateKey:string;valuation:{valuationVersionId:string;currency:string;impliedValuePerShare:string;approvedAt:string}}[];providerConfigured:boolean};
+type Data={runs:{id:string;name:string;analysis:Analysis;integrationWarnings?:string[];requestInputs?:{range:string;riskFreeRate:number;baseCurrency:string};sharedAt:string}[];valuations:{candidateKey:string;valuation:{valuationVersionId:string;currency:string;impliedValuePerShare:string;approvedAt:string}}[];providerConfigured:boolean};
 async function read(url:string){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('Portfolio data unavailable');return r.json();}
 const pct=(n:number|null|undefined)=>n==null?'Unknown':(n*100).toFixed(2)+'%';
 export function PortfolioHub({candidates,onResearch}:{candidates:Candidate[];onResearch:(candidateKey:string,question:string)=>void}){
@@ -73,6 +73,7 @@ export function PortfolioHub({candidates,onResearch}:{candidates:Candidate[];onR
  <div className="table-wrap"><table><thead><tr><th>HOLDING</th><th>WEIGHT</th><th>RISK CONTRIBUTION</th><th>RETURN CONTRIBUTION</th><th>REVIEWED VALUE GAP</th><th>MINIMUM VARIANCE</th></tr></thead><tbody>{latest.holdings.map(h=><tr key={h.symbol}><td>{h.symbol}</td><td>{pct(h.weight)}</td><td>{pct(h.riskContribution)}</td><td>{pct(latest.returns.contributions.find(c=>c.symbol===h.symbol)?.contribution)}</td><td>{pct(latest.valuationDiagnostics.find(v=>v.symbol===h.symbol)?.valueGap)}</td><td>{pct(latest.allocation?.weights.find(w=>w.symbol===h.symbol)?.weight)}</td></tr>)}</tbody></table></div>
  <h3>Portfolio feedback for research</h3><ul>{latest.feedback.map((f,i)=><li key={i}>{f.message}</li>)}</ul>
  <button className="secondary" disabled={!key} onClick={()=>onResearch(key,'Revisit this company’s downside thesis and valuation assumptions in light of my portfolio concentration and historical drawdown alerts. Use issuer filing evidence; portfolio alerts are research prompts, not facts about the issuer.')}>Research the selected company using portfolio feedback</button>
+ <ul aria-label="Integration review required">{data?.runs[0]?.integrationWarnings?.map((w,i)=><li key={i}>{w}</li>)}</ul>
  <ul>{latest.warnings.map((w,i)=><li key={i}>{w}</li>)}</ul><p>{latest.methodology} Value gaps are valuation comparisons, not forecasts. Allocation is a retrospective experiment; no orders are submitted.</p></>}
  <h3>Saved monitoring history</h3><ul>{data?.runs.map(r=><li key={r.id}>{r.name} · {r.analysis.asOf} · volatility {pct(r.analysis.metrics.volatility)} · lookback return {pct(r.analysis.returns.lookbackReturn)}</li>)}</ul>
  <p>Historical FX conversion uses ECB reference rates. Missing or stale conversion rates stop the run. Unavailable issuer classifications remain explicitly unclassified. Add the issuer to your GPI company list to include its verified CIK/CNPJ classification source.</p>
