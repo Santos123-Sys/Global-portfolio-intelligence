@@ -695,6 +695,36 @@
       "recommendedOwner": "GPI identity-data maintainer / analyst",
       "validationTest": "Official CNPJ, legal issuer and exchange/listing match; wrong-name/share-class negative controls",
       "disposition": "Roadmap: requires independent source verification"
+    },
+    {
+      "riskId": "R24",
+      "priority": "P1",
+      "system": "FilingLens",
+      "component": "public model routes / cost authorization",
+      "failureMode": "An unauthenticated external caller can consume configured paid model capacity",
+      "rootCause": "Public model routes use execution concurrency and per-request budgets without requiring an account-scoped capability",
+      "trigger": "Repeated valid /api/agent or other model requests to the public app URL",
+      "probability": 3,
+      "impact": 4,
+      "detectability": 3,
+      "remediationLeverage": 2,
+      "riskPriority": 36,
+      "evidenceClass": "CONFIRMED",
+      "evidence": "api/boot.ts MODEL_ROUTES and /api/agent; prior live public-source benchmark succeeded without Authorization",
+      "affectedUserWorkflow": "All paid analysis entry points and GPI embedded analysis",
+      "financialImpact": "Potential unbounded aggregate provider spend across repeated requests; no actual abuse or charge loss established",
+      "securityImpact": "Cost/resource authorization gap; no private-data disclosure established",
+      "dataIntegrityImpact": "No corruption demonstrated",
+      "operationalImpact": "Public callers can occupy bounded inference slots",
+      "currentControls": "Per-process 2 active / 8 queued, bounded requests and no SDK retries; no demonstrated account-wide spend cap",
+      "controlWeakness": "Concurrency and per-request token bounds are not authentication or a global monetary ceiling",
+      "preventiveMitigation": "Design scoped GPI analysis capability or authenticated standalone session, plus durable account-level usage quota and revoke controls",
+      "detectiveMitigation": "Per-account/anonymous usage and budget alerts; do not log filing content",
+      "recoveryMitigation": "Disable unauthorized analysis ingress through a reviewed progressive rollout; preserve valid sessions and current explicit failure states",
+      "residualRisk": "Existing public inference remains a P1 risk. A coordinated authentication change is deferred because authenticated production acceptance is unavailable; do not silently deploy a new unverified login wall.",
+      "recommendedOwner": "FilingLens security / platform maintainer",
+      "validationTest": "No paid provider call without valid scoped session/capability; authorized GPI and standalone flows pass positive/negative and expiry tests",
+      "disposition": "Prioritized coordinated follow-up; requires authenticated acceptance before enabling"
     }
   ]
 }
