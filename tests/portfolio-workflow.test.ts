@@ -28,6 +28,10 @@ describe('three-app workflow security and deterministic mathematics',()=>{
   expect(result.allocation!.weights.reduce((s,w)=>s+w.weight,0)).toBeCloseTo(1,7);
   expect(()=>RiskResult.parse({...result,returns:{...result.returns,lookbackReturn:100}})).toThrow();
   expect(result.methodology).toContain('not realized');
+  for(const symbols of [['AAA','AAA','CCC'],['AAA','BBB','UNKNOWN']]){
+   const allocation={...result.allocation!,weights:result.allocation!.weights.map((w,i)=>({...w,symbol:symbols[i]}))};
+   expect(()=>RiskResult.parse({...result,allocation})).toThrow('Invalid allocation');
+  }
  });
 });
 
