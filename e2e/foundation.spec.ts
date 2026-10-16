@@ -23,6 +23,9 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
   const finance={status:'ready',snapshot:fixture.snapshot};
   const screen={candidate,status:'PASS',finance,screenedAt:'2026-10-09T00:00:00Z',policyVersion:'usa-cvm-foundation-v1',decisions:[]};
   const jobs:unknown[]=[];const writes:string[]=[];
+  let releaseFirstResearch!:()=>void;
+  const firstResearchGate=new Promise<void>(resolve=>{releaseFirstResearch=resolve;});
+  let holdFirstResearch=true;
   const documents:unknown[]=[];
   await page.route('**/api/corpus**',async route=>{
     if(route.request().url().includes('/handoff'))return route.fulfill({json:{url:'https://filinglens.example/#gpi='+'a'.repeat(64)}});
@@ -32,6 +35,7 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
   await page.route('**/api/foundation',async route=>{
     const req=route.request();if(req.method()==='POST'){
       const body=req.postDataJSON();writes.push(body.kind);
+      if(body.kind==='research'&&holdFirstResearch){holdFirstResearch=false;await firstResearchGate;}
       const deepResearch=body.brief?{architecture:'bounded-research-manager-v1',promptVersion:'test-version',brief:body.brief,status:'model_disabled',plan:null,evidence:[],findings:[],gaps:['Full filing text is not connected.'],trace:[],modelCalls:0,stopReason:'model_disabled'}:null;
       if(body.brief){expect(body.candidateKey).toBe(candidate.key);expect(body.brief).toMatchObject({question:'What evidence challenges the growth thesis?',startYear:2024,endYear:2025,language:'en'});}
       const output=body.kind==='screen'?{kind:'screen',screens:[screen]}:{kind:'research',modelStatus:'disabled_or_no_evidence',report:{candidate,screen,draft:null,deepResearch,questions:{bull:['Which facts support growth?'],bear:['Which facts challenge growth?'],review:[]},valuation:{reason:'Valuation must be performed in FilingLens.'},limitations:['Human review required.']}};
@@ -53,6 +57,7 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
   await page.getByRole('button',{name:'Run screening'}).click();await expect(page.getByRole('heading',{name:'Durable job activity'})).toBeVisible();
   await page.getByRole('tab',{name:'Candidates',exact:true}).click();await expect(page.getByText('PASS',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Evidence pack',exact:true}).first().click();await page.getByRole('tab',{name:'Research',exact:true}).click();
+  releaseFirstResearch();
   await expect(page.getByRole('heading',{name:'FilingLens evidence'})).toBeVisible();await expect(page.getByText('120 USD',{exact:true})).toBeVisible();
   await expect(page.getByText('Valuation must be performed in FilingLens.',{exact:true})).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);

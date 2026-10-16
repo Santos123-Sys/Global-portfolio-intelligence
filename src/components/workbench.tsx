@@ -54,8 +54,9 @@ export default function Workbench() {
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Request failed'); return null; } finally { setBusy(false); }
   }
   async function launch(kind: 'screen' | 'research', candidateKey?: string, brief?: ResearchBrief) {
+    setTab('Activity');
     const result = await call('POST', { kind, candidateKey, brief, idempotencyKey: crypto.randomUUID(), workspace });
-    if (result) { setMessage('Job queued. The worker will retain a source-linked evidence snapshot.'); setTab('Activity'); }
+    if (result) setMessage('Job queued. The worker will retain a source-linked evidence snapshot.');
   }
   async function recordReview(jobId: string, decision: 'request_analysis' | 'watchlist' | 'reject') {
     const rationale = (reviewNotes[jobId] ?? '').trim();
