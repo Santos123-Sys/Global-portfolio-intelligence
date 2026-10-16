@@ -1,0 +1,3958 @@
+{
+  "schemaVersion": "valuation-audit.v1",
+  "valuationVersionId": "flv1_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "issuerId": "us:0000320193",
+  "lineage": {
+    "schemaVersion": "financial-lineage.v1",
+    "issuer": {
+      "name": "Apple Inc.",
+      "ticker": "AAPL",
+      "registryId": "0000320193"
+    },
+    "accountingBasis": "us_gaap",
+    "scope": "consolidated",
+    "calculationVersion": "fcff-roic.v2",
+    "valuationDate": "2026-10-16",
+    "nodes": {
+      "actual:revenue:0": {
+        "id": "actual:revenue:0",
+        "label": "Revenue",
+        "value": 391035,
+        "unit": "USD millions",
+        "period": "FY2024",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of operations; revenue; comparative fiscal year/closing date ended September 28, 2024",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Total net sales \n(1)\n  102,466  \n \n 94,930  \n \n 416,161  \n \n 391,035",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:revenue:1": {
+        "id": "actual:revenue:1",
+        "label": "Revenue",
+        "value": 416161,
+        "unit": "USD millions",
+        "period": "FY2025",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of operations; revenue; fiscal year/closing date ended September 27, 2025",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Total net sales \n(1)\n  102,466  \n \n 94,930  \n \n 416,161  \n \n 391,035",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:ebit:0": {
+        "id": "actual:ebit:0",
+        "label": "Operating income (EBIT)",
+        "value": 123216,
+        "unit": "USD millions",
+        "period": "FY2024",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of operations; ebit; comparative fiscal year/closing date ended September 28, 2024",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Operating income  32,427  \n \n 29,591  \n \n 133,050  \n \n 123,216",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:ebit:1": {
+        "id": "actual:ebit:1",
+        "label": "Operating income (EBIT)",
+        "value": 133050,
+        "unit": "USD millions",
+        "period": "FY2025",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of operations; ebit; fiscal year/closing date ended September 27, 2025",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Operating income  32,427  \n \n 29,591  \n \n 133,050  \n \n 123,216",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:netIncome:0": {
+        "id": "actual:netIncome:0",
+        "label": "Net income",
+        "value": 93736,
+        "unit": "USD millions",
+        "period": "FY2024",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of operations; netIncome; comparative fiscal year/closing date ended September 28, 2024",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Net income $ 27,466  \n \n$ 14,736  \n \n$ 112,010  \n \n$ 93,736",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:netIncome:1": {
+        "id": "actual:netIncome:1",
+        "label": "Net income",
+        "value": 112010,
+        "unit": "USD millions",
+        "period": "FY2025",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of operations; netIncome; fiscal year/closing date ended September 27, 2025",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Net income $ 27,466  \n \n$ 14,736  \n \n$ 112,010  \n \n$ 93,736",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:eps:0": {
+        "id": "actual:eps:0",
+        "label": "Diluted EPS",
+        "value": 6.08,
+        "unit": "USD/share",
+        "period": "FY2024",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of operations; eps; comparative fiscal year/closing date ended September 28, 2024",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Diluted $ 1.85  \n \n$ 0.97  \n \n$ 7.46  \n \n$ 6.08",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:eps:1": {
+        "id": "actual:eps:1",
+        "label": "Diluted EPS",
+        "value": 7.46,
+        "unit": "USD/share",
+        "period": "FY2025",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of operations; eps; fiscal year/closing date ended September 27, 2025",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Diluted $ 1.85  \n \n$ 0.97  \n \n$ 7.46  \n \n$ 6.08",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:grossProfit:0": {
+        "id": "actual:grossProfit:0",
+        "label": "Gross profit",
+        "value": 180683,
+        "unit": "USD millions",
+        "period": "FY2024",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of operations; grossProfit; comparative fiscal year/closing date ended September 28, 2024",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Gross margin  48,341  \n \n 43,879  \n \n 195,201  \n \n 180,683",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:grossProfit:1": {
+        "id": "actual:grossProfit:1",
+        "label": "Gross profit",
+        "value": 195201,
+        "unit": "USD millions",
+        "period": "FY2025",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of operations; grossProfit; fiscal year/closing date ended September 27, 2025",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Gross margin  48,341  \n \n 43,879  \n \n 195,201  \n \n 180,683",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:operatingCashFlow:0": {
+        "id": "actual:operatingCashFlow:0",
+        "label": "Operating cash flow",
+        "value": 118254,
+        "unit": "USD millions",
+        "period": "FY2024",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of cash flows; operatingCashFlow; comparative fiscal year/closing date ended September 28, 2024",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Cash generated by operating activities  111,482  \n \n 118,254",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:operatingCashFlow:1": {
+        "id": "actual:operatingCashFlow:1",
+        "label": "Operating cash flow",
+        "value": 111482,
+        "unit": "USD millions",
+        "period": "FY2025",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of cash flows; operatingCashFlow; fiscal year/closing date ended September 27, 2025",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Cash generated by operating activities  111,482  \n \n 118,254",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:capex:0": {
+        "id": "actual:capex:0",
+        "label": "Capital expenditure",
+        "value": -9447,
+        "unit": "USD millions",
+        "period": "FY2024",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of cash flows; capex; comparative fiscal year/closing date ended September 28, 2024",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Payments for acquisition of property, plant and equipment  (12,715) \n \n (9,447)",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:capex:1": {
+        "id": "actual:capex:1",
+        "label": "Capital expenditure",
+        "value": -12715,
+        "unit": "USD millions",
+        "period": "FY2025",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of cash flows; capex; fiscal year/closing date ended September 27, 2025",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Payments for acquisition of property, plant and equipment  (12,715) \n \n (9,447)",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:cash:0": {
+        "id": "actual:cash:0",
+        "label": "Cash",
+        "value": 29943,
+        "unit": "USD millions",
+        "period": "FY2024",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of balance sheets; cash; comparative fiscal year/closing date ended September 28, 2024",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Cash and cash equivalents $ 35,934  \n \n$ 29,943",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:cash:1": {
+        "id": "actual:cash:1",
+        "label": "Cash",
+        "value": 35934,
+        "unit": "USD millions",
+        "period": "FY2025",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of balance sheets; cash; fiscal year/closing date ended September 27, 2025",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Cash and cash equivalents $ 35,934  \n \n$ 29,943",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:incomeBeforeTax:0": {
+        "id": "actual:incomeBeforeTax:0",
+        "label": "Pretax income",
+        "value": 123485,
+        "unit": "USD millions",
+        "period": "FY2024",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of operations; incomeBeforeTax; comparative fiscal year/closing date ended September 28, 2024",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Income before provision for income taxes  32,804  \n \n 29,610  \n \n 132,729  \n \n 123,485",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:incomeBeforeTax:1": {
+        "id": "actual:incomeBeforeTax:1",
+        "label": "Pretax income",
+        "value": 132729,
+        "unit": "USD millions",
+        "period": "FY2025",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of operations; incomeBeforeTax; fiscal year/closing date ended September 27, 2025",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Income before provision for income taxes  32,804  \n \n 29,610  \n \n 132,729  \n \n 123,485",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:incomeTaxExpense:0": {
+        "id": "actual:incomeTaxExpense:0",
+        "label": "Income tax expense",
+        "value": 29749,
+        "unit": "USD millions",
+        "period": "FY2024",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of operations; incomeTaxExpense; comparative fiscal year/closing date ended September 28, 2024",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Provision for income taxes  5,338  \n \n 14,874  \n \n 20,719  \n \n 29,749",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:incomeTaxExpense:1": {
+        "id": "actual:incomeTaxExpense:1",
+        "label": "Income tax expense",
+        "value": 20719,
+        "unit": "USD millions",
+        "period": "FY2025",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of operations; incomeTaxExpense; fiscal year/closing date ended September 27, 2025",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Provision for income taxes  5,338  \n \n 14,874  \n \n 20,719  \n \n 29,749",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:accountsReceivable:0": {
+        "id": "actual:accountsReceivable:0",
+        "label": "Trade receivables",
+        "value": 33410,
+        "unit": "USD millions",
+        "period": "FY2024",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of balance sheets; accountsReceivable; comparative fiscal year/closing date ended September 28, 2024",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Accounts receivable, net  39,777  \n \n 33,410",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:accountsReceivable:1": {
+        "id": "actual:accountsReceivable:1",
+        "label": "Trade receivables",
+        "value": 39777,
+        "unit": "USD millions",
+        "period": "FY2025",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of balance sheets; accountsReceivable; fiscal year/closing date ended September 27, 2025",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Accounts receivable, net  39,777  \n \n 33,410",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:inventory:0": {
+        "id": "actual:inventory:0",
+        "label": "Inventory",
+        "value": 7286,
+        "unit": "USD millions",
+        "period": "FY2024",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of balance sheets; inventory; comparative fiscal year/closing date ended September 28, 2024",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Inventories  5,718  \n \n 7,286",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:inventory:1": {
+        "id": "actual:inventory:1",
+        "label": "Inventory",
+        "value": 5718,
+        "unit": "USD millions",
+        "period": "FY2025",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of balance sheets; inventory; fiscal year/closing date ended September 27, 2025",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Inventories  5,718  \n \n 7,286",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:accountsPayable:0": {
+        "id": "actual:accountsPayable:0",
+        "label": "Trade payables",
+        "value": 68960,
+        "unit": "USD millions",
+        "period": "FY2024",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of balance sheets; accountsPayable; comparative fiscal year/closing date ended September 28, 2024",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Accounts payable $ 69,860\n  \n \n$ 68,960",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "actual:accountsPayable:1": {
+        "id": "actual:accountsPayable:1",
+        "label": "Trade payables",
+        "value": 69860,
+        "unit": "USD millions",
+        "period": "FY2025",
+        "classification": "reported_actual",
+        "status": "source_linked",
+        "inputs": [],
+        "sources": [
+          {
+            "section": "Condensed consolidated statements of balance sheets; accountsPayable; fiscal year/closing date ended September 27, 2025",
+            "sourceForm": "Issuer FY2025 unaudited earnings statement PDF",
+            "kind": "excerpt",
+            "quote": "Accounts payable $ 69,860\n  \n \n$ 68,960",
+            "url": "https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf",
+            "publisher": "Apple Inc.",
+            "accessed": "2026-10-09"
+          }
+        ],
+        "retrievalMethod": "Document extraction; exact retrieval method not recorded in this analysis",
+        "checks": [
+          "Metric and period locator matched. Source link is not a financial reconciliation."
+        ],
+        "limitations": []
+      },
+      "dcf.currency": {
+        "id": "dcf.currency",
+        "label": "Reporting currency",
+        "value": "USD",
+        "unit": "",
+        "period": "FY2025",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.base_period": {
+        "id": "dcf.base_period",
+        "label": "Annual forecast base period",
+        "value": "FY2025",
+        "unit": "",
+        "period": "FY2025",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.base_revenue": {
+        "id": "dcf.base_revenue",
+        "label": "Annual base revenue",
+        "value": 416161,
+        "unit": "USD millions",
+        "period": "FY2025",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Reported FY2025 annual revenue: third numeric column in statement of operations, after two quarterly columns. USD millions.",
+        "inputs": [
+          "actual:revenue:1"
+        ],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.equity_adjustment": {
+        "id": "dcf.equity_adjustment",
+        "label": "Other equity bridge adjustments",
+        "value": 0,
+        "unit": "USD millions",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit illustrative analyst zero. Excludes current/non-current marketable securities18,763/77,723 and makes no verified preferred/minority-interest claim. Not a fully reconciled investable equity bridge.",
+        "inputs": [],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.net_debt": {
+        "id": "dcf.net_debt",
+        "label": "Net debt",
+        "value": 62723,
+        "unit": "USD millions",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Analyst calculation: commercial paper7,979 + current term debt12,350 + long-term term debt78,328 − cash35,934 =62,723 USD millions, all as of2025-09-27. Leases excluded; not current valuation-date debt.",
+        "inputs": [
+          "actual:cash:1"
+        ],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.shares_outstanding": {
+        "id": "dcf.shares_outstanding",
+        "label": "Shares outstanding",
+        "value": 15004.697,
+        "unit": "million shares",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Source-disclosed FY2025 weighted-average diluted shares15,004,697 thousand /1,000 =15,004.697 million. Explicit demonstration convention; not period-end14,773.260 million common shares or refreshed valuation-date diluted shares. Avoid net-income/rounded-EPS approximation.",
+        "inputs": [
+          "actual:netIncome:1",
+          "actual:eps:1"
+        ],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": [
+          "Net income / diluted EPS is a weighted-average proxy. Confirm valuation-date dilution separately."
+        ]
+      },
+      "dcf.terminal_method": {
+        "id": "dcf.terminal_method",
+        "label": "Terminal method",
+        "value": "perpetuity_growth",
+        "unit": "",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.sbc_treatment": {
+        "id": "dcf.sbc_treatment",
+        "label": "SBC treatment",
+        "value": "expense_as_reported",
+        "unit": "",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.tax_rate": {
+        "id": "dcf.tax_rate",
+        "label": "Cash tax rate",
+        "value": 20,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [
+          "actual:incomeTaxExpense:1",
+          "actual:incomeBeforeTax:1"
+        ],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.da_pct_revenue": {
+        "id": "dcf.da_pct_revenue",
+        "label": "D&A as % of revenue",
+        "value": 2.8109313462818477,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Analyst ratio of reported D&A11,698 / reported revenue416,161 ×100; D&A source in cash flow statement. EBITDA is not fabricated.",
+        "inputs": [
+          "actual:ebit:1",
+          "actual:revenue:1"
+        ],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.capex_pct_revenue": {
+        "id": "dcf.capex_pct_revenue",
+        "label": "Capex as % of revenue",
+        "value": 3.0553079216937675,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Analyst ratio of absolute reported PP&E cash payments12,715 / revenue416,161 ×100; not total investing cash flow.",
+        "inputs": [
+          "actual:capex:1",
+          "actual:revenue:1"
+        ],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.nwc_pct_revenue": {
+        "id": "dcf.nwc_pct_revenue",
+        "label": "Operating NWC as % of revenue",
+        "value": -5.854705270316055,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Analyst proxy (A/R39,777 + inventory5,718 − A/P69,860) / revenue416,161 ×100. Excludes vendor non-trade receivables, deferred revenue and other operating balances; not complete operating working capital.",
+        "inputs": [
+          "actual:accountsReceivable:1",
+          "actual:inventory:1",
+          "actual:accountsPayable:1",
+          "actual:revenue:1"
+        ],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.risk_free_rate": {
+        "id": "dcf.risk_free_rate",
+        "label": "Risk-free rate",
+        "value": 4,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.beta": {
+        "id": "dcf.beta",
+        "label": "Equity beta",
+        "value": 1,
+        "unit": "x",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.equity_risk_premium": {
+        "id": "dcf.equity_risk_premium",
+        "label": "Equity risk premium",
+        "value": 5,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.pre_tax_cost_debt": {
+        "id": "dcf.pre_tax_cost_debt",
+        "label": "Pre-tax cost of debt",
+        "value": 5,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.debt_weight": {
+        "id": "dcf.debt_weight",
+        "label": "Debt weight in capital structure",
+        "value": 20,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.terminal_growth": {
+        "id": "dcf.terminal_growth",
+        "label": "Terminal growth",
+        "value": 2,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.terminal_roic": {
+        "id": "dcf.terminal_roic",
+        "label": "Terminal incremental ROIC",
+        "value": 20,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.scenario_growth_spread": {
+        "id": "dcf.scenario_growth_spread",
+        "label": "Bull/Bear growth spread",
+        "value": 1,
+        "unit": "pp",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.scenario_margin_spread": {
+        "id": "dcf.scenario_margin_spread",
+        "label": "Bull/Bear margin spread",
+        "value": 1,
+        "unit": "pp",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.scenario_wacc_spread": {
+        "id": "dcf.scenario_wacc_spread",
+        "label": "Bull/Bear WACC spread",
+        "value": 0.5,
+        "unit": "pp",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.scenario_terminal_spread": {
+        "id": "dcf.scenario_terminal_spread",
+        "label": "Bull/Bear terminal growth spread",
+        "value": 0.5,
+        "unit": "pp",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.revenue_growth_y1": {
+        "id": "dcf.revenue_growth_y1",
+        "label": "Revenue growth — Year 1",
+        "value": 5,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [
+          "actual:revenue:1",
+          "actual:revenue:0"
+        ],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.ebit_margin_y1": {
+        "id": "dcf.ebit_margin_y1",
+        "label": "EBIT margin — Year 1",
+        "value": 31.970799762591884,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [
+          "actual:ebit:1",
+          "actual:revenue:1"
+        ],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.revenue_growth_y2": {
+        "id": "dcf.revenue_growth_y2",
+        "label": "Revenue growth — Year 2",
+        "value": 5,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [
+          "actual:revenue:1",
+          "actual:revenue:0"
+        ],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.ebit_margin_y2": {
+        "id": "dcf.ebit_margin_y2",
+        "label": "EBIT margin — Year 2",
+        "value": 31.970799762591884,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [
+          "actual:ebit:1",
+          "actual:revenue:1"
+        ],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.revenue_growth_y3": {
+        "id": "dcf.revenue_growth_y3",
+        "label": "Revenue growth — Year 3",
+        "value": 4,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [
+          "actual:revenue:1",
+          "actual:revenue:0"
+        ],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.ebit_margin_y3": {
+        "id": "dcf.ebit_margin_y3",
+        "label": "EBIT margin — Year 3",
+        "value": 31.970799762591884,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [
+          "actual:ebit:1",
+          "actual:revenue:1"
+        ],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.revenue_growth_y4": {
+        "id": "dcf.revenue_growth_y4",
+        "label": "Revenue growth — Year 4",
+        "value": 4,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [
+          "actual:revenue:1",
+          "actual:revenue:0"
+        ],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.ebit_margin_y4": {
+        "id": "dcf.ebit_margin_y4",
+        "label": "EBIT margin — Year 4",
+        "value": 31.970799762591884,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [
+          "actual:ebit:1",
+          "actual:revenue:1"
+        ],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.revenue_growth_y5": {
+        "id": "dcf.revenue_growth_y5",
+        "label": "Revenue growth — Year 5",
+        "value": 3,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [
+          "actual:revenue:1",
+          "actual:revenue:0"
+        ],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.ebit_margin_y5": {
+        "id": "dcf.ebit_margin_y5",
+        "label": "EBIT margin — Year 5",
+        "value": 31.970799762591884,
+        "unit": "%",
+        "period": "Analyst scenario",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Explicit analyst simulation assumption for demonstration; neither issuer guidance, external consensus nor a currently observed market rate.",
+        "inputs": [
+          "actual:ebit:1",
+          "actual:revenue:1"
+        ],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "dcf.valuation_date": {
+        "id": "dcf.valuation_date",
+        "label": "Valuation date",
+        "value": "2026-10-16",
+        "unit": "",
+        "period": "FY2025",
+        "classification": "user_assumption",
+        "status": "user_supplied",
+        "formula": "Date of this illustrative analyst calculation; source balances and shares remain historical.",
+        "inputs": [],
+        "sources": [],
+        "retrievalMethod": "Reviewed or edited by analyst; source-linked starting point is not a forecast fact",
+        "checks": [
+          "Review state: edited"
+        ],
+        "limitations": []
+      },
+      "forecast:Y1:revenue": {
+        "id": "forecast:Y1:revenue",
+        "label": "Y1 revenue",
+        "value": 436969.05,
+        "unit": "USD millions",
+        "period": "Y1",
+        "formula": "Prior revenue × (1 + growth / 100)",
+        "inputs": [
+          "dcf.base_revenue",
+          "dcf.revenue_growth_y1"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y1:ebit_margin": {
+        "id": "forecast:Y1:ebit_margin",
+        "label": "Y1 operating margin",
+        "value": 31.97,
+        "unit": "%",
+        "period": "Y1",
+        "formula": "User-approved operating margin",
+        "inputs": [
+          "dcf.ebit_margin_y1"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y1:ebit": {
+        "id": "forecast:Y1:ebit",
+        "label": "Y1 EBIT",
+        "value": 139702.5,
+        "unit": "USD millions",
+        "period": "Y1",
+        "formula": "Revenue × operating margin / 100",
+        "inputs": [
+          "forecast:Y1:revenue",
+          "forecast:Y1:ebit_margin"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y1:nopat": {
+        "id": "forecast:Y1:nopat",
+        "label": "Y1 NOPAT",
+        "value": 111762,
+        "unit": "USD millions",
+        "period": "Y1",
+        "formula": "EBIT − max(EBIT, 0) × tax rate / 100",
+        "inputs": [
+          "forecast:Y1:ebit",
+          "dcf.tax_rate"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y1:d_and_a": {
+        "id": "forecast:Y1:d_and_a",
+        "label": "Y1 D&A",
+        "value": 12282.9,
+        "unit": "USD millions",
+        "period": "Y1",
+        "formula": "Revenue × D&A / revenue ratio",
+        "inputs": [
+          "forecast:Y1:revenue",
+          "dcf.da_pct_revenue"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y1:capex": {
+        "id": "forecast:Y1:capex",
+        "label": "Y1 capex",
+        "value": 13350.75,
+        "unit": "USD millions",
+        "period": "Y1",
+        "formula": "Revenue × capex / revenue ratio",
+        "inputs": [
+          "forecast:Y1:revenue",
+          "dcf.capex_pct_revenue"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y1:change_nwc": {
+        "id": "forecast:Y1:change_nwc",
+        "label": "Y1 change in NWC",
+        "value": -1218.25,
+        "unit": "USD millions",
+        "period": "Y1",
+        "formula": "(Current revenue − prior revenue) × operating NWC / revenue ratio",
+        "inputs": [
+          "forecast:Y1:revenue",
+          "dcf.base_revenue",
+          "dcf.nwc_pct_revenue"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y1:fcff": {
+        "id": "forecast:Y1:fcff",
+        "label": "Y1 FCFF",
+        "value": 111912.4,
+        "unit": "USD millions",
+        "period": "Y1",
+        "formula": "NOPAT + D&A − capex − change in NWC",
+        "inputs": [
+          "forecast:Y1:nopat",
+          "forecast:Y1:d_and_a",
+          "forecast:Y1:capex",
+          "forecast:Y1:change_nwc"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y2:revenue": {
+        "id": "forecast:Y2:revenue",
+        "label": "Y2 revenue",
+        "value": 458817.5,
+        "unit": "USD millions",
+        "period": "Y2",
+        "formula": "Prior revenue × (1 + growth / 100)",
+        "inputs": [
+          "forecast:Y1:revenue",
+          "dcf.revenue_growth_y2"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y2:ebit_margin": {
+        "id": "forecast:Y2:ebit_margin",
+        "label": "Y2 operating margin",
+        "value": 31.97,
+        "unit": "%",
+        "period": "Y2",
+        "formula": "User-approved operating margin",
+        "inputs": [
+          "dcf.ebit_margin_y2"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y2:ebit": {
+        "id": "forecast:Y2:ebit",
+        "label": "Y2 EBIT",
+        "value": 146687.63,
+        "unit": "USD millions",
+        "period": "Y2",
+        "formula": "Revenue × operating margin / 100",
+        "inputs": [
+          "forecast:Y2:revenue",
+          "forecast:Y2:ebit_margin"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y2:nopat": {
+        "id": "forecast:Y2:nopat",
+        "label": "Y2 NOPAT",
+        "value": 117350.1,
+        "unit": "USD millions",
+        "period": "Y2",
+        "formula": "EBIT − max(EBIT, 0) × tax rate / 100",
+        "inputs": [
+          "forecast:Y2:ebit",
+          "dcf.tax_rate"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y2:d_and_a": {
+        "id": "forecast:Y2:d_and_a",
+        "label": "Y2 D&A",
+        "value": 12897.05,
+        "unit": "USD millions",
+        "period": "Y2",
+        "formula": "Revenue × D&A / revenue ratio",
+        "inputs": [
+          "forecast:Y2:revenue",
+          "dcf.da_pct_revenue"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y2:capex": {
+        "id": "forecast:Y2:capex",
+        "label": "Y2 capex",
+        "value": 14018.29,
+        "unit": "USD millions",
+        "period": "Y2",
+        "formula": "Revenue × capex / revenue ratio",
+        "inputs": [
+          "forecast:Y2:revenue",
+          "dcf.capex_pct_revenue"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y2:change_nwc": {
+        "id": "forecast:Y2:change_nwc",
+        "label": "Y2 change in NWC",
+        "value": -1279.16,
+        "unit": "USD millions",
+        "period": "Y2",
+        "formula": "(Current revenue − prior revenue) × operating NWC / revenue ratio",
+        "inputs": [
+          "forecast:Y2:revenue",
+          "forecast:Y1:revenue",
+          "dcf.nwc_pct_revenue"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y2:fcff": {
+        "id": "forecast:Y2:fcff",
+        "label": "Y2 FCFF",
+        "value": 117508.02,
+        "unit": "USD millions",
+        "period": "Y2",
+        "formula": "NOPAT + D&A − capex − change in NWC",
+        "inputs": [
+          "forecast:Y2:nopat",
+          "forecast:Y2:d_and_a",
+          "forecast:Y2:capex",
+          "forecast:Y2:change_nwc"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y3:revenue": {
+        "id": "forecast:Y3:revenue",
+        "label": "Y3 revenue",
+        "value": 477170.2,
+        "unit": "USD millions",
+        "period": "Y3",
+        "formula": "Prior revenue × (1 + growth / 100)",
+        "inputs": [
+          "forecast:Y2:revenue",
+          "dcf.revenue_growth_y3"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y3:ebit_margin": {
+        "id": "forecast:Y3:ebit_margin",
+        "label": "Y3 operating margin",
+        "value": 31.97,
+        "unit": "%",
+        "period": "Y3",
+        "formula": "User-approved operating margin",
+        "inputs": [
+          "dcf.ebit_margin_y3"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y3:ebit": {
+        "id": "forecast:Y3:ebit",
+        "label": "Y3 EBIT",
+        "value": 152555.13,
+        "unit": "USD millions",
+        "period": "Y3",
+        "formula": "Revenue × operating margin / 100",
+        "inputs": [
+          "forecast:Y3:revenue",
+          "forecast:Y3:ebit_margin"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y3:nopat": {
+        "id": "forecast:Y3:nopat",
+        "label": "Y3 NOPAT",
+        "value": 122044.1,
+        "unit": "USD millions",
+        "period": "Y3",
+        "formula": "EBIT − max(EBIT, 0) × tax rate / 100",
+        "inputs": [
+          "forecast:Y3:ebit",
+          "dcf.tax_rate"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y3:d_and_a": {
+        "id": "forecast:Y3:d_and_a",
+        "label": "Y3 D&A",
+        "value": 13412.93,
+        "unit": "USD millions",
+        "period": "Y3",
+        "formula": "Revenue × D&A / revenue ratio",
+        "inputs": [
+          "forecast:Y3:revenue",
+          "dcf.da_pct_revenue"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y3:capex": {
+        "id": "forecast:Y3:capex",
+        "label": "Y3 capex",
+        "value": 14579.02,
+        "unit": "USD millions",
+        "period": "Y3",
+        "formula": "Revenue × capex / revenue ratio",
+        "inputs": [
+          "forecast:Y3:revenue",
+          "dcf.capex_pct_revenue"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y3:change_nwc": {
+        "id": "forecast:Y3:change_nwc",
+        "label": "Y3 change in NWC",
+        "value": -1074.5,
+        "unit": "USD millions",
+        "period": "Y3",
+        "formula": "(Current revenue − prior revenue) × operating NWC / revenue ratio",
+        "inputs": [
+          "forecast:Y3:revenue",
+          "forecast:Y2:revenue",
+          "dcf.nwc_pct_revenue"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y3:fcff": {
+        "id": "forecast:Y3:fcff",
+        "label": "Y3 FCFF",
+        "value": 121952.51,
+        "unit": "USD millions",
+        "period": "Y3",
+        "formula": "NOPAT + D&A − capex − change in NWC",
+        "inputs": [
+          "forecast:Y3:nopat",
+          "forecast:Y3:d_and_a",
+          "forecast:Y3:capex",
+          "forecast:Y3:change_nwc"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y4:revenue": {
+        "id": "forecast:Y4:revenue",
+        "label": "Y4 revenue",
+        "value": 496257.01,
+        "unit": "USD millions",
+        "period": "Y4",
+        "formula": "Prior revenue × (1 + growth / 100)",
+        "inputs": [
+          "forecast:Y3:revenue",
+          "dcf.revenue_growth_y4"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y4:ebit_margin": {
+        "id": "forecast:Y4:ebit_margin",
+        "label": "Y4 operating margin",
+        "value": 31.97,
+        "unit": "%",
+        "period": "Y4",
+        "formula": "User-approved operating margin",
+        "inputs": [
+          "dcf.ebit_margin_y4"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y4:ebit": {
+        "id": "forecast:Y4:ebit",
+        "label": "Y4 EBIT",
+        "value": 158657.34,
+        "unit": "USD millions",
+        "period": "Y4",
+        "formula": "Revenue × operating margin / 100",
+        "inputs": [
+          "forecast:Y4:revenue",
+          "forecast:Y4:ebit_margin"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y4:nopat": {
+        "id": "forecast:Y4:nopat",
+        "label": "Y4 NOPAT",
+        "value": 126925.87,
+        "unit": "USD millions",
+        "period": "Y4",
+        "formula": "EBIT − max(EBIT, 0) × tax rate / 100",
+        "inputs": [
+          "forecast:Y4:ebit",
+          "dcf.tax_rate"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y4:d_and_a": {
+        "id": "forecast:Y4:d_and_a",
+        "label": "Y4 D&A",
+        "value": 13949.44,
+        "unit": "USD millions",
+        "period": "Y4",
+        "formula": "Revenue × D&A / revenue ratio",
+        "inputs": [
+          "forecast:Y4:revenue",
+          "dcf.da_pct_revenue"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y4:capex": {
+        "id": "forecast:Y4:capex",
+        "label": "Y4 capex",
+        "value": 15162.18,
+        "unit": "USD millions",
+        "period": "Y4",
+        "formula": "Revenue × capex / revenue ratio",
+        "inputs": [
+          "forecast:Y4:revenue",
+          "dcf.capex_pct_revenue"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y4:change_nwc": {
+        "id": "forecast:Y4:change_nwc",
+        "label": "Y4 change in NWC",
+        "value": -1117.48,
+        "unit": "USD millions",
+        "period": "Y4",
+        "formula": "(Current revenue − prior revenue) × operating NWC / revenue ratio",
+        "inputs": [
+          "forecast:Y4:revenue",
+          "forecast:Y3:revenue",
+          "dcf.nwc_pct_revenue"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y4:fcff": {
+        "id": "forecast:Y4:fcff",
+        "label": "Y4 FCFF",
+        "value": 126830.61,
+        "unit": "USD millions",
+        "period": "Y4",
+        "formula": "NOPAT + D&A − capex − change in NWC",
+        "inputs": [
+          "forecast:Y4:nopat",
+          "forecast:Y4:d_and_a",
+          "forecast:Y4:capex",
+          "forecast:Y4:change_nwc"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y5:revenue": {
+        "id": "forecast:Y5:revenue",
+        "label": "Y5 revenue",
+        "value": 511144.72,
+        "unit": "USD millions",
+        "period": "Y5",
+        "formula": "Prior revenue × (1 + growth / 100)",
+        "inputs": [
+          "forecast:Y4:revenue",
+          "dcf.revenue_growth_y5"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y5:ebit_margin": {
+        "id": "forecast:Y5:ebit_margin",
+        "label": "Y5 operating margin",
+        "value": 31.97,
+        "unit": "%",
+        "period": "Y5",
+        "formula": "User-approved operating margin",
+        "inputs": [
+          "dcf.ebit_margin_y5"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y5:ebit": {
+        "id": "forecast:Y5:ebit",
+        "label": "Y5 EBIT",
+        "value": 163417.06,
+        "unit": "USD millions",
+        "period": "Y5",
+        "formula": "Revenue × operating margin / 100",
+        "inputs": [
+          "forecast:Y5:revenue",
+          "forecast:Y5:ebit_margin"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y5:nopat": {
+        "id": "forecast:Y5:nopat",
+        "label": "Y5 NOPAT",
+        "value": 130733.64,
+        "unit": "USD millions",
+        "period": "Y5",
+        "formula": "EBIT − max(EBIT, 0) × tax rate / 100",
+        "inputs": [
+          "forecast:Y5:ebit",
+          "dcf.tax_rate"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y5:d_and_a": {
+        "id": "forecast:Y5:d_and_a",
+        "label": "Y5 D&A",
+        "value": 14367.93,
+        "unit": "USD millions",
+        "period": "Y5",
+        "formula": "Revenue × D&A / revenue ratio",
+        "inputs": [
+          "forecast:Y5:revenue",
+          "dcf.da_pct_revenue"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y5:capex": {
+        "id": "forecast:Y5:capex",
+        "label": "Y5 capex",
+        "value": 15617.05,
+        "unit": "USD millions",
+        "period": "Y5",
+        "formula": "Revenue × capex / revenue ratio",
+        "inputs": [
+          "forecast:Y5:revenue",
+          "dcf.capex_pct_revenue"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y5:change_nwc": {
+        "id": "forecast:Y5:change_nwc",
+        "label": "Y5 change in NWC",
+        "value": -871.63,
+        "unit": "USD millions",
+        "period": "Y5",
+        "formula": "(Current revenue − prior revenue) × operating NWC / revenue ratio",
+        "inputs": [
+          "forecast:Y5:revenue",
+          "forecast:Y4:revenue",
+          "dcf.nwc_pct_revenue"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "forecast:Y5:fcff": {
+        "id": "forecast:Y5:fcff",
+        "label": "Y5 FCFF",
+        "value": 130356.16,
+        "unit": "USD millions",
+        "period": "Y5",
+        "formula": "NOPAT + D&A − capex − change in NWC",
+        "inputs": [
+          "forecast:Y5:nopat",
+          "forecast:Y5:d_and_a",
+          "forecast:Y5:capex",
+          "forecast:Y5:change_nwc"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "dcf:wacc": {
+        "id": "dcf:wacc",
+        "label": "WACC",
+        "value": 8,
+        "unit": "%",
+        "period": "2026-10-16",
+        "formula": "(1 − debt weight) × (risk-free + beta × ERP) + debt weight × cost of debt × (1 − tax rate)",
+        "inputs": [
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.tax_rate"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "dcf:terminal_growth": {
+        "id": "dcf:terminal_growth",
+        "label": "Terminal growth",
+        "value": 2,
+        "unit": "%",
+        "period": "Perpetuity",
+        "formula": "Reviewed nominal growth assumption",
+        "inputs": [
+          "dcf.terminal_growth"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "terminal:nopat": {
+        "id": "terminal:nopat",
+        "label": "Terminal NOPAT",
+        "value": 133348.31708889603,
+        "unit": "USD millions",
+        "period": "Y6",
+        "formula": "Y5 NOPAT × (1 + g / 100)",
+        "inputs": [
+          "forecast:Y5:nopat",
+          "dcf.terminal_growth"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "terminal:reinvestment_rate": {
+        "id": "terminal:reinvestment_rate",
+        "label": "Terminal reinvestment rate",
+        "value": 10,
+        "unit": "%",
+        "period": "Perpetuity",
+        "formula": "g / terminal incremental ROIC × 100",
+        "inputs": [
+          "dcf.terminal_growth",
+          "dcf.terminal_roic"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "terminal:reinvestment": {
+        "id": "terminal:reinvestment",
+        "label": "Terminal reinvestment",
+        "value": 13334.831708889602,
+        "unit": "USD millions",
+        "period": "Y6",
+        "formula": "Terminal NOPAT × reinvestment rate / 100",
+        "inputs": [
+          "terminal:nopat",
+          "terminal:reinvestment_rate"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "terminal:fcff": {
+        "id": "terminal:fcff",
+        "label": "Terminal FCFF",
+        "value": 120013.48538000643,
+        "unit": "USD millions",
+        "period": "Y6",
+        "formula": "Terminal NOPAT − terminal reinvestment",
+        "inputs": [
+          "terminal:nopat",
+          "terminal:reinvestment"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_forecast",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "dcf:terminal_value": {
+        "id": "dcf:terminal_value",
+        "label": "Terminal enterprise value",
+        "value": 2000224.76,
+        "unit": "USD millions",
+        "period": "End of Y5",
+        "formula": "Terminal FCFF in Y6 / ((WACC − g) / 100)",
+        "inputs": [
+          "terminal:fcff",
+          "dcf:wacc",
+          "dcf:terminal_growth"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "dcf:enterprise_value": {
+        "id": "dcf:enterprise_value",
+        "label": "Enterprise value",
+        "value": 1844438.47,
+        "unit": "USD millions",
+        "period": "2026-10-16",
+        "formula": "Σ FCFF_t / (1 + WACC/100)^t + terminal value / (1 + WACC/100)^5",
+        "inputs": [
+          "forecast:Y1:fcff",
+          "forecast:Y2:fcff",
+          "forecast:Y3:fcff",
+          "forecast:Y4:fcff",
+          "forecast:Y5:fcff",
+          "dcf:wacc",
+          "dcf:terminal_value"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "dcf:equity_value": {
+        "id": "dcf:equity_value",
+        "label": "Equity value",
+        "value": 1781715.47,
+        "unit": "USD millions",
+        "period": "2026-10-16",
+        "formula": "Enterprise value − net debt + other equity adjustments",
+        "inputs": [
+          "dcf:enterprise_value",
+          "dcf.net_debt",
+          "dcf.equity_adjustment"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "dcf:implied_per_share": {
+        "id": "dcf:implied_per_share",
+        "label": "Implied value per share",
+        "value": 118.74,
+        "unit": "USD/share",
+        "period": "2026-10-16",
+        "formula": "Equity value / valuation-date diluted shares",
+        "inputs": [
+          "dcf:equity_value",
+          "dcf.shares_outstanding"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:0:0": {
+        "id": "sensitivity:0:0",
+        "label": "DCF sensitivity",
+        "value": 134.95,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=7%, g=1.5%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:0:1": {
+        "id": "sensitivity:0:1",
+        "label": "DCF sensitivity",
+        "value": 138.77,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=7%, g=1.75%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:0:2": {
+        "id": "sensitivity:0:2",
+        "label": "DCF sensitivity",
+        "value": 142.96,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=7%, g=2%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:0:3": {
+        "id": "sensitivity:0:3",
+        "label": "DCF sensitivity",
+        "value": 147.59,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=7%, g=2.25%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:0:4": {
+        "id": "sensitivity:0:4",
+        "label": "DCF sensitivity",
+        "value": 152.72,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=7%, g=2.5%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:1:0": {
+        "id": "sensitivity:1:0",
+        "label": "DCF sensitivity",
+        "value": 123.43,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=7.5%, g=1.5%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:1:1": {
+        "id": "sensitivity:1:1",
+        "label": "DCF sensitivity",
+        "value": 126.46,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=7.5%, g=1.75%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:1:2": {
+        "id": "sensitivity:1:2",
+        "label": "DCF sensitivity",
+        "value": 129.76,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=7.5%, g=2%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:1:3": {
+        "id": "sensitivity:1:3",
+        "label": "DCF sensitivity",
+        "value": 133.36,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=7.5%, g=2.25%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:1:4": {
+        "id": "sensitivity:1:4",
+        "label": "DCF sensitivity",
+        "value": 137.32,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=7.5%, g=2.5%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:2:0": {
+        "id": "sensitivity:2:0",
+        "label": "DCF sensitivity",
+        "value": 113.67,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=8%, g=1.5%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:2:1": {
+        "id": "sensitivity:2:1",
+        "label": "DCF sensitivity",
+        "value": 116.11,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=8%, g=1.75%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:2:2": {
+        "id": "sensitivity:2:2",
+        "label": "DCF sensitivity",
+        "value": 118.74,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=8%, g=2%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:2:3": {
+        "id": "sensitivity:2:3",
+        "label": "DCF sensitivity",
+        "value": 121.6,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=8%, g=2.25%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:2:4": {
+        "id": "sensitivity:2:4",
+        "label": "DCF sensitivity",
+        "value": 124.71,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=8%, g=2.5%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:3:0": {
+        "id": "sensitivity:3:0",
+        "label": "DCF sensitivity",
+        "value": 105.3,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=8.5%, g=1.5%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:3:1": {
+        "id": "sensitivity:3:1",
+        "label": "DCF sensitivity",
+        "value": 107.29,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=8.5%, g=1.75%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:3:2": {
+        "id": "sensitivity:3:2",
+        "label": "DCF sensitivity",
+        "value": 109.42,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=8.5%, g=2%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:3:3": {
+        "id": "sensitivity:3:3",
+        "label": "DCF sensitivity",
+        "value": 111.72,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=8.5%, g=2.25%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:3:4": {
+        "id": "sensitivity:3:4",
+        "label": "DCF sensitivity",
+        "value": 114.2,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=8.5%, g=2.5%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:4:0": {
+        "id": "sensitivity:4:0",
+        "label": "DCF sensitivity",
+        "value": 98.05,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=9%, g=1.5%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:4:1": {
+        "id": "sensitivity:4:1",
+        "label": "DCF sensitivity",
+        "value": 99.68,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=9%, g=1.75%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:4:2": {
+        "id": "sensitivity:4:2",
+        "label": "DCF sensitivity",
+        "value": 101.43,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=9%, g=2%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:4:3": {
+        "id": "sensitivity:4:3",
+        "label": "DCF sensitivity",
+        "value": 103.29,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=9%, g=2.25%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "sensitivity:4:4": {
+        "id": "sensitivity:4:4",
+        "label": "DCF sensitivity",
+        "value": 105.3,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun v2 with WACC=9%, g=2.5%; all remaining reviewed assumptions fixed",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "scenario:bull": {
+        "id": "scenario:bull",
+        "label": "bull scenario",
+        "value": 148.26,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun reviewed ledger using approved scenario growth, margin, WACC and terminal-growth spreads; not probabilities",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "scenario:base": {
+        "id": "scenario:base",
+        "label": "base scenario",
+        "value": 118.74,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun reviewed ledger using approved scenario growth, margin, WACC and terminal-growth spreads; not probabilities",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      },
+      "scenario:bear": {
+        "id": "scenario:bear",
+        "label": "bear scenario",
+        "value": 97.42,
+        "unit": "USD/share",
+        "period": "Scenario",
+        "formula": "Rerun reviewed ledger using approved scenario growth, margin, WACC and terminal-growth spreads; not probabilities",
+        "inputs": [
+          "dcf.currency",
+          "dcf.base_period",
+          "dcf.base_revenue",
+          "dcf.equity_adjustment",
+          "dcf.net_debt",
+          "dcf.shares_outstanding",
+          "dcf.terminal_method",
+          "dcf.sbc_treatment",
+          "dcf.tax_rate",
+          "dcf.da_pct_revenue",
+          "dcf.capex_pct_revenue",
+          "dcf.nwc_pct_revenue",
+          "dcf.risk_free_rate",
+          "dcf.beta",
+          "dcf.equity_risk_premium",
+          "dcf.pre_tax_cost_debt",
+          "dcf.debt_weight",
+          "dcf.terminal_growth",
+          "dcf.terminal_roic",
+          "dcf.scenario_growth_spread",
+          "dcf.scenario_margin_spread",
+          "dcf.scenario_wacc_spread",
+          "dcf.scenario_terminal_spread",
+          "dcf.revenue_growth_y1",
+          "dcf.ebit_margin_y1",
+          "dcf.revenue_growth_y2",
+          "dcf.ebit_margin_y2",
+          "dcf.revenue_growth_y3",
+          "dcf.ebit_margin_y3",
+          "dcf.revenue_growth_y4",
+          "dcf.ebit_margin_y4",
+          "dcf.revenue_growth_y5",
+          "dcf.ebit_margin_y5",
+          "dcf.valuation_date"
+        ],
+        "sources": [],
+        "retrievalMethod": "Deterministic calculation from the reviewed ledger",
+        "classification": "calculated_metric",
+        "status": "calculated",
+        "checks": [
+          "Calculation provenance; not a statement of forecast accuracy."
+        ],
+        "limitations": [
+          "Displayed values may be rounded. Reproduce from full reviewed inputs and calculation version."
+        ]
+      }
+    }
+  }
+}

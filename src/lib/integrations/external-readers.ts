@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PortfolioExposureV1, RiskRunV1, ValuationVersionV1 } from './shared-contracts';
+import { ValuationAudit } from './valuation-lineage';
 
 export class ProviderReadError extends Error {
   constructor(readonly code: 'invalid_configuration' | 'request_failed' | 'provider_unavailable' |
@@ -11,7 +12,7 @@ export class ProviderReadError extends Error {
 type ProviderConfig = { baseUrl: string; token: string; workspaceId?: string; fetch?: typeof fetch };
 
 /** One bounded, read-only request. Provider failure cannot become a synthetic fact. */
-async function externalJson(path: string, config: ProviderConfig): Promise<unknown> {
+async function externalJson(path: string, config: ProviderConfig, maxBytes = 128_000): Promise<unknown> {
   let base: URL;
   try { base = new URL(config.baseUrl); } catch { throw new ProviderReadError('invalid_configuration'); }
   if (base.protocol !== 'https:' || base.username || base.password || base.search ||
@@ -32,7 +33,7 @@ async function externalJson(path: string, config: ProviderConfig): Promise<unkno
   if (!response.headers.get('content-type')?.includes('application/json')) {
     await response.body?.cancel(); throw new ProviderReadError('invalid_contract');
   }
-  if (Number(response.headers.get('content-length')) > 128_000) {
+  if (Number(response.headers.get('content-length')) > maxBytes) {
     await response.body?.cancel(); throw new ProviderReadError('response_too_large');
   }
   const reader = response.body?.getReader();
@@ -43,7 +44,7 @@ async function externalJson(path: string, config: ProviderConfig): Promise<unkno
       const { value, done } = await reader.read();
       if (done) break;
       size += value.length;
-      if (size > 128_000) { await reader.cancel(); throw new ProviderReadError('response_too_large'); }
+      if (size > maxBytes) { await reader.cancel(); throw new ProviderReadError('response_too_large'); }
       chunks.push(value);
     }
   } finally { reader.releaseLock(); }
@@ -91,4 +92,22 @@ export function mappedRiskStudioWorkspace(accountId: string, json: string): stri
   const mapping = z.record(z.string().uuid(), z.string().uuid()).safeParse(raw);
   if (!mapping.success) throw new ProviderReadError('invalid_configuration');
   return mapping.data[accountId] ?? null;
+}
+
+
+/** Saved audit evidence stays scoped to the same authorized workspace as its approved valuation. */
+export async function readValuationAudit(valuationId: string, issuerId: string, config: ProviderConfig) {
+  if (!/^flv1_[a-f0-9]{64}$/.test(valuationId) ||
+    !/^(us:\d{10}|br:\d{14})$/.test(issuerId) || !z.string().uuid().safeParse(config.workspaceId).success)
+    throw new ProviderReadError('invalid_configuration');
+  const raw = await externalJson('/api/integration/v1/valuations/' + valuationId + '/audit', config, 512_000);
+  const parsed = ValuationAudit.safeParse(raw);
+  if (!parsed.success) throw new ProviderReadError('invalid_contract');
+  const audit = parsed.data;
+  const [jurisdiction, registryId] = issuerId.split(':');
+  const savedRegistry = jurisdiction === 'us' ? String(audit.lineage.issuer.registryId ?? '').padStart(10, '0')
+    : String(audit.lineage.issuer.registryId ?? '').replace(/[^0-9]/g, '');
+  if (audit.valuationVersionId !== valuationId || audit.issuerId !== issuerId || savedRegistry !== registryId)
+    throw new ProviderReadError('identity_mismatch');
+  return audit;
 }

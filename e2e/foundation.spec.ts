@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { createHmac } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import seed from '../data/usa-cvm-universe.json' with { type: 'json' };
 import { defaultProfile } from '../src/lib/foundation/contracts';
 import fixture from '../tests/fixtures/filinglens-public-finance-v1.json' with { type: 'json' };
+import appleAudit from '../tests/fixtures/apple-valuation-audit-v1.json' with { type: 'json' };
 
 test('signed-out visitors must authenticate; legacy APIs no longer exist',async({page,request})=>{
   const redirect=await request.get('/',{maxRedirects:0});expect(redirect.status()).toBe(307);expect(redirect.headers().location).toContain('/login');
@@ -50,7 +52,8 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
     analysis:{asOf:'2026-10-15',baseCurrency:'USD',holdings:[{symbol:'AAPL',shares:12,price:100,value:1200,weight:1,riskContribution:null,quoteCurrency:'USD',localPrice:100,fxRate:1,fxDate:'2026-10-15'}],
       metrics:{volatility:.2,var95:.03,maxDrawdown:-.1},returns:{lookbackReturn:.05,contributions:[{symbol:'AAPL',contribution:.05}]},
       valuationDiagnostics:[],allocation:null,feedback:[],warnings:[],fxSources:[],methodology:'Synthetic browser fixture.'}
-  }],valuations:[],providerConfigured:true}}));
+  }],valuations:[{candidateKey:candidate.key,valuation:{valuationVersionId:appleAudit.valuationVersionId,method:'dcf',currency:'USD',impliedValuePerShare:'118.74',approvedAt:'2026-10-16T00:00:00Z'}}],providerConfigured:true}}));
+  await page.route('**/api/integration/v1/valuation-audit?**',route=>route.fulfill({json:{status:'ready',audit:appleAudit}}));
   await page.route('**/api/workspace?**',route=>route.fulfill({json:{version:'investment-workspace.v1',candidateKey:new URL(route.request().url()).searchParams.get('company'),issuerId:'us:0000320193',financialOrigin:'https://filinglens.example',checkedAt:'2026-10-15T00:00:00.000Z',documents:{status:'empty',count:0,ruleVersion:'corpus-integrity.v1'},valuations:{status:'empty',count:0},portfolio:{status:'empty',count:0}}}));
   await page.goto('/');await expect(page.getByRole('heading',{name:'Investment workspace',exact:true})).toBeVisible();
   await page.getByRole('tab',{name:'Candidates',exact:true}).click();await expect(page.getByRole('heading',{name:'Candidate watchlist'})).toBeVisible();
@@ -80,6 +83,30 @@ for(const width of [390,1440])test(`candidate → screen → research foundation
   expect(writes).toEqual(['screen','research','research','profile']);
   await page.getByRole('tab',{name:'Portfolio',exact:true}).click();
   await expect(page.getByRole('list',{name:'Integration review required'})).toContainText(identityWarning);
+  // Source-backed Apple example: only HTTP transport is mocked; source values/quotes are frozen public issuer evidence.
+  const evidenceButton=page.getByRole('button',{name:`Inspect ${candidate.key} reviewed valuation evidence`});
+  await evidenceButton.focus();await page.keyboard.press('Enter');
+  const evidenceDialog=page.getByRole('dialog',{name:`Saved valuation evidence · ${candidate.key}`});
+  await expect(evidenceDialog).toBeVisible();
+  await expect(evidenceDialog.getByRole('heading',{name:'Implied value per share: 118.74 USD/share'})).toBeFocused();
+  for(const input of ['Equity value:','Enterprise value:','Y1 FCFF:','Y1 NOPAT:','Y1 EBIT:','Y1 revenue:','Annual base revenue:','Revenue:']){
+    await evidenceDialog.getByRole('button',{name:new RegExp('^'+input.replaceAll('.', '\\.'))}).click();
+  }
+  await expect(evidenceDialog.getByRole('heading',{name:'Revenue: 416,161 USD millions'})).toBeVisible();
+  await expect(evidenceDialog.getByRole('link',{name:'Open original source'})).toHaveAttribute('href','https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf');
+  await expect(evidenceDialog.locator('blockquote')).toContainText('416,161');
+  await expect(evidenceDialog.locator('mark')).toHaveText('416,161');
+  await page.screenshot({path:`/tmp/gpi-valuation-evidence-${width}.png`});
+  const download=page.waitForEvent('download');await evidenceDialog.getByRole('button',{name:'Export saved evidence'}).click();
+  const exportedFile=await download;expect(exportedFile.suggestedFilename()).toBe('GPI-valuation-evidence.json');
+  const exported=JSON.parse(readFileSync((await exportedFile.path())!,'utf8'));
+  expect(exported.lineage.nodes['dcf:implied_per_share'].value).toBe(118.74);
+  expect(exported.lineage.nodes['actual:revenue:1']).toMatchObject({value:416161,sources:[{url:'https://www.apple.com/newsroom/pdfs/fy2025-q4/FY25_Q4_Consolidated_Financial_Statements.pdf'}]});
+  await page.keyboard.press('Escape');await expect(evidenceDialog).not.toBeVisible();await expect(evidenceButton).toBeFocused();
+  await page.route('**/api/integration/v1/valuation-audit?**',route=>route.fulfill({status:503,json:{status:'unavailable'}}));
+  await evidenceButton.click();await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Evidence could not be verified');
+  await expect(page.getByRole('dialog').locator('blockquote')).toHaveCount(0);await page.keyboard.press('Escape');
+
   await page.getByLabel('Portfolio holdings',{exact:true}).fill('AAPL,12');
   const consent=page.getByRole('checkbox',{name:'Share these holdings with Portfolio Risk Studio and retain the results in this GPI account.'});
   const calculate=page.getByRole('button',{name:'Calculate and save risk feedback'});
