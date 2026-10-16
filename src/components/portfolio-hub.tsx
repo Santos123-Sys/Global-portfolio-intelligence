@@ -1,11 +1,12 @@
 'use client';
 import {useState,useEffect} from 'react';
+import {ValuationEvidence} from './valuation-evidence';
 import useSWR from 'swr';
 import type {Candidate} from '@/lib/foundation/contracts';
 import type {z} from 'zod';
 import type {RiskResult} from '@/lib/integrations/portfolio-feedback';
 type Analysis=z.infer<typeof RiskResult>;
-type Data={runs:{id:string;name:string;analysis:Analysis;integrationWarnings?:string[];requestInputs?:{range:string;riskFreeRate:number;baseCurrency:string};sharedAt:string}[];valuations:{candidateKey:string;valuation:{valuationVersionId:string;currency:string;impliedValuePerShare:string;approvedAt:string}}[];providerConfigured:boolean};
+type Data={runs:{id:string;name:string;analysis:Analysis;integrationWarnings?:string[];requestInputs?:{range:string;riskFreeRate:number;baseCurrency:string};sharedAt:string}[];valuations:{candidateKey:string;valuation:{valuationVersionId:string;method:'dcf'|'comps';currency:string;impliedValuePerShare:string;approvedAt:string}}[];providerConfigured:boolean};
 async function read(url:string){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('Portfolio data unavailable');return r.json();}
 const pct=(n:number|null|undefined)=>n==null?'Unknown':(n*100).toFixed(2)+'%';
 export function PortfolioHub({candidates,onResearch}:{candidates:Candidate[];onResearch:(candidateKey:string,question:string)=>void}){
@@ -55,7 +56,7 @@ export function PortfolioHub({candidates,onResearch}:{candidates:Candidate[];onR
  {handoff&&<p><a href={handoff} target="_blank" rel="noreferrer">Open FilingLens for this company (two-hour workspace authorization)</a></p>}
  <h3>2. Synchronized reviewed valuations</h3><p>FilingLens now notifies GPI after approved publication. Returning from FilingLens also retries automatically when delivery was delayed. Manual import remains available for recovery.</p><input aria-label="Approved valuation version" value={version} onChange={e=>setVersion(e.target.value)} placeholder="flv1_…"/>
  <button disabled={!version||busy} onClick={()=>void post('/api/integration/v1/portfolio-feedback',{action:'import_valuation',candidateKey:key,valuationVersionId:version})}>Retry valuation import</button>
- <ul>{data?.valuations.map(v=><li key={v.valuation.valuationVersionId}>{v.candidateKey}: {v.valuation.currency} {v.valuation.impliedValuePerShare}/share · reviewed {new Date(v.valuation.approvedAt).toLocaleDateString()}</li>)}</ul>
+ <ul>{data?.valuations.map(v=><li key={v.valuation.valuationVersionId}>{v.candidateKey}: <ValuationEvidence candidateKey={v.candidateKey} valuation={v.valuation}/> · reviewed {new Date(v.valuation.approvedAt).toLocaleDateString()}</li>)}</ul>
  <h3>3. Allocate and monitor</h3><input aria-label="Portfolio name" value={name} onChange={e=>{setName(e.target.value);setConsent(false);}}/>
  <textarea aria-label="Portfolio holdings" value={csv} onChange={e=>{setCsv(e.target.value);setConsent(false);}} placeholder={'AAPL,12\nMSFT,8\nNVDA,5'}/>
  <p>Use market symbols (for example PETR4.SA for B3). Each quote currency is verified with the price provider.</p>

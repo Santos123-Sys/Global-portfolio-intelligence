@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: Santos123-Sys/FilingLens
-          ref: f4a80926120c460f4231cca2a1394822aebcf73b
+          ref: e07c958f650fd65f33c511edc07abc8416d82f14
           path: .cross-app/filinglens
           persist-credentials: false
       - name: Install FilingLens verification dependencies
@@ -58,5 +58,8 @@ jobs:
         run: |
           npm run build --prefix .cross-app/filinglens
           FILINGLENS_TEST_ROOT="$GITHUB_WORKSPACE/.cross-app/filinglens" node scripts/verify-filinglens-security.mjs
+      - name: Verify built financial evidence and calculation recovery
+        working-directory: .cross-app/filinglens
+        run: PLAYWRIGHT_TEST_MODULE="$GITHUB_WORKSPACE/node_modules/@playwright/test" node ops/verify-valuation-workflow.cjs
       - run: npm run test:e2e
       - run: npm run test:e2e:production

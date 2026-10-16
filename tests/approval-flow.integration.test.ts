@@ -16,6 +16,7 @@ vi.mock('postgres',()=>{
 import {POST as login,DELETE as logout} from '../src/app/api/auth/session/route';
 import {POST as handoff} from '../src/app/api/integration/v1/handoff/route';
 import {POST as analysisAccess} from '../src/app/api/integration/v1/analysis-access/route';
+import {GET as auditGet} from '../src/app/api/integration/v1/valuation-audit/route';
 import {POST as receiveValuationEvent} from '../src/app/api/integration/v1/valuation-events/route';
 import {POST as portfolioPost,GET as portfolioGet} from '../src/app/api/integration/v1/portfolio-feedback/route';
 import {hashPassword} from '../src/lib/password';
@@ -63,7 +64,7 @@ it.skipIf(!root)('real password/session → signed handoff → issuer validation
  expect((await app.request('https://filing.example/api/metadata',{method:'POST',headers:{'X-GPI-Handoff':ticket!},body:'{}'})).status).toBe(200);
  const analysis={jurisdiction:'us',company:{name:'Synthetic approval fixture',ticker:'AAPL',exchange:'NASDAQ',filingType:'10-K',periodEnd:'2025-09-27',filedAt:null,description:'Synthetic test only'},metadata:{cik:'0000320193',cnpj:null},financials:{unit:'USD millions',years:['2025'],revenue:[100],netIncome:[10],eps:null,grossMargin:null,operatingMargin:null,operatingCashFlow:null,capex:null,freeCashFlow:null,dividends:null,buybacks:null,totalAssets:null,totalDebt:null,cash:null}};
  const proposal=await prepareValuation(analysis,'dcf');
- const values:Record<string,number|string>={'dcf.currency':'USD','dcf.base_period':'FY2025','dcf.base_revenue':100,'dcf.equity_adjustment':0,'dcf.net_debt':0,'dcf.shares_outstanding':10,'dcf.terminal_method':'perpetuity_growth','dcf.sbc_treatment':'expense_as_reported','dcf.tax_rate':20,'dcf.da_pct_revenue':3,'dcf.capex_pct_revenue':4,'dcf.nwc_pct_revenue':10,'dcf.risk_free_rate':4,'dcf.beta':1,'dcf.equity_risk_premium':5,'dcf.pre_tax_cost_debt':5,'dcf.debt_weight':20,'dcf.terminal_growth':2,'dcf.scenario_growth_spread':1,'dcf.scenario_margin_spread':1,'dcf.scenario_wacc_spread':.5,'dcf.scenario_terminal_spread':.5};
+ const values:Record<string,number|string>={'dcf.currency':'USD','dcf.base_period':'FY2025','dcf.base_revenue':100,'dcf.equity_adjustment':0,'dcf.net_debt':0,'dcf.shares_outstanding':10,'dcf.terminal_method':'perpetuity_growth','dcf.sbc_treatment':'expense_as_reported','dcf.tax_rate':20,'dcf.da_pct_revenue':3,'dcf.capex_pct_revenue':4,'dcf.nwc_pct_revenue':10,'dcf.risk_free_rate':4,'dcf.beta':1,'dcf.equity_risk_premium':5,'dcf.pre_tax_cost_debt':5,'dcf.debt_weight':20,'dcf.terminal_growth':2,'dcf.terminal_roic':20,'dcf.scenario_growth_spread':1,'dcf.scenario_margin_spread':1,'dcf.scenario_wacc_spread':.5,'dcf.scenario_terminal_spread':.5};
  const assumptions=proposal.assumptions.map((a:{id:string;proposed_value:unknown})=>({...a,status:'accepted',final_value:values[a.id]??(a.id.includes('revenue_growth')?5:a.id.includes('ebit_margin')?20:a.proposed_value)}));
  const approve={ticket,method:'dcf',confirmed:true,scenario:'base',analysis,assumptions};
  const notificationCalls:string[]=[];
@@ -96,6 +97,10 @@ it.skipIf(!root)('real password/session → signed handoff → issuer validation
  expect(scopedResponse.valuations[0].valuation.valuationVersionId).toBe(valuation.valuationVersionId);
  // The value is already persisted in GPI. User should not need to press manual import.
 
+ const sourceAudit=await auditGet(new Request('https://gpi.example/api/integration/v1/valuation-audit?candidateKey=XNAS:AAPL&valuationVersionId='+valuation.valuationVersionId,{headers:{cookie}}));
+ expect(sourceAudit.status).toBe(200);const sourceBody=await sourceAudit.json();
+ expect(sourceBody.audit.issuerId).toBe(valuation.issuerId);
+ expect(sourceBody.audit.lineage.nodes['dcf:implied_per_share'].value).toBe(Number(valuation.impliedValuePerShare));
  expect((await (await publish(approve)).json()).reused).toBe(true);
  const readHeaders={authorization:'Bearer '+process.env.FILINGLENS_VALUATION_READ_API_TOKEN,'x-workspace-id':ctx.workspaceId};
  expect((await app.request('https://filing.example/api/integration/v1/valuations/'+valuation.valuationVersionId,{headers:{...readHeaders,'x-workspace-id':'550e8400-e29b-41d4-a716-446655440099'}})).status).toBe(404);
@@ -105,6 +110,7 @@ it.skipIf(!root)('real password/session → signed handoff → issuer validation
  const stored=await portfolioGet(new Request('https://gpi.example/api/integration/v1/portfolio-feedback',{headers:{cookie}}));const body=await stored.json();expect(body.runs).toHaveLength(1);expect(body.valuations[0].valuation.valuationVersionId).toBe(valuation.valuationVersionId);expect(body.runs[0].analysis.valuationDiagnostics[0].valuationVersionId).toBe(valuation.valuationVersionId);
  const otherLogin=await login(request('/api/auth/session',{email:'other@example.test',password:'Isolated!ApprovalVerification!2026'}));const otherCookie=otherLogin.headers.get('set-cookie')!.split(';')[0];
  const otherData=await portfolioGet(new Request('https://gpi.example/api/integration/v1/portfolio-feedback',{headers:{cookie:otherCookie}}));expect((await otherData.json()).runs).toHaveLength(0);
+ expect((await auditGet(new Request('https://gpi.example/api/integration/v1/valuation-audit?candidateKey=XNAS:AAPL&valuationVersionId='+valuation.valuationVersionId,{headers:{cookie:otherCookie}}))).status).toBe(404);
  expect((await portfolioPost(request('/api/integration/v1/portfolio-feedback',{action:'import_valuation',candidateKey:'XNAS:AAPL',valuationVersionId:valuation.valuationVersionId},otherCookie))).status).toBe(503);
  console.log('SIMULATION_RESULT '+JSON.stringify({test:'isolated_live_code_workflow',syntheticInputs:true,
    userSignIn:'passed',signedHandoff:'passed',analystApproval:'passed',automaticNotification:synchronization,
@@ -118,5 +124,6 @@ it.skipIf(!root)('real password/session → signed handoff → issuer validation
  expect((await logout(new Request('https://gpi.example/api/auth/session',{method:'DELETE',headers:{origin:'https://gpi.example',cookie}}))).status).toBe(200);
  expect((await app.request('https://filing.example/api/metadata',{method:'POST',headers:{'X-GPI-Handoff':ticket!},body:'{}'})).status).toBe(401);
  expect((await publish(approve)).status).toBe(401);
+ expect((await auditGet(new Request('https://gpi.example/api/integration/v1/valuation-audit?candidateKey=XNAS:AAPL&valuationVersionId='+valuation.valuationVersionId,{headers:{cookie}}))).status).toBe(401);
  expect((await handoff(request('/api/integration/v1/handoff',{candidateKey:'XNAS:AAPL',confirmed:true},cookie))).status).toBe(401);
 },60000);
