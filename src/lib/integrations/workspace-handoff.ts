@@ -5,6 +5,9 @@ export const HandoffContext = z.object({
   reviewerUserId:z.string().uuid(), issuerId:z.string().regex(/^(us:\d{10}|br:\d{14})$/),
   candidateKey:z.string().regex(/^[A-Z0-9.:-]{1,60}$/), ticker:z.string().regex(/^[A-Z0-9.-]{1,20}$/),
   nonce:z.string().uuid(), issuedAt:z.number().int(), expiresAt:z.number().int(),
+  sessionId:z.string().uuid().optional(),
+  audience:z.literal('filinglens').optional(),
+  permissions:z.array(z.enum(['analysis:run','valuation:publish'])).max(2).optional(),
 }).strict();
 export type HandoffContext = z.infer<typeof HandoffContext>;
 const mac=(s:string,v:string)=>createHmac('sha256',s).update(v).digest('base64url');

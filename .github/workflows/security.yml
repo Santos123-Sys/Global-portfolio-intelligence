@@ -24,8 +24,10 @@ jobs:
       SESSION_SECRET: ci-only-session-secret-with-at-least-32-characters
       MFA_ENCRYPTION_KEY: ci-only-mfa-secret-with-at-least-32-characters
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -33,17 +35,16 @@ jobs:
       - name: Reject production advisories and severe toolchain advisories
         run: |
           npm audit --omit=dev --audit-level=moderate
-          npm audit --audit-level=high || true
           node scripts/check-dev-audit.mjs
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build:worker
       - run: npm test
       - name: Check out the pinned FilingLens approval implementation
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: Santos123-Sys/FilingLens
-          ref: 2848e5f9d9ec1837353b891a783582aabe42f818
+          ref: f4a80926120c460f4231cca2a1394822aebcf73b
           path: .cross-app/filinglens
           persist-credentials: false
       - name: Install FilingLens verification dependencies
@@ -53,5 +54,9 @@ jobs:
       - run: npm run build
       - name: Install browser for workflow smoke test
         run: npx playwright install --with-deps chromium
+      - name: Verify built FilingLens authorization and recovery
+        run: |
+          npm run build --prefix .cross-app/filinglens
+          FILINGLENS_TEST_ROOT="$GITHUB_WORKSPACE/.cross-app/filinglens" node scripts/verify-filinglens-security.mjs
       - run: npm run test:e2e
       - run: npm run test:e2e:production

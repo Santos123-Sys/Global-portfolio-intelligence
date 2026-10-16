@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
 const allowedAdvisories = new Set([
   // CVE-2026-93687: dev-tool-only braces stack exhaustion. As of 2026-10-04
@@ -8,21 +9,19 @@ const allowedAdvisories = new Set([
   'GHSA-vfj7-8cjw-p6xm',
 ]);
 
-let raw = '';
-try {
-  raw = execFileSync('npm', ['audit', '--json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-} catch (error) {
-  raw = String(error?.stdout ?? '');
-}
-if (!raw.trim()) throw new Error('npm audit did not return a JSON report');
-const report = JSON.parse(raw);
-const vulnerabilities = report.vulnerabilities ?? {};
+/** Scanner outages and malformed output are failures, never a clean vulnerability result. */
+export function checkAuditReport(report) {
+if (!report || report.error || report.auditReportVersion !== 2 || !report.vulnerabilities ||
+    typeof report.vulnerabilities !== 'object' || Array.isArray(report.vulnerabilities) ||
+    !report.metadata?.vulnerabilities ||
+    !['info','low','moderate','high','critical','total'].every(k=>Number.isInteger(report.metadata.vulnerabilities[k])&&report.metadata.vulnerabilities[k]>=0))
+  throw new Error('npm audit returned missing, failed or unsupported scan evidence');
+const vulnerabilities = report.vulnerabilities;
 const severe = new Set(['high', 'critical']);
 
 function advisoryAllowed(entry) {
   if (!entry || typeof entry !== 'object') return false;
-  const haystack = `${entry.url ?? ''} ${entry.title ?? ''}`;
-  return [...allowedAdvisories].some(id => haystack.includes(id));
+  return [...allowedAdvisories].some(id => entry.url === `https://github.com/advisories/${id}`);
 }
 
 function chainAllowed(name, visiting = new Set()) {
@@ -45,10 +44,24 @@ const blocked = Object.entries(vulnerabilities)
 if (blocked.length) {
   console.error('Unapproved high/critical development advisories detected:');
   for (const [name, vulnerability] of blocked) console.error(`- ${name}: ${vulnerability.severity}`);
-  process.exit(1);
+  throw new Error('Unapproved high/critical development advisories');
 }
 
 const allowed = Object.entries(vulnerabilities)
   .filter(([, vulnerability]) => severe.has(vulnerability?.severity))
   .map(([name]) => name);
 if (allowed.length) console.warn(`Temporarily allowing documented unpatched dev-only advisory chain: ${allowed.join(', ')}`);
+return {allowed,checked:Object.keys(vulnerabilities).length};
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  let raw = '';
+  try {
+    raw = execFileSync('npm', ['audit', '--json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (error) {
+    if(error?.status!==1)throw new Error('npm audit failed to complete');
+    raw = String(error?.stdout ?? '');
+  }
+  if (!raw.trim()) throw new Error('npm audit did not return a JSON report');
+  checkAuditReport(JSON.parse(raw));
+}
