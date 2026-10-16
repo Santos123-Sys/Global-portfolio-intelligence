@@ -19,7 +19,7 @@ export async function POST(req:Request){
   const identity=resolveIssuer(candidate);if(identity.status!=='source_linked')return NextResponse.json({error:'Issuer mapping required'},{status:409});
   const now=Math.floor(Date.now()/1000);
   const ticket=signHandoff({version:'workspace-handoff.v1',workspaceId:s.auth.accountId,reviewerUserId:s.auth.actorUserId,
-   issuerId:identity.issuer.issuerId,candidateKey:candidate.key,ticker:candidate.ticker,nonce:randomUUID(),issuedAt:now,expiresAt:now+7200},process.env.INTEGRATION_SIGNING_SECRET??'');
+   issuerId:identity.issuer.issuerId,candidateKey:candidate.key,ticker:candidate.ticker,nonce:randomUUID(),issuedAt:now,expiresAt:now+7200,sessionId:s.auth.sessionId,audience:'filinglens',permissions:['analysis:run','valuation:publish']},process.env.INTEGRATION_SIGNING_SECRET??'');
   const base=new URL(process.env.FILINGLENS_API_URL??'');
   if(base.protocol!=='https:'||base.username||base.password||base.pathname!=='/'||base.search||base.hash)throw Error();
   base.hash=new URLSearchParams({integration:ticket}).toString();
