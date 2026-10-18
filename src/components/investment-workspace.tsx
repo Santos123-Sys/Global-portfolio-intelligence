@@ -5,6 +5,7 @@ import type {Candidate} from '@/lib/foundation/contracts';
 import {WorkspaceOverview,acceptedPublication} from '@/lib/workspace/contracts';
 import {CorpusLibrary} from './corpus-library';
 import {PortfolioHub} from './portfolio-hub';
+import {BrowserWorkspace} from './browser-workspace';
 async function read(url:string){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('Workspace overview unavailable. Refresh or use the individual modules.');const body=WorkspaceOverview.parse(await r.json());if(body.candidateKey!==new URL(url,window.location.origin).searchParams.get('company'))throw Error('Company context mismatch. Refresh the workspace.');return body;}
 type AnalysisSession={url:string;expiresAt:string};
 function CompanyWorkspace({candidate,onResearch}:{candidate:Candidate;onResearch:(key:string,question:string)=>void}){
@@ -52,6 +53,7 @@ function CompanyWorkspace({candidate,onResearch}:{candidate:Candidate;onResearch
   {message&&<p role="status" className="callout">{message}</p>}
   <div hidden={step!=='Sources'}>
    <button className="secondary" onClick={()=>onResearch(candidate.key,'What filing evidence supports or challenges the company’s growth and downside thesis?')}>Research this company</button>
+   <BrowserWorkspace key={candidate.key} candidate={candidate}/>
    <CorpusLibrary candidates={[candidate]} onAnalysisReady={url=>{
     const u=new URL(url);if(!data?.financialOrigin||u.origin!==data.financialOrigin||u.pathname!=='/'||!u.hash)throw Error('Financial module configuration mismatch');
     setSession({url:u.href,expiresAt:new Date(Date.now()+10*60*1000).toISOString()});setStep('Financial analysis');setMessage('Selected-year documents sent through the single-use handoff. Confirm the filing inside the financial panel.');
