@@ -1,0 +1,31 @@
+[Unit]
+Description=GPI sandboxed public browser research worker
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=browsercheck
+Group=browsercheck
+WorkingDirectory=/opt/gpi
+Environment=NODE_ENV=production
+Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/gpi-browsers
+EnvironmentFile=/etc/gpi/browser-worker.env
+ExecStartPre=/usr/local/bin/gpi-node --import tsx scripts/verify-browser-engine.ts
+ExecStart=/usr/local/bin/gpi-node --import tsx scripts/browser-worker.ts
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+MemoryMax=2G
+TasksMax=256
+
+[Install]
+WantedBy=multi-user.target

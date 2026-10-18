@@ -19,6 +19,19 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: security
+          POSTGRES_PASSWORD: security
+          POSTGRES_DB: security
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U security"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       DATABASE_URL: postgresql://security:security@127.0.0.1:5432/security
       SESSION_SECRET: ci-only-session-secret-with-at-least-32-characters
@@ -40,6 +53,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run build:worker
       - run: npm test
+      - name: Verify native PostgreSQL browser admission, claims and process loss
+        run: BROWSER_POSTGRES_TEST_URL="$DATABASE_URL" node --import tsx scripts/verify-browser-postgres.ts
       - name: Check out the pinned FilingLens approval implementation
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:

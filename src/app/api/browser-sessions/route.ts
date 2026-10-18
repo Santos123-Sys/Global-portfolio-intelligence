@@ -69,6 +69,7 @@ export async function POST(req:Request) {
     return reply({run:publicRun(await createRun(s.auth,input,`${candidate.issuer.jurisdiction}:${candidate.issuer.registryId}`,candidate.name))},201);
   } catch(e) {
     const code=e instanceof Error?e.message:'';
+    if(code==='browser_capacity_unavailable')return reply({error:'Browser capacity is unavailable. Please try again when a worker is ready.'},503);
     if(code==='not_found')return reply({error:'Not found'},404);
     if(['forbidden','creator_session_required','control_owned'].includes(code))return reply({error:'Only the creating signed-in operator may control this session'},403);
     return reply({error:'Request rejected: check source scope, current control state, quota and input.'},409);

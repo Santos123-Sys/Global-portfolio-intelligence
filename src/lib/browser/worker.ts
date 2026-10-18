@@ -5,7 +5,7 @@ import { ResearchBrowser,captureEvidence,FIXTURE_ORIGIN } from './engine';
 import { configuredOrigins } from './policy';
 import { checkBudget,propose } from './operator';
 import type { ModelCall } from '../research/manager';
-import { activeAuthority,claimRun,event,locked,reapRuns,retainObservation } from './store';
+import { activeAuthority,advertiseBrowserWorker,claimRun,event,locked,reapRuns,retainObservation } from './store';
 
 const wait=(ms:number)=>new Promise(r=>setTimeout(r,ms));
 export async function executeBrowserRun(initial:BrowserRun,shutdown:AbortSignal,dependencies:{engine?:ResearchBrowser;model?:ModelCall}={}) {
@@ -113,5 +113,15 @@ export async function executeBrowserRun(initial:BrowserRun,shutdown:AbortSignal,
 }
 export async function browserWorker(signal:AbortSignal) {
   const worker=randomUUID();
-  while(!signal.aborted){await reapRuns();const run=await claimRun(worker);if(run)await executeBrowserRun(run,signal);else await wait(1000);}
+  if(!process.env.RESEARCH_MODEL_API_KEY||!process.env.RESEARCH_MODEL_NAME)throw Error('research_model_unconfigured');
+  // Direct worker starts must prove isolation too, not only browser-service starts.
+  const probe=new ResearchBrowser([FIXTURE_ORIGIN],true);
+  try { await probe.open(FIXTURE_ORIGIN+'/'); } finally { await probe.close(); }
+  try {
+    while(!signal.aborted){
+      await reapRuns();await advertiseBrowserWorker(worker,true);
+      const run=await claimRun(worker);
+      if(run)await executeBrowserRun(run,signal);else await wait(1000);
+    }
+  } finally { await advertiseBrowserWorker(worker,false); }
 }

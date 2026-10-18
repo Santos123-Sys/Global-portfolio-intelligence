@@ -7,14 +7,16 @@ import { accountCanEdit } from '../account-scope';
 import { Command, terminal, type BrowserRun, type BrowserEvent, type Observation } from './contracts';
 
 type Tx = postgres.TransactionSql;
+// Explicit text intermediate avoids postgres.js serializing an already encoded
+// string as a JSON string when PostgreSQL infers the parameter type as jsonb.
 export const json = (value:unknown) => JSON.stringify(value);
 async function write(tx:Tx,run:BrowserRun) {
   run.version++;
-  await tx`UPDATE gpi_browser_sessions SET payload=${json(run)}::jsonb WHERE id=${run.id}`;
+  await tx`UPDATE gpi_browser_sessions SET payload=${json(run)}::text::jsonb WHERE id=${run.id}`;
 }
 export async function event(tx:Tx,run:BrowserRun,type:string,summary:string,extra:Partial<BrowserEvent>={}) {
   const item:BrowserEvent={...extra,seq:++run.seq,at:new Date().toISOString(),type,summary};
-  await tx`INSERT INTO gpi_browser_events(session_id,seq,payload) VALUES(${run.id},${item.seq},${json(item)}::jsonb)`;
+  await tx`INSERT INTO gpi_browser_events(session_id,seq,payload) VALUES(${run.id},${item.seq},${json(item)}::text::jsonb)`;
 }
 export async function locked<T>(id:string,fn:(run:BrowserRun,tx:Tx)=>Promise<T>):Promise<T> {
   return await sql().begin(async tx=>{
@@ -29,13 +31,19 @@ export async function createRun(auth:AuthContext,input:BrowserRun['input'],issue
     await tx`SELECT pg_advisory_xact_lock(hashtextextended(${auth.userId},5))`;
     const existing=await tx`SELECT payload FROM gpi_browser_sessions WHERE owner_id=${auth.userId} AND idempotency_key=${input.idempotencyKey}`;
     if(existing[0]){const r=existing[0].payload as BrowserRun;if(!isDeepStrictEqual(r.input,input))throw Error('idempotency_conflict');return r;}
+    // Serialize admission and claims across replicas. An idle worker advertises a
+    // short lease only after Chromium preflight; queued runs reserve those slots.
+    await tx`SELECT pg_advisory_xact_lock(793134766)`;
+    const capacity=await tx`SELECT count(*)::int AS n FROM gpi_browser_workers WHERE ready_until>now() AND busy=false`;
+    const queued=await tx`SELECT count(*)::int AS n FROM gpi_browser_sessions WHERE payload->>'state'='queued'`;
+    if(capacity[0].n<=queued[0].n)throw Error('browser_capacity_unavailable');
     const rows=await tx`SELECT payload FROM gpi_browser_sessions WHERE owner_id=${auth.userId} AND created_at>now()-interval '24 hours'`;
     if(rows.length>=10||rows.some(r=>!terminal(r.payload.state)&&r.payload.expiresAt>Date.now()))throw Error('browser_quota');
     const now=Date.now();
     const run:BrowserRun={id:randomUUID(),owner:auth.userId,actor:auth.actorUserId,authSession:auth.sessionId,accountId:auth.accountId,
       input,issuerId,companyName,state:'queued',epoch:0,version:0,seq:0,controller:null,createdAt:now,expiresAt:now+600_000,
       leaseUntil:now+30_000,worker:null,actions:0,calls:0,tokens:0,reason:null,observation:null,evidence:[]};
-    await tx`INSERT INTO gpi_browser_sessions(id,owner_id,idempotency_key,payload) VALUES(${run.id},${run.owner},${input.idempotencyKey},${json(run)}::jsonb)`;
+    await tx`INSERT INTO gpi_browser_sessions(id,owner_id,idempotency_key,payload) VALUES(${run.id},${run.owner},${input.idempotencyKey},${json(run)}::text::jsonb)`;
     await event(tx,run,'queued',input.mode==='fixture'?'Deterministic fixture operator queued':'AI public research operator queued');
     await write(tx,run);return run;
   });
@@ -69,7 +77,7 @@ export async function submit(auth:AuthContext,id:string,value:unknown) {
       run.epoch++;
       run.state=command.kind==='stop'?'cancelling':'pausing';
     }
-    await tx`INSERT INTO gpi_browser_commands(session_id,id,actor_id,payload) VALUES(${id},${command.id},${auth.actorUserId},${json(command)}::jsonb)`;
+    await tx`INSERT INTO gpi_browser_commands(session_id,id,actor_id,payload) VALUES(${id},${command.id},${auth.actorUserId},${json(command)}::text::jsonb)`;
     await event(tx,run,'command_received',`${command.kind} requested; awaiting worker acknowledgement`,{actionId:command.id});
     return run;
   });
@@ -86,16 +94,23 @@ export async function activeAuthority(run:BrowserRun,tx:Tx) {
 }
 export async function retainObservation(tx:Tx,run:BrowserRun,o:Observation) {
   run.observation=o;
-  await tx`INSERT INTO gpi_browser_observations(session_id,id,payload) VALUES(${run.id},${o.id},${json(o)}::jsonb) ON CONFLICT DO NOTHING`;
+  await tx`INSERT INTO gpi_browser_observations(session_id,id,payload) VALUES(${run.id},${o.id},${json(o)}::text::jsonb) ON CONFLICT DO NOTHING`;
 }
 export async function claimRun(worker:string) {
   return sql().begin(async tx=>{
+    await tx`SELECT pg_advisory_xact_lock(793134766)`;
     const rows=await tx`SELECT payload FROM gpi_browser_sessions WHERE payload->>'state'='queued' ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1`;
     if(!rows[0])return null;
     const run=rows[0].payload as BrowserRun;
+    await tx`UPDATE gpi_browser_workers SET busy=true WHERE id=${worker}::uuid`;
     run.worker=worker;run.state='running';run.leaseUntil=Date.now()+30_000;
     await event(tx,run,'starting','Starting isolated public browser');await write(tx,run);return run;
   });
+}
+export async function advertiseBrowserWorker(worker:string,ready:boolean) {
+  if(!ready){await sql()`DELETE FROM gpi_browser_workers WHERE id=${worker}::uuid`;return;}
+  await sql()`INSERT INTO gpi_browser_workers(id,ready_until,busy) VALUES(${worker}::uuid,now()+interval '5 seconds',false)
+    ON CONFLICT(id) DO UPDATE SET ready_until=EXCLUDED.ready_until,busy=false`;
 }
 export async function reapRuns() {
   // Never reclaim running actions: the external outcome may be unknown.
