@@ -2,9 +2,9 @@ import { randomUUID,createHash } from 'node:crypto';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { Action, type Observation, type BrowserEvidence, type LiveFrame } from './contracts';
 import { allowedSource, fetchSource } from './policy';
+import { FIXTURE_ORIGIN,FIXTURE_QUOTE } from './fixture';
+export { FIXTURE_ORIGIN,FIXTURE_QUOTE } from './fixture';
 
-export const FIXTURE_ORIGIN='https://fixture.gpi.invalid';
-export const FIXTURE_QUOTE='Example Industries reports that recurring maintenance contracts supported customer retention during fiscal year 2025.';
 export class ResearchBrowser {
   private browser?:Browser;
   private context?:BrowserContext;
