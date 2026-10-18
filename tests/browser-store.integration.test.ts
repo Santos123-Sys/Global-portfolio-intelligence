@@ -4,7 +4,7 @@ import {createServer} from 'node:http';
 import {once} from 'node:events';
 import {build} from 'esbuild';
 import {chromium} from 'playwright';
-import {vi,it,expect,beforeAll,afterAll} from 'vitest';
+import {vi,it,expect,beforeAll,beforeEach,afterAll} from 'vitest';
 import {drizzle} from 'drizzle-orm/pglite';
 import * as schema from '../src/lib/db/schema';
 const state=vi.hoisted(()=>({db:null as PGlite|null}));
@@ -20,7 +20,7 @@ import {GET,POST} from '../src/app/api/browser-sessions/route';
 import {GET as streamGet} from '../src/app/api/browser-sessions/stream/route';
 import {hashPassword} from '../src/lib/password';
 import {getOptionalSession,type AuthContext} from '../src/lib/auth';
-import {createRun,readRun,submit,claimRun,reapRuns,locked,event,activeAuthority} from '../src/lib/browser/store';
+import {createRun,readRun,submit,claimRun,reapRuns,locked,event,activeAuthority,advertiseBrowserWorker} from '../src/lib/browser/store';
 import {saveWorkspace} from '../src/lib/foundation/store';
 import {defaultProfile} from '../src/lib/foundation/contracts';
 import {executeBrowserRun} from '../src/lib/browser/worker';
@@ -32,8 +32,8 @@ const input=()=>({company:'XNAS:TEST',year:2025,question:'Find the annual custom
 beforeAll(async()=>{
  vi.stubEnv('DATABASE_URL','postgres://isolated/test');vi.stubEnv('SESSION_SECRET','isolated-session-secret-'.repeat(3));vi.stubEnv('NODE_ENV','test');vi.stubEnv('PUBLIC_APP_URL','https://gpi.example');vi.stubEnv('BROWSER_WORKSPACE_ENABLED','true');vi.stubEnv('BROWSER_SOURCE_ORIGINS','https://reports.example.com');
  state.db=new PGlite();
- for(const name of ['001_foundation.sql','002_gpi_integration.sql','003_document_corpus.sql','004_portfolio_feedback.sql','005_browser_workspace.sql'])await state.db.exec(readFileSync('migrations/'+name,'utf8'));
- await state.db.exec(readFileSync('migrations/005_browser_workspace.sql','utf8'));
+ for(const name of ['001_foundation.sql','002_gpi_integration.sql','003_document_corpus.sql','004_portfolio_feedback.sql','005_browser_workspace.sql','006_browser_capacity.sql'])await state.db.exec(readFileSync('migrations/'+name,'utf8'));
+ await state.db.exec(readFileSync('migrations/006_browser_capacity.sql','utf8'));
  const password=await hashPassword('Synthetic!Browser!Test!2026');
  await state.db.query("INSERT INTO users(id,email,display_name,password_hash) VALUES($1,'one@example.test','One',$3),($2,'two@example.test','Two',$3)",[owner,'550e8400-e29b-41d4-a716-446655440001',password]);
  cookie=(await login(req('/api/auth/session',{email:'one@example.test',password:'Synthetic!Browser!Test!2026'},''))).headers.get('set-cookie')!.split(';')[0];
@@ -41,6 +41,7 @@ beforeAll(async()=>{
  auth=(await getOptionalSession(req('/')))!;
  await saveWorkspace(owner,{version:1,profile:defaultProfile,candidates:[{key:'XNAS:TEST',ticker:'TEST',name:'Example Industries',exchange:'XNAS',market:'us',identitySourceUrl:'https://www.sec.gov/',issuer:{jurisdiction:'us',registryId:'0000000001'}}]});
 },30000);
+beforeEach(async()=>{await state.db!.query('DELETE FROM gpi_browser_workers');await advertiseBrowserWorker('550e8400-e29b-41d4-a716-446655440099',true);});
 afterAll(async()=>{await state.db?.close();vi.unstubAllEnvs();});
 it('actual login and owner authorization protect snapshots, commands, streams and observations',async()=>{
  const r=await createRun(auth,input(),'us:0000000001','Example Industries');
@@ -55,17 +56,17 @@ it('idempotency, epoch fencing and orphan reconciliation preserve one effect',as
  const i=input(),run=await createRun(auth,i,'us:0000000001','Example Industries');
  expect((await createRun(auth,i,'us:0000000001','Example Industries')).id).toBe(run.id);
  await expect(createRun(auth,{...i,year:2024},'us:0000000001','Example Industries')).rejects.toThrow('idempotency_conflict');
- await claimRun('idempotency-fixture');
+ await claimRun(crypto.randomUUID());
  const command={id:crypto.randomUUID(),kind:'pause',epoch:0};
  const paused=await submit(auth,run.id,command);expect(paused.epoch).toBe(1);expect(paused.state).toBe('pausing');
  expect((await submit(auth,run.id,command)).epoch).toBe(1);
  await expect(submit(auth,run.id,{id:crypto.randomUUID(),kind:'resume',epoch:0})).rejects.toThrow('stale_control');
  await locked(run.id,async(r,tx)=>{r.leaseUntil=0;await event(tx,r,'action_dispatched','Synthetic unknown outcome');});
- await reapRuns();expect((await readRun(owner,run.id))?.state).toBe('reconciling');expect(await claimRun('other-worker')).toBeNull();
+ await reapRuns();expect((await readRun(owner,run.id))?.state).toBe('reconciling');expect(await claimRun(crypto.randomUUID())).toBeNull();
 });
 it.skipIf(process.env.BROWSER_INTEGRATION!=='true')('real Chromium worker retains exact evidence with ordered durable receipts and replay observations',async()=>{
  const created=await createRun(auth,input(),'us:0000000001','Example Industries');
- const claimed=await claimRun('browser-integration');expect(claimed?.id).toBe(created.id);
+ const claimed=await claimRun(crypto.randomUUID());expect(claimed?.id).toBe(created.id);
  await executeBrowserRun(claimed!,new AbortController().signal);
  const run=(await readRun(owner,created.id))!;expect(run.state).toBe('completed');expect(run.evidence[0].text).toBe(FIXTURE_QUOTE);expect(run.actions).toBe(3);
  const response=await GET(req('/api/browser-sessions?id='+run.id));const body=await response.json();
@@ -76,7 +77,7 @@ it.skipIf(process.env.BROWSER_INTEGRATION!=='true')('real Chromium worker retain
 },30000);
 it.skipIf(process.env.BROWSER_INTEGRATION!=='true')('takeover fences a late model response, human input is once-only, and stop closes Chromium',async()=>{
  const created=await createRun(auth,{...input(),mode:'model'},'us:0000000001','Example Industries');
- const claimed=(await claimRun('race-fixture'))!;
+ const claimed=(await claimRun(crypto.randomUUID()))!;
  let release!:()=>void,entered!:()=>void;
  const waiting=new Promise<void>(r=>{entered=r;}),gate=new Promise<void>(r=>{release=r;});
  const task=executeBrowserRun(claimed,new AbortController().signal,{engine:new ResearchBrowser([FIXTURE_ORIGIN],true),model:async()=>{entered();await gate;return {value:{kind:'link',index:0},usage:{prompt_tokens:100,completion_tokens:10}};}});
@@ -95,7 +96,7 @@ it.skipIf(process.env.BROWSER_INTEGRATION!=='true')('takeover fences a late mode
 },30000);
 it.skipIf(process.env.BROWSER_INTEGRATION!=='true')('real React canvas receives authenticated frames, keyboard takeover, replay and stop',async()=>{
  const created=await createRun(auth,{...input(),mode:'model'},'us:0000000001','Example Industries');
- const claimed=(await claimRun('viewer-fixture'))!;
+ const claimed=(await claimRun(crypto.randomUUID()))!;
  const stop=new AbortController();
  const task=executeBrowserRun(claimed,stop.signal,{engine:new ResearchBrowser([FIXTURE_ORIGIN],true),model:async(_s,_i,signal)=>{await new Promise<void>(resolve=>signal.addEventListener('abort',()=>resolve(),{once:true}));throw Error('cancelled');}});
  const candidate={key:'XNAS:TEST',ticker:'TEST',name:'Example Industries',exchange:'XNAS',market:'us',issuer:{jurisdiction:'us',registryId:'0000000001'}};
@@ -136,6 +137,22 @@ it.skipIf(process.env.BROWSER_INTEGRATION!=='true')('real React canvas receives 
   for(const width of [390,1440]){await page.setViewportSize({width,height:1000});expect(await page.locator('canvas').isVisible()).toBe(true);}
  }finally{stop.abort();await task;await browser.close();server.closeAllConnections();server.close();vi.stubEnv('PUBLIC_APP_URL','https://gpi.example');}
 },45000);
+it('admission rejects absent, busy and expired capacity; an accepted retry remains idempotent',async()=>{
+ await state.db!.query('DELETE FROM gpi_browser_workers');
+ const i=input();
+ await expect(createRun(auth,i,'us:0000000001','Example Industries')).rejects.toThrow('browser_capacity_unavailable');
+ const worker=crypto.randomUUID();await advertiseBrowserWorker(worker,true);
+ const accepted=await createRun(auth,i,'us:0000000001','Example Industries');
+ await claimRun(worker);
+ expect((await state.db!.query<{busy:boolean}>('SELECT busy FROM gpi_browser_workers WHERE id=$1',[worker])).rows[0].busy).toBe(true);
+ // A retry retrieves the accepted run even when capacity is now occupied.
+ expect((await createRun(auth,i,'us:0000000001','Example Industries')).id).toBe(accepted.id);
+ await expect(createRun({...auth,userId:crypto.randomUUID()},input(),'us:0000000001','Example Industries')).rejects.toThrow('browser_capacity_unavailable');
+ await advertiseBrowserWorker(worker,true);
+ await state.db!.query("UPDATE gpi_browser_workers SET ready_until=now()-interval '1 second'");
+ await expect(createRun({...auth,userId:crypto.randomUUID()},input(),'us:0000000001','Example Industries')).rejects.toThrow('browser_capacity_unavailable');
+ await locked(accepted.id,async r=>{r.state='cancelled';});
+});
 it('logout revokes worker authority',async()=>{
  const run=await createRun(auth,input(),'us:0000000001','Example Industries');
  expect(await locked(run.id,(r,tx)=>activeAuthority(r,tx))).toBe(true);
