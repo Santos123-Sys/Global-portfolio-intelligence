@@ -18,6 +18,7 @@ vi.mock('postgres',()=>{
 import {POST as login,DELETE as logout} from '../src/app/api/auth/session/route';
 import {GET,POST} from '../src/app/api/browser-sessions/route';
 import {GET as streamGet} from '../src/app/api/browser-sessions/stream/route';
+import {GET as verificationGet,POST as verificationPost} from '../src/app/api/browser-verification/route';
 import {hashPassword} from '../src/lib/password';
 import {getOptionalSession,type AuthContext} from '../src/lib/auth';
 import {createRun,readRun,submit,claimRun,reapRuns,locked,event,activeAuthority,advertiseBrowserWorker} from '../src/lib/browser/store';
@@ -25,6 +26,7 @@ import {saveWorkspace} from '../src/lib/foundation/store';
 import {defaultProfile} from '../src/lib/foundation/contracts';
 import {executeBrowserRun} from '../src/lib/browser/worker';
 import {ResearchBrowser,FIXTURE_ORIGIN,FIXTURE_QUOTE} from '../src/lib/browser/engine';
+import {acquireRuntime,mutateRuntime,renewRuntime,runtimePermitsWorker} from '../src/lib/browser/runtime-store';
 let cookie='',otherCookie='',auth:AuthContext;
 const owner='550e8400-e29b-41d4-a716-446655440000';
 const req=(path:string,body?:unknown,c=cookie)=>new Request('https://gpi.example'+path,{...(body?{method:'POST',body:JSON.stringify(body)}:{}),headers:{origin:'https://gpi.example','content-type':'application/json',cookie:c}});
@@ -32,7 +34,7 @@ const input=()=>({company:'XNAS:TEST',year:2025,question:'Find the annual custom
 beforeAll(async()=>{
  vi.stubEnv('DATABASE_URL','postgres://isolated/test');vi.stubEnv('SESSION_SECRET','isolated-session-secret-'.repeat(3));vi.stubEnv('NODE_ENV','test');vi.stubEnv('PUBLIC_APP_URL','https://gpi.example');vi.stubEnv('BROWSER_WORKSPACE_ENABLED','true');vi.stubEnv('BROWSER_SOURCE_ORIGINS','https://reports.example.com');
  state.db=new PGlite();
- for(const name of ['001_foundation.sql','002_gpi_integration.sql','003_document_corpus.sql','004_portfolio_feedback.sql','005_browser_workspace.sql','006_browser_capacity.sql'])await state.db.exec(readFileSync('migrations/'+name,'utf8'));
+ for(const name of ['001_foundation.sql','002_gpi_integration.sql','003_document_corpus.sql','004_portfolio_feedback.sql','005_browser_workspace.sql','006_browser_capacity.sql','007_browser_runtime.sql'])await state.db.exec(readFileSync('migrations/'+name,'utf8'));
  await state.db.exec(readFileSync('migrations/006_browser_capacity.sql','utf8'));
  const password=await hashPassword('Synthetic!Browser!Test!2026');
  await state.db.query("INSERT INTO users(id,email,display_name,password_hash) VALUES($1,'one@example.test','One',$3),($2,'two@example.test','Two',$3)",[owner,'550e8400-e29b-41d4-a716-446655440001',password]);
@@ -95,12 +97,13 @@ it.skipIf(process.env.BROWSER_INTEGRATION!=='true')('takeover fences a late mode
  await task;expect((await readRun(owner,created.id))!.state).toBe('cancelled');
 },30000);
 it.skipIf(process.env.BROWSER_INTEGRATION!=='true')('real React canvas receives authenticated frames, keyboard takeover, replay and stop',async()=>{
- const created=await createRun(auth,{...input(),mode:'model'},'us:0000000001','Example Industries');
+ vi.stubEnv('BROWSER_WORKSPACE_ENABLED','false');vi.stubEnv('BROWSER_VERIFICATION_ENABLED','true');
+ const created=await createRun(auth,input(),'us:0000000001','Example Industries',true);
  const claimed=(await claimRun(crypto.randomUUID()))!;
  const stop=new AbortController();
  const task=executeBrowserRun(claimed,stop.signal,{engine:new ResearchBrowser([FIXTURE_ORIGIN],true),model:async(_s,_i,signal)=>{await new Promise<void>(resolve=>signal.addEventListener('abort',()=>resolve(),{once:true}));throw Error('cancelled');}});
  const candidate={key:'XNAS:TEST',ticker:'TEST',name:'Example Industries',exchange:'XNAS',market:'us',issuer:{jurisdiction:'us',registryId:'0000000001'}};
- const bundle=await build({stdin:{contents:`import React from 'react'; import {createRoot} from 'react-dom/client'; import {BrowserWorkspace} from './src/components/browser-workspace'; createRoot(document.getElementById('root')).render(<BrowserWorkspace candidate={${JSON.stringify(candidate)}}/>);`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'browser',jsx:'automatic',define:{'process.env.NODE_ENV':'"test"'}});
+ const bundle=await build({stdin:{contents:`import React from 'react'; import {createRoot} from 'react-dom/client'; import {BrowserWorkspace} from './src/components/browser-workspace'; createRoot(document.getElementById('root')).render(<BrowserWorkspace verification candidate={${JSON.stringify(candidate)}}/>);`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,platform:'browser',jsx:'automatic',define:{'process.env.NODE_ENV':'"test"'}});
  const server=createServer(async(req,res)=>{
   try{
    if(req.url==='/'){res.setHeader('content-type','text/html');res.end('<html><body><main id="root"></main><script src="/app.js"></script></body></html>');return;}
@@ -109,7 +112,7 @@ it.skipIf(process.env.BROWSER_INTEGRATION!=='true')('real React canvas receives 
    const controller=new AbortController();res.on('close',()=>controller.abort());
    const headers=new Headers();for(const [key,value] of Object.entries(req.headers))if(value)headers.set(key,Array.isArray(value)?value.join(','):value);
    const request=new Request(`http://127.0.0.1:${(server.address() as {port:number}).port}${req.url}`,{method:req.method,headers,signal:controller.signal,...(chunks.length?{body:Buffer.concat(chunks)}:{})});
-   const response=req.url?.startsWith('/api/browser-sessions/stream')?await streamGet(request):req.method==='POST'?await POST(request):await GET(request);
+   const response=req.url?.startsWith('/api/browser-verification')?(req.method==='POST'?await verificationPost(request):await verificationGet(request)):req.url?.startsWith('/api/browser-sessions/stream')?await streamGet(request):req.method==='POST'?await POST(request):await GET(request);
    res.writeHead(response.status,Object.fromEntries(response.headers));
    if(response.body){const reader=response.body.getReader();try{while(!controller.signal.aborted){const {done,value}=await reader.read();if(done)break;if(!res.write(value))await once(res,'drain');}}finally{await reader.cancel().catch(()=>{});}}
    res.end();
@@ -131,11 +134,19 @@ it.skipIf(process.env.BROWSER_INTEGRATION!=='true')('real React canvas receives 
   await page.getByRole('button',{name:'Inspect observation',exact:true}).first().click();
   await page.getByText(/REPLAY — input disabled/).waitFor();expect(await page.getByRole('button',{name:'Scroll down',exact:true}).isEnabled()).toBe(false);
   await page.getByRole('button',{name:'Return to live view',exact:true}).click();
+  await page.reload();
+  await page.waitForFunction(()=>document.querySelector('[role="status"]')?.textContent?.includes('human'));
+  await page.getByRole('button',{name:'Resume agent',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('blockquote')?.textContent?.includes('recurring maintenance contracts'));
   await page.getByRole('button',{name:'Stop task',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('[role="status"]')?.textContent?.includes('cancelled'));
-  expect((await readRun(owner,created.id))!.actions).toBe(1);
+  expect((await readRun(owner,created.id))!.actions).toBe(2);
+  await page.getByRole('button',{name:'I saw the live canvas, inspected replay and recovered it after reload',exact:true}).click();
+  await page.getByRole('alert').filter({hasText:'retained as a user report'}).waitFor();
+  const status=await (await verificationGet(req('/api/browser-verification'))).json();
+  expect(Object.values(status.checks).every(Boolean)).toBe(true);
   for(const width of [390,1440]){await page.setViewportSize({width,height:1000});expect(await page.locator('canvas').isVisible()).toBe(true);}
- }finally{stop.abort();await task;await browser.close();server.closeAllConnections();server.close();vi.stubEnv('PUBLIC_APP_URL','https://gpi.example');}
+ }finally{stop.abort();await task;await browser.close();server.closeAllConnections();server.close();vi.stubEnv('PUBLIC_APP_URL','https://gpi.example');vi.stubEnv('BROWSER_WORKSPACE_ENABLED','true');vi.stubEnv('BROWSER_VERIFICATION_ENABLED','false');}
 },45000);
 it('admission rejects absent, busy and expired capacity; an accepted retry remains idempotent',async()=>{
  await state.db!.query('DELETE FROM gpi_browser_workers');
@@ -152,6 +163,41 @@ it('admission rejects absent, busy and expired capacity; an accepted retry remai
  await state.db!.query("UPDATE gpi_browser_workers SET ready_until=now()-interval '1 second'");
  await expect(createRun({...auth,userId:crypto.randomUUID()},input(),'us:0000000001','Example Industries')).rejects.toThrow('browser_capacity_unavailable');
  await locked(accepted.id,async r=>{r.state='cancelled';});
+});
+it('verification requires sign-in and fixed sources while normal research is disabled',async()=>{
+ vi.stubEnv('BROWSER_WORKSPACE_ENABLED','false');vi.stubEnv('BROWSER_VERIFICATION_ENABLED','true');
+ try{
+  expect((await verificationGet(req('/api/browser-verification',undefined,''))).status).toBe(401);
+  expect((await verificationPost(req('/api/browser-verification',{idempotencyKey:crypto.randomUUID(),sourceUrl:'https://evil.invalid'}))).status).toBe(409);
+  await state.db!.query('DELETE FROM gpi_browser_workers');
+  expect((await verificationPost(req('/api/browser-verification',{idempotencyKey:crypto.randomUUID()}))).status).toBe(503);
+  await advertiseBrowserWorker(crypto.randomUUID(),true);
+  const created=await verificationPost(req('/api/browser-verification',{idempotencyKey:crypto.randomUUID()}));expect(created.status).toBe(201);
+  const run=(await created.json()).run;expect(run.verification).toBe(true);expect(run.input.sourceUrl).toBe(FIXTURE_ORIGIN+'/');
+  expect((await GET(req('/api/browser-sessions?id='+run.id,undefined,otherCookie))).status).toBe(404);
+  expect((await verificationPost(req('/api/browser-verification',{kind:'confirm_display',id:run.id,observationId:crypto.randomUUID()},otherCookie))).status).toBe(404);
+  expect((await POST(req('/api/browser-sessions',input()))).status).toBe(404);
+  expect((await POST(req('/api/browser-sessions?id='+run.id,{id:crypto.randomUUID(),kind:'stop',epoch:0}))).status).toBe(202);
+ }finally{vi.stubEnv('BROWSER_WORKSPACE_ENABLED','true');vi.stubEnv('BROWSER_VERIFICATION_ENABLED','false');}
+});
+it('native SQL lease fences stale controllers and production admission requires a ready managed generation',async()=>{
+ const controller=crypto.randomUUID(),other=crypto.randomUUID();
+ const runtime=(await acquireRuntime(controller,'a'.repeat(40)))!;expect(runtime.phase).toBe('idle');
+ expect(await acquireRuntime(other,'a'.repeat(40))).toBeNull();expect(await renewRuntime(controller)).toBe(true);
+ await mutateRuntime(controller,r=>{r.phase='ready';r.vmId='synthetic-vm';});
+ vi.stubEnv('NODE_ENV','production');vi.stubEnv('BROWSER_RUNTIME_GENERATION',runtime.generation);
+ try{
+  expect(await runtimePermitsWorker(undefined,true)).toBe(true);
+  // beforeEach advertised an unmanaged worker; production must ignore it.
+  await expect(createRun({...auth,userId:crypto.randomUUID()},input(),'us:0000000001','Example Industries')).rejects.toThrow('browser_capacity_unavailable');
+  await advertiseBrowserWorker(crypto.randomUUID(),true);
+  const accepted=await createRun({...auth,userId:crypto.randomUUID()},input(),'us:0000000001','Example Industries');
+  await locked(accepted.id,async r=>{r.state='cancelled';});
+  await mutateRuntime(controller,r=>{r.phase='recovering';});expect(await runtimePermitsWorker()).toBe(false);
+  await state.db!.query("UPDATE gpi_browser_runtime SET lease_until=now()-interval '1 second'");
+  expect(await renewRuntime(controller)).toBe(false);await expect(mutateRuntime(controller,()=>{})).rejects.toThrow('runtime_lease_lost');
+  expect((await acquireRuntime(other,'a'.repeat(40)))!.phase).toBe('recovering');
+ }finally{vi.stubEnv('NODE_ENV','test');vi.stubEnv('BROWSER_RUNTIME_GENERATION','');}
 });
 it('logout revokes worker authority',async()=>{
  const run=await createRun(auth,input(),'us:0000000001','Example Industries');

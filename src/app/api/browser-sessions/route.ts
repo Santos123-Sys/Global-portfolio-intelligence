@@ -9,23 +9,25 @@ import { configuredOrigins,allowedSource } from '@/lib/browser/policy';
 import { createRun,readRun,submit } from '@/lib/browser/store';
 import { documentMeta,digest } from '@/lib/corpus/documents';
 import { saveDocument } from '@/lib/corpus/store';
+import { browserEnabled,browserRunEnabled } from '@/lib/browser/access';
 
 export const runtime='nodejs';
 const headers={'cache-control':'no-store','x-content-type-options':'nosniff'};
 const reply=(value:unknown,status=200)=>Response.json(value,{status,headers});
-const enabled=()=>process.env.BROWSER_WORKSPACE_ENABLED==='true';
+const enabled=browserEnabled;
 const Id=z.string().uuid();
 export async function GET(req:Request) {
   const s=await authenticateRequest(req);if(!s.ok)return s.response;
-  if(!enabled())return reply({enabled:false});
   const url=new URL(req.url),id=url.searchParams.get('id');
   try{
     if(!id){
+      if(!enabled())return reply({enabled:false});
       const rows=await sql()`SELECT payload FROM gpi_browser_sessions WHERE owner_id=${s.auth.userId} ORDER BY created_at DESC LIMIT 10`;
       return reply({enabled:true,origins:configuredOrigins(),canEdit:accountCanEdit(s.auth.role),runs:rows.map(r=>publicRun({...r.payload,observation:null}))});
     }
     if(!Id.safeParse(id).success)return reply({error:'Invalid session'},400);
     const run=await readRun(s.auth.userId,id);if(!run)return reply({error:'Not found'},404);
+    if(!browserRunEnabled(run))return reply({error:'Browser workspace disabled'},404);
     const observationId=url.searchParams.get('observation');
     if(observationId){
       if(!Id.safeParse(observationId).success)return reply({error:'Invalid observation'},400);
@@ -41,12 +43,14 @@ export async function GET(req:Request) {
 const Accept=z.object({kind:z.literal('accept'),id:z.string().uuid(),evidenceId:z.string().uuid(),issuerId:z.string(),year:z.number().int(),confirmed:z.literal(true)}).strict();
 export async function POST(req:Request) {
   const s=await authenticateRequest(req);if(!s.ok)return s.response;
-  if(!enabled())return reply({error:'Browser workspace disabled'},404);
   try{assertSameOrigin(req);if(!accountCanEdit(s.auth.role))throw Error();}catch{return reply({error:'Forbidden'},403);}
   const body=await readBoundedJson(req,12_000);if(!body.ok)return reply({error:body.error},body.status);
   try {
     const url=new URL(req.url),id=url.searchParams.get('id');
-    if(id){Id.parse(id);return reply({run:publicRun(await submit(s.auth,id,body.value))},202);}
+    if(id){Id.parse(id);const run=await readRun(s.auth.userId,id);if(!run)return reply({error:'Not found'},404);
+      if(!browserRunEnabled(run))return reply({error:'Browser workspace disabled'},404);
+      return reply({run:publicRun(await submit(s.auth,id,body.value))},202);}
+    if(!enabled())return reply({error:'Browser workspace disabled'},404);
     const accept=Accept.safeParse(body.value);
     if(accept.success){
       const a=accept.data,run=await readRun(s.auth.userId,a.id);

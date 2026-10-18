@@ -12,8 +12,9 @@ non-root `browsercheck` with `NODE_ENV=production`: all passed (3753, 1109,
 
 The credential-free staging checkpoint `gpi-browser-verified-20261018-8a26ef4a`
 contains the experimental runtime. Ubuntu 26.04 required a VM-only Playwright
-1.64.0 installation; the repository remains pinned to 1.56.1. This is not yet
-a reproducible production image or a dependency-upgrade verification.
+1.64.0 installation; at that measurement the repository was pinned to 1.56.1.
+The follow-up implementation pins both runtime/test packages to 1.64.1 and adds
+a reproducible SDK recipe. See browser-runtime-plan.md for its live release gates.
 
 ## Bounded live-model check
 
@@ -61,14 +62,12 @@ authenticated React canvas/SSE and Chromium takeover/stop. General suite:
 217 passed, four opt-in tests skipped; type checking and lint passed (one
 existing JSX punctuation warning).
 
-## Proposed process supervision
+## Supervision follow-up
 
-`deploy/gpi-browser-worker.service` is a preparation artifact, not a verified
-installation. It assumes immutable code at `/opt/gpi`, a Node executable at
-`/usr/local/bin/gpi-node`, browsers at `/opt/gpi-browsers`, and a root-owned
-0600 `/etc/gpi/browser-worker.env`. Never put credentials into an image or
-checkpoint. The unit requires runtime verification and only restarts a process;
-it cannot replace a lost VM.
+The unverified systemd preparation artifact was removed. The managed VM controller,
+lease fences, bounded recovery and signed-in verification page are described in
+[browser-runtime-plan.md](browser-runtime-plan.md). Historical fixture results
+above do not establish that the new controller was provisioned and verified live.
 
 ## Remaining activation gates
 

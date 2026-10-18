@@ -8,7 +8,7 @@ async function request(url:string,body?:unknown){
   const r=await fetch(url,{cache:'no-store',...(body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{})});
   const data=await r.json();if(!r.ok)throw Error(data.error??'Browser connection unavailable');return data;
 }
-export function BrowserWorkspace({candidate}:{candidate:Candidate}) {
+export function BrowserWorkspace({candidate,verification=false}:{candidate:Candidate;verification?:boolean}) {
   const [config,setConfig]=useState<{enabled:boolean;origins:string[];canEdit:boolean}>({enabled:false,origins:[],canEdit:false});
   const [source,setSource]=useState(''),[year,setYear]=useState(2025),[question,setQuestion]=useState('What primary-source evidence supports the company’s growth and risks?');
   const [run,setRun]=useState<View|null>(null),[events,setEvents]=useState<BrowserEvent[]>([]),[message,setMessage]=useState('');
@@ -17,7 +17,7 @@ export function BrowserWorkspace({candidate}:{candidate:Candidate}) {
   const [confirmed,setConfirmed]=useState(false),[now,setNow]=useState(0);
   const canvas=useRef<HTMLCanvasElement>(null),imageGeneration=useRef(0),cursor=useRef(0),creating=useRef<string|null>(null);
   useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[]);
-  useEffect(()=>{let active=true;void request('/api/browser-sessions').then(d=>{if(!active)return;setConfig(d);const previous=d.runs?.find((r:View)=>r.input.company===candidate.key);if(previous){setRun(previous);setSource(previous.input.sourceUrl);setYear(previous.input.year);setQuestion(previous.input.question);}}).catch(()=>{});return()=>{active=false;};},[candidate.key]);
+  useEffect(()=>{let active=true;void request(verification?'/api/browser-verification':'/api/browser-sessions').then(d=>{if(!active)return;setConfig(d);const previous=d.runs?.find((r:View)=>r.input.company===candidate.key);if(previous){setRun(previous);setSource(previous.input.sourceUrl);setYear(previous.input.year);setQuestion(previous.input.question);}}).catch(()=>{});return()=>{active=false;};},[candidate.key,verification]);
   useEffect(()=>{
     if(!run?.id)return;let active=true;let timer:ReturnType<typeof setTimeout>;let stream:EventSource;const id=run.id;
     function connect(){
@@ -41,7 +41,7 @@ export function BrowserWorkspace({candidate}:{candidate:Candidate}) {
   },[shown]);
   async function start(){
     setBusy(true);setMessage('');creating.current??=crypto.randomUUID();
-    try{const d=await request('/api/browser-sessions',{company:candidate.key,year,question,sourceUrl:source,mode:'model',idempotencyKey:creating.current});cursor.current=0;setEvents([]);setReplay(null);setRun(d.run);creating.current=null;}
+    try{const d=await request(verification?'/api/browser-verification':'/api/browser-sessions',verification?{idempotencyKey:creating.current}:{company:candidate.key,year,question,sourceUrl:source,mode:'model',idempotencyKey:creating.current});cursor.current=0;setEvents([]);setReplay(null);setRun(d.run);creating.current=null;}
     catch(e){setMessage((e as Error).message);}finally{setBusy(false);}
   }
   async function command(kind:string,action?:Action){
@@ -54,11 +54,11 @@ export function BrowserWorkspace({candidate}:{candidate:Candidate}) {
   return <section className="card" aria-label="Live browser research">
     <h3>Browser research · {candidate.name}</h3>
     <p>Public-source reader. One operator, no private sign-in, forms, downloads or purchases. Financial verification remains in FilingLens.</p>
-    <label>Reporting year<input type="number" min="2000" max="2200" value={year} onChange={e=>setYear(Number(e.target.value))}/></label>
+    {!verification&&<><label>Reporting year<input type="number" min="2000" max="2200" value={year} onChange={e=>setYear(Number(e.target.value))}/></label>
     <label>Research question<textarea value={question} maxLength={1000} onChange={e=>setQuestion(e.target.value)}/></label>
     <label>Public source URL<input type="url" value={source} onChange={e=>{setSource(e.target.value);creating.current=null;}} placeholder={config.origins[0]??'No source origins configured'}/></label>
-    <p className="muted">Allowed origins: {config.origins.join(', ')||'None configured'}. Limits: 30 actions, 20 model calls, 5 minutes active research; session closes after 10 minutes. Observations retained for 7 days.</p>
-    <button disabled={busy||!config.canEdit||!candidate.issuer||!config.origins.length} onClick={()=>void start()}>Start browser research</button>
+    <p className="muted">Allowed origins: {config.origins.join(', ')||'None configured'}. Limits: 30 actions, 20 model calls, 5 minutes active research; session closes after 10 minutes. Observations retained for 7 days.</p></>}
+    <button disabled={busy||!config.canEdit||!candidate.issuer||!config.origins.length} onClick={()=>void start()}>{verification?'Start synthetic verification':'Start browser research'}</button>
     {message&&<p role="alert">{message}</p>}
     {run&&<>
       <p role="status">{run.input.mode==='fixture'?'Deterministic fixture operator':'GPI research operator · AI DOM researcher'} · {run.state} · {connected?'Connected':'Reconnecting; input disabled'} · {run.reason??''}</p>
@@ -79,9 +79,14 @@ export function BrowserWorkspace({candidate}:{candidate:Candidate}) {
         </details></>}
       <h4>Action timeline</h4><ol>{events.map(e=><li key={e.seq}>{e.at} · {e.type} · {e.summary} {e.observationId&&<button className="secondary" onClick={()=>void request(`/api/browser-sessions?id=${run.id}&observation=${e.observationId}`).then(d=>setReplay(d.observation)).catch(()=>setMessage('Observation unavailable'))}>Inspect observation</button>}</li>)}</ol>
       <h4>Source evidence awaiting review</h4><p>Exact quote matching checks capture integrity. Issuer/year labels, source authority and financial meaning still require review.</p>
-      <label><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>I checked the source, issuer {run.issuerId} and reporting year {run.input.year}.</label>
+      {!verification&&<label><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>I checked the source, issuer {run.issuerId} and reporting year {run.input.year}.</label>}
       {run.evidence.map(e=><article key={e.id}><blockquote>{e.text}</blockquote><a href={e.finalUrl} target="_blank" rel="noreferrer">{e.title}</a><p>{e.status} · characters {e.start}–{e.end} · {e.capturedAt}</p>
-        <button disabled={!confirmed||!config.canEdit||busy} onClick={()=>{setBusy(true);void request('/api/browser-sessions',{kind:'accept',id:run.id,evidenceId:e.id,issuerId:run.issuerId,year:run.input.year,confirmed:true}).then(()=>setMessage('Reviewed excerpt added to corpus. It is not a verified financial figure.')).catch(err=>setMessage(err.message)).finally(()=>setBusy(false));}}>Accept reviewed excerpt into corpus</button></article>)}
+        {!verification&&<button disabled={!confirmed||!config.canEdit||busy} onClick={()=>{setBusy(true);void request('/api/browser-sessions',{kind:'accept',id:run.id,evidenceId:e.id,issuerId:run.issuerId,year:run.input.year,confirmed:true}).then(()=>setMessage('Reviewed excerpt added to corpus. It is not a verified financial figure.')).catch(err=>setMessage(err.message)).finally(()=>setBusy(false));}}>Accept reviewed excerpt into corpus</button>}</article>)}
+      {verification&&shown&&<button className="secondary" disabled={!canControl||busy} onClick={()=>{
+        setBusy(true);void request('/api/browser-verification',{kind:'confirm_display',id:run.id,observationId:shown.id})
+          .then(()=>setMessage('Your display, replay and reload confirmation was retained as a user report.'))
+          .catch(err=>setMessage(err.message)).finally(()=>setBusy(false));
+      }}>I saw the live canvas, inspected replay and recovered it after reload</button>}
     </>}
   </section>;
 }

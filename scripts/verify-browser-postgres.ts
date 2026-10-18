@@ -7,6 +7,7 @@ import postgres from 'postgres';
 import type { AuthContext } from '../src/lib/auth';
 import { sql, closeStore } from '../src/lib/foundation/store';
 import { advertiseBrowserWorker, claimRun, createRun, locked, readRun, reapRuns, retainObservation, submit } from '../src/lib/browser/store';
+import {acquireRuntime,mutateRuntime,renewRuntime} from '../src/lib/browser/runtime-store';
 
 // Deliberately restricted to a disposable loopback database, never a Railway DB.
 const mode = process.argv[2];
@@ -36,9 +37,18 @@ if (mode === 'claim' || mode === 'hold') {
     await admin.unsafe(`CREATE DATABASE ${name}`);created = true;
     const testUrl = new URL(adminUrl);testUrl.pathname = '/' + name;
     process.env.DATABASE_URL = testUrl.href;
-    for (const migration of ['005_browser_workspace.sql', '006_browser_capacity.sql']) {
+    for (const migration of ['005_browser_workspace.sql', '006_browser_capacity.sql','007_browser_runtime.sql']) {
       await sql().unsafe(await readFile(new URL('../migrations/' + migration, import.meta.url), 'utf8'));
     }
+    const leader=randomUUID(),challenger=randomUUID();
+    assert.ok(await acquireRuntime(leader,'a'.repeat(40)));
+    assert.equal(await acquireRuntime(challenger,'a'.repeat(40)),null);
+    await mutateRuntime(leader,s=>{s.phase='creating';});
+    await sql()`UPDATE gpi_browser_runtime SET lease_until=now()-interval '1 second'`;
+    assert.equal(await renewRuntime(leader),false);
+    await assert.rejects(mutateRuntime(leader,()=>{}),/runtime_lease_lost/);
+    const replacement=await acquireRuntime(challenger,'a'.repeat(40));
+    assert.equal(replacement?.phase,'blocked');assert.equal(replacement?.reason,'creation_outcome_unknown');
     const auth = (): AuthContext => ({userId: randomUUID(), actorUserId: randomUUID(), sessionId: randomUUID(), accountId: randomUUID(),
       email: 'synthetic@example.invalid', displayName: 'Canary', role: 'owner', isPlatformAdmin: false, accountName: 'Canary', accountType: 'personal'});
     const input = () => ({company: 'Canary', year: 2025, question: 'Find the report evidence', sourceUrl: 'https://fixture.gpi.invalid/', idempotencyKey: randomUUID(), mode: 'fixture' as const});
