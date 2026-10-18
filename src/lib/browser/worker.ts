@@ -5,7 +5,8 @@ import { ResearchBrowser,captureEvidence,FIXTURE_ORIGIN } from './engine';
 import { configuredOrigins } from './policy';
 import { checkBudget,propose } from './operator';
 import type { ModelCall } from '../research/manager';
-import { activeAuthority,advertiseBrowserWorker,claimRun,event,locked,reapRuns,retainObservation } from './store';
+import { activeAuthority,advertiseBrowserWorker,claimRun,event,locked,reapRuns,retainObservation,touchBrowserWorker } from './store';
+import { runtimePermitsWorker } from './runtime-store';
 
 const wait=(ms:number)=>new Promise(r=>setTimeout(r,ms));
 export async function executeBrowserRun(initial:BrowserRun,shutdown:AbortSignal,dependencies:{engine?:ResearchBrowser;model?:ModelCall}={}) {
@@ -43,7 +44,8 @@ export async function executeBrowserRun(initial:BrowserRun,shutdown:AbortSignal,
     // Starting checks precede network access.
     await locked(initial.id,async(run,tx)=>{if(!await activeAuthority(run,tx)||run.state!=='running')throw Error('authority_revoked');});
     const first=await engine.open(initial.input.sourceUrl);
-    await locked(initial.id,async(run,tx)=>{await retainObservation(tx,run,first);await event(tx,run,'observed','Public page observed',{observationId:first.id});});
+    await locked(initial.id,async(run,tx)=>{await retainObservation(tx,run,first);await event(tx,run,'observed','Public page observed',{observationId:first.id});
+      if(run.verification){run.state='paused';await event(tx,run,'verification_ready','Synthetic verification page ready; use Take control');}});
     while(!shutdown.aborted&&!finished){
       const snapshot=await locked(initial.id,async(run,tx)=>{
         if(run.worker!==initial.worker||terminal(run.state)){finished=true;return run;}
@@ -79,6 +81,11 @@ export async function executeBrowserRun(initial:BrowserRun,shutdown:AbortSignal,
         }
         await sql()`UPDATE gpi_browser_commands SET status='completed' WHERE session_id=${initial.id} AND id=${command.id}`;
       }else if(snapshot.state==='running'&&!modelTask){
+        if(snapshot.verification&&snapshot.evidence.length){
+          await locked(initial.id,async(run,tx)=>{if(run.state==='running'){run.state='paused';
+            await event(tx,run,'verification_evidence_ready','Synthetic evidence captured; use Stop task to verify closure');}});
+          await wait(350);continue;
+        }
         checkBudget(snapshot);modelAbort=new AbortController();
         const signal=AbortSignal.any([modelAbort.signal,shutdown,AbortSignal.timeout(25_000)]);
         const expected=await locked(initial.id,async(run,tx)=>{
@@ -114,14 +121,22 @@ export async function executeBrowserRun(initial:BrowserRun,shutdown:AbortSignal,
 export async function browserWorker(signal:AbortSignal) {
   const worker=randomUUID();
   if(!process.env.RESEARCH_MODEL_API_KEY||!process.env.RESEARCH_MODEL_NAME)throw Error('research_model_unconfigured');
+  if(process.env.NODE_ENV==='production'&&!process.env.BROWSER_RUNTIME_GENERATION)throw Error('managed_browser_runtime_required');
   // Direct worker starts must prove isolation too, not only browser-service starts.
   const probe=new ResearchBrowser([FIXTURE_ORIGIN],true);
   try { await probe.open(FIXTURE_ORIGIN+'/'); } finally { await probe.close(); }
+  const fenced=new AbortController(),stop=AbortSignal.any([signal,fenced.signal]);let touching=false;
+  const heartbeat=setInterval(()=>{
+    if(touching||stop.aborted)return;touching=true;
+    void runtimePermitsWorker().then(async permitted=>{if(!permitted){fenced.abort();return;}await touchBrowserWorker(worker);})
+      .catch(()=>fenced.abort()).finally(()=>{touching=false;});
+  },1000);
   try {
-    while(!signal.aborted){
+    while(!stop.aborted){
       await reapRuns();await advertiseBrowserWorker(worker,true);
+      if(!await runtimePermitsWorker(undefined,true)){await wait(500);continue;}
       const run=await claimRun(worker);
-      if(run)await executeBrowserRun(run,signal);else await wait(1000);
+      if(run)await executeBrowserRun(run,stop);else await wait(1000);
     }
-  } finally { await advertiseBrowserWorker(worker,false); }
+  } finally { clearInterval(heartbeat);await advertiseBrowserWorker(worker,false); }
 }

@@ -13,7 +13,7 @@ export default function Login() {
       const data = await res.json();
       if (res.status === 202 && data.mfaRequired) setMfa(true);
       else if (!res.ok) setError(data.error ?? 'Sign-in unavailable');
-      else { router.replace('/'); router.refresh(); }
+      else { router.replace(new URLSearchParams(window.location.search).get('returnTo')==='/browser-verification'?'/browser-verification':'/'); router.refresh(); }
     } catch { setError('Sign-in service unavailable. Please try again.'); } finally { setBusy(false); }
   }
   return <main className="login"><div className="brand">GPI <span>FOUNDATION / 01</span></div><h1>Discovery starts<br />with evidence.</h1>

@@ -46,6 +46,8 @@ export type BrowserRun = {
   createdAt:number; expiresAt:number; leaseUntil:number; worker:string|null;
   actions:number; calls:number; tokens:number; reason:string|null;
   observation:Observation|null; frame?:LiveFrame|null; evidence:BrowserEvidence[];
+  verification?:boolean;
+  runtimeGeneration?:string;
 };
 export type BrowserEvent = {seq:number;at:string;type:string;summary:string;observationId?:string;actionId?:string;action?:Action};
 export function publicRun(run:BrowserRun) {
