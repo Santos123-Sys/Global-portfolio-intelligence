@@ -61,6 +61,8 @@ it.skipIf(!root)('real password/session → signed handoff → issuer validation
  const ticket=new URLSearchParams(new URL((await link.json()).url).hash.slice(1)).get('integration');
  const context=await app.request('https://filing.example/api/integration/v1/handoff/context',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({ticket})});expect(context.status).toBe(200);
  const {context:ctx}=await context.json();expect(ctx.reviewerUserId).toBe('550e8400-e29b-41d4-a716-446655440000');
+ expect(ctx.audience).toBe('filinglens');expect(ctx.sessionId).toBeTruthy();
+ expect(ctx.permissions).toEqual(['analysis:run','valuation:publish']);
  expect((await app.request('https://filing.example/api/metadata',{method:'POST',headers:{'X-GPI-Handoff':ticket!},body:'{}'})).status).toBe(200);
  const analysis={jurisdiction:'us',company:{name:'Synthetic approval fixture',ticker:'AAPL',exchange:'NASDAQ',filingType:'10-K',periodEnd:'2025-09-27',filedAt:null,description:'Synthetic test only'},metadata:{cik:'0000320193',cnpj:null},financials:{unit:'USD millions',years:['2025'],revenue:[100],netIncome:[10],eps:null,grossMargin:null,operatingMargin:null,operatingCashFlow:null,capex:null,freeCashFlow:null,dividends:null,buybacks:null,totalAssets:null,totalDebt:null,cash:null}};
  const proposal=await prepareValuation(analysis,'dcf');
@@ -126,4 +128,16 @@ it.skipIf(!root)('real password/session → signed handoff → issuer validation
  expect((await publish(approve)).status).toBe(401);
  expect((await auditGet(new Request('https://gpi.example/api/integration/v1/valuation-audit?candidateKey=XNAS:AAPL&valuationVersionId='+valuation.valuationVersionId,{headers:{cookie}}))).status).toBe(401);
  expect((await handoff(request('/api/integration/v1/handoff',{candidateKey:'XNAS:AAPL',confirmed:true},cookie))).status).toBe(401);
+ // A newly authenticated session gets a different binding; the old signed URL
+ // cannot be resurrected by logging in again or by replaying an earlier allow.
+ const renewed=await login(request('/api/auth/session',{email:'analyst@example.test',password:'Isolated!ApprovalVerification!2026'}));
+ expect(renewed.status).toBe(200);const renewedCookie=renewed.headers.get('set-cookie')!.split(';')[0];
+ const renewal=await handoff(request('/api/integration/v1/handoff',{candidateKey:'XNAS:AAPL',confirmed:true},renewedCookie));
+ expect(renewal.status).toBe(200);
+ const renewedTicket=new URLSearchParams(new URL((await renewal.json()).url).hash.slice(1)).get('integration');
+ expect((await app.request('https://filing.example/api/metadata',{method:'POST',headers:{'X-GPI-Handoff':ticket!},body:'{}'})).status).toBe(401);
+ expect((await app.request('https://filing.example/api/metadata',{method:'POST',headers:{'X-GPI-Handoff':renewedTicket!},body:'{}'})).status).toBe(200);
+ await state.gpi!.query("UPDATE memberships SET role='viewer' WHERE user_id=$1 AND account_id=$2",[ctx.reviewerUserId,ctx.workspaceId]);
+ expect((await app.request('https://filing.example/api/metadata',{method:'POST',headers:{'X-GPI-Handoff':renewedTicket!},body:'{}'})).status).toBe(401);
+ expect((await publish({...approve,ticket:renewedTicket})).status).toBe(401);
 },60000);
