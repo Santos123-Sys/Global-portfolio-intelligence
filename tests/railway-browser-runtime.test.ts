@@ -14,7 +14,7 @@ it('pins public source and passes only necessary service references to the VM, n
   expect(state.commands.some(c=>c.includes('git checkout --detach '+release))).toBe(true);
   expect(state.commands.some(c=>c.includes('NODE_ENV=production')&&c.includes('verify-browser-engine.ts'))).toBe(true);
   expect(state.commands.join('\n')).not.toContain('synthetic-control-secret');
-  const options=state.options!;expect(options.networkIsolation).toBe('PRIVATE');expect(options.domains).toBeUndefined();
+  const options=state.options!;expect(options.authType).toBe('bearer');expect(options.networkIsolation).toBe('PRIVATE');expect(options.domains).toBeUndefined();
   const env=options.env as Record<string,string>;
   expect(Object.keys(env).sort()).toEqual(['BROWSER_RUNTIME_GENERATION','BROWSER_SOURCE_ORIGINS','DATABASE_URL','NODE_ENV',
     'PLAYWRIGHT_BROWSERS_PATH','RESEARCH_MODEL_API_KEY','RESEARCH_MODEL_NAME'].sort());
