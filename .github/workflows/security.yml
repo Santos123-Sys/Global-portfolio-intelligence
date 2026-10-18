@@ -54,6 +54,10 @@ jobs:
       - run: npm run build
       - name: Install browser for workflow smoke test
         run: npx playwright install --with-deps chromium
+      - name: Verify isolated browser execution and durable control
+        run: |
+          npm run browser:verify
+          npm run browser:test
       - name: Verify built FilingLens authorization and recovery
         run: |
           npm run build --prefix .cross-app/filinglens

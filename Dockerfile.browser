@@ -1,0 +1,15 @@
+# Browser-only execution capacity. No public port, debugging endpoint or stored profile.
+FROM mcr.microsoft.com/playwright:v1.56.1-noble
+RUN apt-get update && apt-get install -y --no-install-recommends dumb-init && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts && chown -R pwuser:pwuser /app
+COPY --chown=pwuser:pwuser src ./src
+COPY --chown=pwuser:pwuser scripts/browser-worker.ts scripts/browser-reaper.ts scripts/browser-service.ts scripts/verify-browser-engine.ts ./scripts/
+COPY --chown=pwuser:pwuser data ./data
+COPY --chown=pwuser:pwuser tsconfig.json ./
+USER pwuser
+ENV NODE_ENV=production
+# dumb-init forwards termination to the entire Chromium process group on worker exit.
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["node", "--import", "tsx", "scripts/browser-service.ts"]

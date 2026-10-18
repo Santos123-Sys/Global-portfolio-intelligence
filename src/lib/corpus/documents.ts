@@ -11,6 +11,9 @@ export const DocumentMeta = z.object({
   sha256: z.string().regex(/^[a-f0-9]{64}$/), parser: z.string().max(80), textSha256: z.string().regex(/^[a-f0-9]{64}$/),
   retrievedAt: z.string().datetime(), periodEnd: z.string().nullable(),
   bytes: z.number().int().positive().max(8_000_000), path: z.string().max(400),
+  browserProvenance:z.object({originalUrl:z.string().url(),finalUrl:z.string().url(),observedAt:z.string().datetime(),
+    observationId:z.string().uuid(),actionId:z.string().uuid(),start:z.number().int().nonnegative(),end:z.number().int().positive(),
+    method:z.literal('dom-innerText'),verification:z.literal('user_reviewed_excerpt_not_financial_verification')}).strict().optional(),
 }).strict();
 export type DocumentMeta = z.infer<typeof DocumentMeta>;
 export type CorpusDocument = { metadata: DocumentMeta; text: string };
