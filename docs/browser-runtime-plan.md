@@ -45,18 +45,21 @@ flowchart TD
 
 ## Configure without sending secrets in chat
 
-A dedicated Railway **project token scoped to the chosen environment** is needed.
-Create it in the project's Settings > Tokens and store it directly in the
-`agentic-worker` service as `BROWSER_RUNTIME_RAILWAY_TOKEN`. The installed SDK
-supports the project-token header; actual sandbox permissions remain to be checked.
-Do not substitute a human CLI/OAuth credential or broaden token scope silently.
+The official Sandbox quickstart documents **account or workspace API tokens**.
+Use a dedicated token scoped to the project's workspace and store it directly
+in the `agentic-worker` service as `BROWSER_RUNTIME_RAILWAY_TOKEN`. This is broader
+than a single-environment project token: only the controller receives it, and its
+resource operations are pinned to the service's environment. The SDK's generic
+project-token header is supported, but Sandbox permissions for that token type
+have not been verified. No token is created or broadened automatically. Never
+substitute a human CLI/OAuth credential.
 
 Controller service variables:
 
 | Variable | Value / behavior |
 |---|---|
-| BROWSER_RUNTIME_RAILWAY_TOKEN | Dedicated environment-scoped project token, entered in Railway only |
-| BROWSER_RUNTIME_AUTH_TYPE | project-token (default); do not broaden without reviewing a permission failure |
+| BROWSER_RUNTIME_RAILWAY_TOKEN | Dedicated workspace-scoped API token, entered in Railway only |
+| BROWSER_RUNTIME_AUTH_TYPE | bearer (documented Sandbox API path); project-token is an unverified opt-in |
 | BROWSER_RUNTIME_ENABLED | true only for the controlled canary after the token exists |
 | RAILWAY_ENVIRONMENT_ID | Railway's built-in environment identity |
 | BROWSER_RUNTIME_RELEASE_SHA | Optional exact immutable override; otherwise deployed RAILWAY_GIT_COMMIT_SHA |
@@ -68,8 +71,8 @@ Controller service variables:
 | BROWSER_WORKSPACE_ENABLED | Keep false/absent until the runtime and signed-in acceptance pass |
 
 The controller and VM must use the same environment as the web application's
-DATABASE_URL. No production token or database reference is transferred to staging.
-There is no automatic fallback to a broader account token.
+DATABASE_URL. VM creation is pinned to the controller service's environment; no production database
+reference is transferred to staging. There is no automatic fallback to an account token.
 
 ## Signed-in acceptance in the user's browser
 
@@ -120,5 +123,6 @@ schema and action receipts for audit. The old systemd unit is superseded by the
 managed controller and is not a production deployment instruction.
 
 References: https://docs.railway.com/sandboxes and
+https://docs.railway.com/sandboxes/quickstart and
 https://docs.railway.com/guides/lock-down-production-project . Implementation uses
 the installed SDK types and README; provider behavior still requires a live trial.

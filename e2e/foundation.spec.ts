@@ -14,6 +14,7 @@ test('signed-out visitors must authenticate; legacy APIs no longer exist',async(
   await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.getByRole('alert').filter({hasText:'Synthetic invalid credentials'})).toBeVisible();
   expect((await request.get('/api/analysis')).status()).toBe(404);
   expect((await request.get('/api/foundation')).status()).toBe(401);
+  expect((await request.get('/api/browser-verification')).status()).toBe(401);
 });
 for(const width of [390,1440])test(`candidate → screen → research foundation at ${width}px`,async({page,context})=>{
   await page.setViewportSize({width,height:1000});

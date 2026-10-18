@@ -9,7 +9,7 @@ export function railwayRuntimeConfig(env:Record<string,string|undefined>=process
   return Config.parse({token:env.BROWSER_RUNTIME_RAILWAY_TOKEN,environmentId:env.RAILWAY_ENVIRONMENT_ID,
     release:env.BROWSER_RUNTIME_RELEASE_SHA??env.RAILWAY_GIT_COMMIT_SHA,service:env.BROWSER_RUNTIME_VARIABLE_SERVICE??'agentic-worker',
     key:env.BROWSER_RUNTIME_MODEL_KEY_VARIABLE??'RESEARCH_MODEL_API_KEY',model:env.BROWSER_RUNTIME_MODEL_NAME_VARIABLE??'RESEARCH_MODEL_NAME',
-    origins:env.BROWSER_SOURCE_ORIGINS??'',authType:env.BROWSER_RUNTIME_AUTH_TYPE??'project-token'});
+    origins:env.BROWSER_SOURCE_ORIGINS??'',authType:env.BROWSER_RUNTIME_AUTH_TYPE??'bearer'});
 }
 export class RailwayBrowserRuntime implements RuntimeProvider {
   private template?:ReturnType<typeof Sandbox.template>;

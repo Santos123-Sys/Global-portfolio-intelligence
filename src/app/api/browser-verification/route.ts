@@ -6,7 +6,7 @@ import { readBoundedJson } from '@/lib/request-body';
 import { sql } from '@/lib/foundation/store';
 import { createRun,event,locked } from '@/lib/browser/store';
 import { publicRun,type BrowserRun } from '@/lib/browser/contracts';
-import { FIXTURE_ORIGIN,FIXTURE_QUOTE } from '@/lib/browser/engine';
+import { FIXTURE_ORIGIN,FIXTURE_QUOTE } from '@/lib/browser/fixture';
 import { verificationEnabled } from '@/lib/browser/access';
 import { runtimeStatus } from '@/lib/browser/runtime-store';
 

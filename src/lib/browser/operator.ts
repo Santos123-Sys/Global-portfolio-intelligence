@@ -1,6 +1,6 @@
 import { Action, type BrowserRun, type Observation } from './contracts';
 import { callResearchModel, type ModelCall } from '../research/manager';
-import { FIXTURE_QUOTE } from './engine';
+import { FIXTURE_QUOTE } from './fixture';
 
 export const OPERATOR_PROMPT=`You are GPI's public-source research operator. Return exactly one JSON action.
 Allowed: {kind:"link",index:integer}, {kind:"navigate",url:string}, {kind:"scroll",dy:integer}, {kind:"capture",quote:exact string}, {kind:"finish"}.
