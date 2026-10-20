@@ -19,7 +19,7 @@ it('retains prices and ex/record/payment dates as evidence without changing a di
   const data=u.pathname.endsWith('historical')?{historicalDataPrice:h.rows.map(r=>({date:Date.parse(r.date)/1000,rawClose:r.close,close:r.adjustedClose}))}:{cashDividends:[{exDate:h.rows[20].date,lastDatePrior:h.rows[19].date,paymentDate:'2026-11-20',rate:.5,rawRate:1,label:'JCP'}]};
   return Response.json({results:[{requestedSymbol:'PETR4',symbol:'PETR4',changed:false,data}]});
  });
- const result=(await inspectBrazilAdjustments(h,fetcher))!;expect(result.conflicts).toBe(2);expect(result.pairs[0].rawClose).toBe(h.rows[20].close);expect(result.pairs[0].brapiEvents[0].paymentDate).toBe('2026-11-20');expect(JSON.stringify(h)).toBe(before);expect(fetcher).toHaveBeenCalledTimes(2);expect(JSON.stringify(result)).not.toContain('synthetic');
+ const result=(await inspectBrazilAdjustments(h,fetcher))!;expect(result.conflicts).toBe(2);expect(result.rawCompared).toBe(h.rows.length);expect(result.rawMatchesWithinHalfCent).toBe(h.rows.length);expect(result.rawMaxDifference).toBe(0);expect(result.pairs[0].rawClose).toBe(h.rows[20].close);expect(result.pairs[0].brapiEvents[0].paymentDate).toBe('2026-11-20');expect(JSON.stringify(h)).toBe(before);expect(fetcher).toHaveBeenCalledTimes(2);expect(JSON.stringify(result)).not.toContain('synthetic');
 });
 it('records denied raw/event access once without retrying or fabricating prices',async()=>{
  const h=fixture();vi.stubEnv('PRICE_ADJUSTMENT_DIAGNOSTICS','true');vi.stubEnv('BRAPI_API_KEY','synthetic');const fetcher=vi.fn(async()=>new Response('',{status:403}));

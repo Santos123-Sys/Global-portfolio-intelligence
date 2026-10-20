@@ -36,5 +36,10 @@ export async function inspectBrazilAdjustments(h:MarketHistory,fetcher:typeof fe
   const p=h.rows[i-1],rawCurrent=rawMap.get(r.date),rawPrevious=rawMap.get(p.date);
   return [{date:r.date,previousDate:p.date,primaryClose:r.close,previousPrimaryClose:p.close,primaryAdjusted:r.adjustedClose,previousPrimaryAdjusted:p.adjustedClose,secondaryAdjusted:secondary.get(r.date),previousSecondaryAdjusted:secondary.get(p.date),rawClose:number(rawCurrent?.rawClose),previousRawClose:number(rawPrevious?.rawClose),reportedClose:number(rawCurrent?.close),yahooEvents:h.corporateActions.filter(a=>a.date===r.date),brapiEvents:actions.filter(a=>a.exDate===r.date||a.lastDatePrior===p.date||a.lastDatePrior===r.date)}];
  });
- return {symbol:h.symbol,rawStatus:status(results[0]),eventStatus:status(results[1]),rawHash:raw?.hash??null,eventHash:events?.hash??null,rawObservations:rawRows.length,eventObservations:actions.length,conflicts:pairs.length,pairs};
+ const rawComparison=h.rows.flatMap(r=>{const close=number(rawMap.get(r.date)?.rawClose);return close===null?[]:[{date:r.date,difference:Math.abs(close-r.close)}];});
+ const fitsCent=(value:number)=>Math.abs(value-Math.round(value*100)/100)<=Math.max(1,value)*2**-23;
+ return {symbol:h.symbol,rawStatus:status(results[0]),eventStatus:status(results[1]),rawHash:raw?.hash??null,eventHash:events?.hash??null,rawObservations:rawRows.length,eventObservations:actions.length,
+  rawCompared:rawComparison.length,rawMatchesWithinHalfCent:rawComparison.filter(r=>r.difference<=.005).length,rawMaxDifference:rawComparison.length?Math.max(...rawComparison.map(r=>r.difference)):null,
+  rawConflictSamples:rawComparison.filter(r=>r.difference>.005).slice(0,5),primaryAdjustedOnCentGrid:h.rows.filter(r=>fitsCent(r.adjustedClose)).length,primaryClosesOnCentGrid:h.rows.filter(r=>fitsCent(r.close)).length,
+  conflicts:pairs.length,pairs};
 }
