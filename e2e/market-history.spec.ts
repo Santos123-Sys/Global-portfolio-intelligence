@@ -20,7 +20,8 @@ for(const width of [390,1440])test(`saved disabled evidence has recovery and dat
  await page.goto('/');await page.getByRole('tab',{name:'Research',exact:true}).click();
  await expect(page.getByText('Evidence pack saved; no AI draft was produced.',{exact:true})).toBeVisible();
  await expect(page.getByText(/Current connection: enabled/)).toBeVisible();
- await expect(page.getByText('Quality checks passed',{exact:true})).toBeVisible();
+ await expect(page.getByText('Structural checks passed',{exact:true})).toBeVisible();
+ await expect(page.getByText('not configured',{exact:true})).toBeVisible();
  await page.getByText('Inspect provenance, checks and limitations',{exact:true}).click();
  await expect(page.getByRole('link',{name:'Inspect daily prices, returns and source lineage (JSON)'})).toHaveAttribute('href',/snapshotId=mh1_/);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
