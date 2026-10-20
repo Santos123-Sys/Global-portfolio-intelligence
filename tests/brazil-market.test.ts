@@ -1,3 +1,4 @@
+import {acquireSecondaryEvidence} from '../src/lib/market/secondary-evidence';
 import {integratedServe} from '../ops/portfolio-risk-function';
 import {historyFixture} from './market-history-fixture';
 import {historyHash} from '../src/lib/market/history-quality';
@@ -99,4 +100,13 @@ it('Risk Studio consumes v2 rows under strict reconciliation with exact dataset 
  const response=await integratedServe(new Request('https://risk.test/v1/portfolio-analyze',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({workspaceId:crypto.randomUUID(),portfolioId:crypto.randomUUID(),runId:crypto.randomUUID(),positions:[{symbol:h.symbol,shares:1}],issuers:[{symbol:h.symbol,issuerId:h.issuerId}],valuations:[],baseCurrency:'BRL',riskFreeRate:0,range:'5y',confirmed:true,marketHistories:[{history:h,sourceHash,snapshotId}]})}));
  expect(response.status).toBe(200);const body=await response.json();expect(body.metrics.volatility).toBeLessThan(1e-9);expect(body.historySnapshots[0]).toEqual({symbol:h.symbol,sourceHash,snapshotId});
  expect(body.sources.some((s:{symbol:string;priceBasis:string})=>s.symbol===h.symbol&&s.priceBasis==='brazil-gross-entitlement.v2')).toBe(true);
+});
+
+it('retains a failed optional acquisition as an explicitly blocked dataset with no approved risk',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(now);
+ vi.stubEnv('PRICE_RECONCILIATION_ENABLED','true');vi.stubEnv('BRAZIL_HISTORY_NORMALIZATION_ENABLED','true');
+ vi.stubEnv('BRAZIL_MARKET_NORMALIZATION_ENABLED','true');vi.stubEnv('BRAZIL_HISTORY_BRAPI_PUBLIC','false');vi.stubEnv('BRAPI_API_KEY','');
+ const h=fixture('B3SA3');delete h.brazilEvidence;
+ const evidence=await acquireSecondaryEvidence(h,vi.fn());expect(evidence.brazilAcquisitionFailure).toBe('history_brazil_credential_required');
+ Object.assign(h,evidence);const q=assessHistory(h,h,now);expect(q.status).toBe('quarantined');expect(q.issues).toContain('brazil_evidence_unavailable');expect(q.metrics).toBeNull();
 });
