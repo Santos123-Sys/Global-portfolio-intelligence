@@ -92,7 +92,7 @@ export async function processHistory(fetcher:typeof fetch=fetch) {
     });
     console.log(JSON.stringify({kind:'market_history',status:saved?quality.status:'lease_lost',symbol:job.symbol,observations:quality.observations,...(saved?{snapshotId:id,calculationBasis:quality.brazilNormalization?.version??history.priceBasis}:{})}));
   }catch(e){
-    const reason=e instanceof Error&&/^history_[a-z_]+$/.test(e.message)?e.message:'history_validation_failed';
+    const reason=e instanceof Error&&/^history_[a-z_0-9]{1,100}$/.test(e.message)?e.message:'history_validation_failed';
     await sql()`UPDATE gpi_market_history_jobs SET status='failed',error_code=${reason},lease_until=null WHERE id=${job.id} AND lease_token=${lease}`;
     console.error(JSON.stringify({kind:'market_history',status:'failed',reason}));
   }

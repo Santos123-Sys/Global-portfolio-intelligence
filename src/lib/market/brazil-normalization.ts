@@ -1,9 +1,11 @@
+import {normalizeBrazilMarket} from './brazil-market-normalization';
 import type {MarketHistory,PriceRow} from './history-quality';
 import {brazilEventReviews,june2024Review} from './brazil-event-reviews';
 
-export type BrazilEvidence={version:'brazil-evidence.v1';symbol:'PETR4.SA';issuerId:'br:33000167000101';isin:'BRPETRACNPR6';retrievedAt:string;
+export type BrazilEvidence={version:'brazil-evidence.v1'|'brazil-evidence.v2';symbol:string;issuerId:string;isin:string;retrievedAt:string;
+ identity?:{symbol:string;cnpj:string;assetType:string;subType:string;profileUrl:string;profileSha256:string;coverageUrl:string;coverageSha256:string};
  raw:{sourceUrl:string;rawSha256:string;rows:{date:string;close:number;adjustedClose:number}[]};
- events:{sourceUrl:string;rawSha256:string;cash:{exDate:string|null;recordDate:string;paymentDate:string;label:string;rawRate:number;isin:string;verified:boolean}[];stock:{date:string;factor:number}[]};
+ events:{sourceUrl:string;rawSha256:string;cash:{exDate:string|null;recordDate:string;paymentDate:string;label:string;rawRate:number;isin:string;verified:boolean}[];stock:{date:string;factor:number;isin?:string;label?:string;recordDate?:string}[];subscriptions?:unknown[]};
  relay:{sourceUrl:string;rawSha256:string;rows:{date:string;close:number}[]}};
 const date=(s:unknown):s is string=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s;
 const near=(a:number,b:number,tolerance=.000002)=>Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=tolerance;
@@ -11,6 +13,7 @@ const positive=(v:unknown):v is number=>typeof v==='number'&&Number.isFinite(v)&
 const hash=(v:string)=>/^[a-f0-9]{64}$/.test(v);
 export function normalizeBrazil(h:MarketHistory,now=Date.now()){
  const e=h.brazilEvidence;if(!e)return null;
+ if(e.version==='brazil-evidence.v2')return normalizeBrazilMarket(h,e,now);
  const invalid=()=>{throw Error('history_brazil_evidence_invalid');};
  if(h.symbol!=='PETR4.SA'||h.issuerId!=='br:33000167000101'||h.currency!=='BRL'||e.version!=='brazil-evidence.v1'||e.symbol!==h.symbol||e.issuerId!==h.issuerId||e.isin!=='BRPETRACNPR6'||h.secondary?.provider!=='BrAPI'||
   e.raw.sourceUrl!=='https://brapi.dev/api/v2/stocks/historical'||e.events.sourceUrl!=='https://brapi.dev/api/v2/stocks/dividends'||e.relay.sourceUrl!=='https://cotab3.com.br/cotacoes'||

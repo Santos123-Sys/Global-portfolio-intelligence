@@ -75,7 +75,7 @@ it.each([false,true])('acquires bounded sources with explicit public mode %s and
   const data=u.pathname.endsWith('historical')?{usedInterval:'1d',historicalDataPrice:h.rows.map(r=>({date:Date.parse(r.date)/1000,rawClose:r.close,adjustedClose:r.adjustedClose}))}:{cashDividends:[],stockDividends:[]};return Response.json({results:[{requestedSymbol:'PETR4',symbol:'PETR4',changed:false,data}]});
  });
  Object.assign(h,await acquireBrazilEvidence(h,mock));expect(normalizeBrazil(h,now)!.status).toBe('verified');expect(mock).toHaveBeenCalledTimes(3);
- await expect(acquireBrazilEvidence({...h,symbol:'VALE3.SA'},mock)).rejects.toThrow('history_brazil_not_configured');expect(mock).toHaveBeenCalledTimes(3);
+ await expect(acquireBrazilEvidence({...h,symbol:'INVALID.SA'},mock)).rejects.toThrow('history_brazil_not_configured');expect(mock).toHaveBeenCalledTimes(3);
  await expect(acquireBrazilEvidence(h,async()=>new Response('',{status:403}))).rejects.toThrow('history_brazil_raw_http_403');
 });
 it('paces BrAPI calls and retries a short Retry-After once with identical credentials',async()=>{

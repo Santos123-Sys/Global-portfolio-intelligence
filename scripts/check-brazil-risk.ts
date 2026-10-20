@@ -8,6 +8,6 @@ export async function checkBrazilRisk(h:MarketHistory,base:URL,token:string,fetc
  if(!response.ok){await response.body?.cancel();throw Error('risk_canary_http_'+response.status);}
  const body=await readBoundedJson(new Request('https://response.invalid',{method:'POST',body:response.body,headers:{'content-type':'application/json'},duplex:'half'} as RequestInit),1500000);
  const r=body.ok?body.value as {schemaVersion?:string;baseCurrency?:string;historySnapshots?:{symbol:string;snapshotId:string;sourceHash:string}[];sources?:{symbol:string;priceBasis:string}[];metrics?:{volatility:number;var95:number}}:null;
- if(r?.schemaVersion!=='portfolio-analysis.v1'||r.baseCurrency!=='BRL'||r.historySnapshots?.length!==1||r.historySnapshots[0].snapshotId!==snapshotId||r.historySnapshots[0].sourceHash!==sourceHash||r.historySnapshots[0].symbol!==h.symbol||!r.sources?.some(s=>s.symbol===h.symbol&&s.priceBasis==='brazil-gross-entitlement.v1')||!Number.isFinite(r.metrics?.volatility))throw Error('risk_canary_contract');
+ if(r?.schemaVersion!=='portfolio-analysis.v1'||r.baseCurrency!=='BRL'||r.historySnapshots?.length!==1||r.historySnapshots[0].snapshotId!==snapshotId||r.historySnapshots[0].sourceHash!==sourceHash||r.historySnapshots[0].symbol!==h.symbol||!r.sources?.some(s=>s.symbol===h.symbol&&s.priceBasis===q.brazilNormalization!.version)||!Number.isFinite(r.metrics?.volatility))throw Error('risk_canary_contract');
  return {status:'verified',symbol:h.symbol,snapshotId,sourceHash,volatility:r.metrics!.volatility,stateless:true};
 }

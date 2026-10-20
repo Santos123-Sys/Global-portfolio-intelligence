@@ -1,3 +1,4 @@
+import {checkBrazilMarket} from './check-brazil-market';
 import { setTimeout as delay } from 'node:timers/promises';
 import { claimJob, closeStore, finishJob } from '../src/lib/foundation/store';
 import { executeJob } from '../src/lib/foundation/runner';
@@ -6,6 +7,7 @@ import { superviseBrowserRuntime } from '../src/lib/browser/runtime-supervisor';
 import {processHistory,queueExistingBrazilRepairs} from '../src/lib/market/history-store';
 import {checkIntegrations} from './check-integrations';
 
+if(process.env.BRAZIL_MARKET_CANARY_ENABLED==='true')void checkBrazilMarket().catch(()=>console.error(JSON.stringify({kind:'brazil_market_coverage',status:'unavailable'})));
 let stopping = false;
 let reaping=false;
 let historyRunning:Promise<void>|undefined;
