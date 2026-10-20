@@ -95,6 +95,14 @@ previous risk bundle for recovery. Rollback means disabling the producer flag
 and restoring compatible code; it does not erase prior immutable snapshots.
 If a data error is discovered, quarantine/recompute affected outputs separately.
 
+`BRAZIL_HISTORY_RISK_CANARY=true` runs one stateless one-share public PETR4
+calculation at startup, verifies exact snapshot lineage and the consumer basis,
+and writes no user portfolio. `BRAZIL_HISTORY_REPAIR_EXISTING=true` queues only
+existing quarantined legacy PETR4 jobs for the current UTC day, once, preserving
+the three-attempt cap, owner binding, leases and immutable snapshots. Enable this
+repair only after the compatible consumer is live; disable the one-shot flags
+after observing success. The ongoing normalization flag remains enabled.
+
 ## Residual risks
 
 | Boundary | Evidence / risk | Control | Residual |

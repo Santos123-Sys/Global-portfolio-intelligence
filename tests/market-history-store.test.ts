@@ -9,7 +9,7 @@ vi.mock('postgres',()=>{
   fn.json=(v:unknown)=>JSON.stringify(v);fn.begin=(work:(tx:ReturnType<typeof tag>)=>Promise<unknown>)=>state.db!.transaction(tx=>work(tag(tx)));return fn;
  }return {default:()=>tag(state.db!)};
 });
-import {queueHistory,processHistory,listHistory,storedHistory,readHistory} from '../src/lib/market/history-store';
+import {queueHistory,queueExistingBrazilRepairs,processHistory,listHistory,storedHistory,readHistory} from '../src/lib/market/history-store';
 import {enqueue,claimJob,finishJob} from '../src/lib/foundation/store';
 import {defaultProfile} from '../src/lib/foundation/contracts';
 const owner='550e8400-e29b-41d4-a716-446655440000',other='550e8400-e29b-41d4-a716-446655440001';
@@ -77,4 +77,15 @@ it('keeps the daily refresh key on UTC even when the database session uses a dif
   const result=await state.db!.query<{valid:boolean}>("SELECT bool_and(as_of=(now() AT TIME ZONE 'UTC')::date) AS valid FROM gpi_market_history_jobs WHERE owner_id=$1",[owner]);
   expect(result.rows[0].valid).toBe(true);
  }finally{await state.db!.exec("SET TIME ZONE 'UTC'");}
+});
+it('requeues only the pinned existing quarantined dataset once and never bypasses the attempt cap',async()=>{
+ vi.stubEnv('BRAZIL_HISTORY_NORMALIZATION_ENABLED','true');vi.stubEnv('BRAZIL_HISTORY_REPAIR_EXISTING','true');
+ try{
+  const id='mh1_'+'d'.repeat(64),job=crypto.randomUUID();
+  await state.db!.query("INSERT INTO gpi_market_history_snapshots(id,owner_id,candidate_key,issuer_id,symbol,source_hash,payload,quality) VALUES($1,$2,'BVMF:PETR4','br:33000167000101','PETR4.SA',$3,'{}','{\"status\":\"quarantined\"}')",[id,owner,'d'.repeat(64)]);
+  await state.db!.query("INSERT INTO gpi_market_history_jobs(id,owner_id,candidate_key,issuer_id,symbol,as_of,status,attempts,snapshot_id) VALUES($1,$2,'BVMF:PETR4','br:33000167000101','PETR4.SA',(now() AT TIME ZONE 'UTC')::date,'complete',2,$3)",[job,owner,id]);
+  expect(await queueExistingBrazilRepairs()).toBe(1);expect(await queueExistingBrazilRepairs()).toBe(0);
+  await state.db!.query("UPDATE gpi_market_history_jobs SET status='complete',attempts=3 WHERE id=$1",[job]);expect(await queueExistingBrazilRepairs()).toBe(0);
+  await state.db!.query("UPDATE gpi_market_history_jobs SET attempts=2 WHERE id=$1",[job]);await state.db!.query("UPDATE gpi_market_history_snapshots SET payload='{\"brazilEvidence\":{}}' WHERE id=$1",[id]);expect(await queueExistingBrazilRepairs()).toBe(0);
+ }finally{vi.stubEnv('BRAZIL_HISTORY_NORMALIZATION_ENABLED','false');vi.stubEnv('BRAZIL_HISTORY_REPAIR_EXISTING','false');}
 });

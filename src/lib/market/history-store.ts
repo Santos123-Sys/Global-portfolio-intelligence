@@ -16,6 +16,17 @@ export async function queueHistory(owner:string,key:string,refresh=false) {
     ON CONFLICT(owner_id,candidate_key,issuer_id,as_of) DO UPDATE SET
       status=CASE WHEN (gpi_market_history_jobs.status='failed' OR (${refresh} AND gpi_market_history_jobs.status='complete')) AND gpi_market_history_jobs.attempts<3 THEN 'queued' ELSE gpi_market_history_jobs.status END`;
 }
+/** One explicitly enabled repair pass; respects the existing UTC-day attempt cap and leases. */
+export async function queueExistingBrazilRepairs(){
+ if(process.env.BRAZIL_HISTORY_NORMALIZATION_ENABLED!=='true'||process.env.BRAZIL_HISTORY_REPAIR_EXISTING!=='true')return 0;
+ const rows=await sql()`UPDATE gpi_market_history_jobs j SET status='queued',error_code=null
+  WHERE j.symbol='PETR4.SA' AND j.issuer_id='br:33000167000101' AND j.status='complete' AND j.attempts<3
+  AND j.as_of=(now() AT TIME ZONE 'UTC')::date
+  AND EXISTS(SELECT 1 FROM gpi_market_history_snapshots s WHERE s.owner_id=j.owner_id AND s.id=j.snapshot_id
+   AND s.symbol=j.symbol AND s.issuer_id=j.issuer_id AND s.quality->>'status'='quarantined' AND NOT(s.payload ? 'brazilEvidence'))
+  RETURNING j.symbol`;
+ return rows.length;
+}
 export function riskConnection() {
   const base=new URL(process.env.PORTFOLIO_RISK_API_URL??''),token=process.env.PORTFOLIO_RISK_API_TOKEN??'';
   if(base.protocol!=='https:'||base.pathname!=='/'||base.username||base.password||base.search||base.hash||token.length<32||/[\r\n]/.test(token))throw Error('risk_provider_not_configured');
