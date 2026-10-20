@@ -193,7 +193,13 @@ async function integratedServe(req){
    }
    if(symbols.some(s=>!lookup.has(s)))return fail('Market data unavailable for one or more symbols',503);
    const context=await globalContext(b,lookup);
-   return reply({...integrationAnalysis(b,context.lookup,context),...(b.range==='5y'?{historySnapshots:b.marketHistories.map(s=>({symbol:s.history.symbol,snapshotId:s.snapshotId,sourceHash:s.sourceHash}))}:{})});
+   const analysis=integrationAnalysis(b,context.lookup,context);
+   if(b.range==='5y'){
+    const message='Prepared histories use one unofficial Yahoo feed; internal quality checks do not independently certify prices or corporate-action adjustments.';
+    analysis.warnings.push(message);analysis.feedback.push({kind:'data_quality',message});
+    analysis.methodology+=' Five-year inputs are immutable GPI datasets, aligned on common sessions.';
+   }
+   return reply({...analysis,...(b.range==='5y'?{historySnapshots:b.marketHistories.map(s=>({symbol:s.history.symbol,snapshotId:s.snapshotId,sourceHash:s.sourceHash}))}:{})});
   }catch{return fail('Invalid or unavailable portfolio analysis',422)}
  }
  if(u.pathname==='/api/integrations'&&req.method==='GET')return reply({filingLens:{status:filingLensReady()?'configured':'disabled',schemaVersion:'filinglens-public-finance-v1',operations:filingLensReady()?['public_regulatory_financial_snapshot']:[]},globalPortfolioIntelligence:{status:gpiReady()?'configured':'disabled',operations:gpiReady()?['account_scoped_risk_feedback','reviewed_valuation_allocation_diagnostics','historical_return_attribution']:[],url:gpiReady()?Bun.env.GPI_API_URL:null},dataTransfer:filingLensReady()||gpiReady()});

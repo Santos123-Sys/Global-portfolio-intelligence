@@ -16,7 +16,8 @@ export function MarketHistoryPanel({candidate}:{candidate?:Candidate}){
  return <section className="evidence"><h3>Five-year market dataset</h3>
  <p>Completed company research queues daily market history automatically. Only datasets that pass the checks can feed the five-year risk calculation.</p>
  {error&&<p role="alert">{error.message}</p>}{message&&<p role="status">{message}</p>}
- {candidate&&<button className="secondary" disabled={busy||!data?.enabled} onClick={async()=>{
+ {candidate&&!candidate.issuer&&<p>A verified CIK/CNPJ mapping is required. Update this company’s issuer mapping in Candidates → Advanced candidate import before preparing history.</p>}
+ {candidate&&<button className="secondary" disabled={busy||!data?.enabled||!candidate.issuer} onClick={async()=>{
   setBusy(true);try{const r=await fetch('/api/integration/v1/market-history',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({candidateKey:candidate.key})});
    const result=await r.json();if(!r.ok)throw Error(result.error);setMessage('Request saved. Existing daily requests are reused; failed reads allow up to three attempts.');await mutate();
   }catch{setMessage('History request failed. Check issuer mapping and provider configuration.');}finally{setBusy(false);}
