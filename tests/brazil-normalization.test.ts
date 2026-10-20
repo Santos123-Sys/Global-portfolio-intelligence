@@ -78,6 +78,24 @@ it.each([false,true])('acquires bounded sources with explicit public mode %s and
  await expect(acquireBrazilEvidence({...h,symbol:'VALE3.SA'},mock)).rejects.toThrow('history_brazil_not_configured');expect(mock).toHaveBeenCalledTimes(3);
  await expect(acquireBrazilEvidence(h,async()=>new Response('',{status:403}))).rejects.toThrow('history_brazil_raw_http_403');
 });
+it('paces BrAPI calls and retries a short Retry-After once with identical credentials',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(now);vi.stubEnv('BRAPI_API_KEY','fixed-secret');const h=base(),calls:{url:string;authorization:unknown}[]=[];
+ const fetcher=vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
+  const u=new URL(String(input));if(u.hostname==='cotab3.com.br')return new Response(html('PETR4',h.rows));
+  calls.push({url:String(input),authorization:(init?.headers as Record<string,string>).authorization});
+  if(calls.length===1)return new Response('',{status:429,headers:{'retry-after':'0'}});
+  const data=u.pathname.endsWith('/historical')?{usedInterval:'1d',historicalDataPrice:h.rows.map(r=>({date:Date.parse(r.date)/1000,rawClose:r.close,adjustedClose:r.adjustedClose}))}:{cashDividends:[],stockDividends:[]};
+  return Response.json({results:[{requestedSymbol:'PETR4',symbol:'PETR4',changed:false,data}]});
+ });
+ const result=await acquireBrazilEvidence(h,fetcher);expect(result.brazilEvidence.raw.rows).toHaveLength(h.rows.length);
+ expect(calls).toHaveLength(3);expect(calls[0]).toEqual(calls[1]);expect(calls.map(c=>new URL(c.url).pathname)).toEqual(['/api/v2/stocks/historical','/api/v2/stocks/historical','/api/v2/stocks/dividends']);
+ expect(calls.every(c=>c.authorization==='Bearer fixed-secret')).toBe(true);
+});
+it.each([['3600',1],['0',2]] as const)('stops rather than exceeding a Retry-After %s or the shared retry budget',async(retryAfter,expected)=>{
+ const calls:string[]=[];const h=base();
+ const fetcher=vi.fn(async(input:RequestInfo|URL)=>{const u=new URL(String(input));if(u.hostname==='cotab3.com.br')return new Response(html('PETR4',h.rows));calls.push(String(input));return new Response('',{status:429,headers:{'retry-after':retryAfter}});});
+ await expect(acquireBrazilEvidence(h,fetcher)).rejects.toThrow('history_brazil_raw_http_429');expect(calls).toHaveLength(expected);expect(calls.every(c=>new URL(c).pathname.endsWith('/historical'))).toBe(true);
+});
 it('Risk Studio consumes canonical gross rows under strict reconciliation and rejects a lost quote witness',async()=>{
  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(now);const h=base();h.rows[30].close=99;h.rows[30].adjustedClose=99;
  const token='t'.repeat(40);vi.stubGlobal('Bun',{env:{PORTFOLIO_RISK_API_TOKEN:token,PRICE_RECONCILIATION_REQUIRED:'true'}});
