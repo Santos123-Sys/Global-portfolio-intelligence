@@ -21,6 +21,10 @@ ADR conversion, interpolation, averaging or tolerance widening is used.
 - BrAPI historical and dividends v2 endpoints, `includeRaw=true`, exact identity,
   daily interval; existing server credential when configured. BrAPI documents
   PETR4 as an open test instrument. Never extrapolate this access to another symbol.
+  `BRAZIL_HISTORY_BRAPI_PUBLIC=true` explicitly selects the documented public
+  PETR4 mode before either request, without changing the configured credential
+  used by other integrations. There is no anonymous retry after a denied request.
+  Source: https://brapi.dev/blog/acesso-gratuito-ilimitado-acoes-teste-brapi .
 - Cota B3's public POST form at https://cotab3.com.br/cotacoes; exact ticker echo,
   table shape, completed session dates, positive cent prices, 3 MB bound. No key
   is sent to this source. All three reads share a 20-second budget; no retries.

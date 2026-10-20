@@ -19,9 +19,11 @@ export function parseCotaPrices(html:string,symbol:string){
 /** Three fixed, bounded reads share one 20s budget. No credential is sent to the public relay. */
 export async function acquireBrazilEvidence(h:MarketHistory,fetcher:typeof fetch=fetch):Promise<{secondary:SecondaryPrices;brazilEvidence:BrazilEvidence}>{
  if(h.symbol!=='PETR4.SA'||h.issuerId!=='br:33000167000101'||h.currency!=='BRL')throw Error('history_brazil_not_configured');
- // BrAPI documents PETR4 as an open test instrument. Use the configured key when present.
- // This exception is never extrapolated to another listing or used to retry a denied request.
- const brapiHeaders={accept:'application/json',...(process.env.BRAPI_API_KEY?{authorization:'Bearer '+process.env.BRAPI_API_KEY}:{})};
+ // BrAPI explicitly offers complete PETR4 data without a token. Select that
+ // documented mode before acquisition; never retry a denial with different credentials.
+ // The identity guard above prevents this option from applying to another listing.
+ const key=process.env.BRAZIL_HISTORY_BRAPI_PUBLIC==='true'?undefined:process.env.BRAPI_API_KEY;
+ const brapiHeaders={accept:'application/json',...(key?{authorization:'Bearer '+key}:{})};
  const signal=AbortSignal.timeout(20000);
  async function read(url:URL,init:RequestInit={},limit=2000000){
   const r=await fetcher(url,{...init,redirect:'error',cache:'no-store',signal});

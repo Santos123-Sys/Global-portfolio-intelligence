@@ -66,15 +66,16 @@ it('parses a fixed public form response without executing scripts and rejects id
  const rows=base().rows.slice(0,2);expect(parseCotaPrices(html('PETR4',rows)+'<script>throw "never execute"</script>','PETR4')).toEqual(rows.map(r=>({date:r.date,close:r.close})));
  expect(()=>parseCotaPrices(html('PETR3',rows),'PETR4')).toThrow('history_brazil_relay_identity');expect(()=>parseCotaPrices(html('PETR4',rows).replace('100,00','NaN'),'PETR4')).toThrow('history_brazil_relay_contract');
 });
-it('acquires three bounded fixed sources and never sends the BrAPI key to the public relay',async()=>{
- vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(now);vi.stubEnv('BRAPI_API_KEY','br-secret');const h=base();
+it.each([false,true])('acquires bounded sources with explicit public mode %s and confines credentials',async(publicMode)=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(now);vi.stubEnv('BRAPI_API_KEY','br-secret');vi.stubEnv('BRAZIL_HISTORY_BRAPI_PUBLIC',String(publicMode));const h=base();
  const mock=vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{const u=new URL(String(input));
   expect(init?.redirect).toBe('error');expect(init?.signal).toBeInstanceOf(AbortSignal);
   if(u.hostname==='cotab3.com.br'){expect(JSON.stringify(init)).not.toContain('br-secret');expect(init?.method).toBe('POST');return new Response(html('PETR4',h.rows));}
-  expect((init?.headers as Record<string,string>).authorization).toBe('Bearer br-secret');
+  expect((init?.headers as Record<string,string>).authorization).toBe(publicMode?undefined:'Bearer br-secret');
   const data=u.pathname.endsWith('historical')?{usedInterval:'1d',historicalDataPrice:h.rows.map(r=>({date:Date.parse(r.date)/1000,rawClose:r.close,adjustedClose:r.adjustedClose}))}:{cashDividends:[],stockDividends:[]};return Response.json({results:[{requestedSymbol:'PETR4',symbol:'PETR4',changed:false,data}]});
  });
  Object.assign(h,await acquireBrazilEvidence(h,mock));expect(normalizeBrazil(h,now)!.status).toBe('verified');expect(mock).toHaveBeenCalledTimes(3);
+ await expect(acquireBrazilEvidence({...h,symbol:'VALE3.SA'},mock)).rejects.toThrow('history_brazil_not_configured');expect(mock).toHaveBeenCalledTimes(3);
  await expect(acquireBrazilEvidence(h,async()=>new Response('',{status:403}))).rejects.toThrow('history_brazil_raw_http_403');
 });
 it('Risk Studio consumes canonical gross rows under strict reconciliation and rejects a lost quote witness',async()=>{
