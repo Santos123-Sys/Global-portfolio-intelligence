@@ -107,6 +107,15 @@ the three-attempt cap, owner binding, leases and immutable snapshots. Enable thi
 repair only after the compatible consumer is live; disable the one-shot flags
 after observing success. The ongoing normalization flag remains enabled.
 
+After the stateless risk consumer verifies the exact hash, the same acquired
+payload can also be saved for current-day legacy quarantined jobs, including
+ones whose provider-attempt budget is exhausted. This maintenance step performs
+no new acquisition and never resets attempts. It locks eligible completed or
+failed jobs, joins prior snapshots by owner, skips queued/running work, inserts
+an immutable version and updates the job's pointer. Original snapshots remain
+intact. A subsequent pass is idempotent; another account's snapshot cannot serve
+as the prior evidence for a repair.
+
 ## Residual risks
 
 | Boundary | Evidence / risk | Control | Residual |

@@ -1,6 +1,6 @@
 import {financeForCandidate} from '../src/lib/foundation/runner';
 import {assessHistory,historyIdentity} from '../src/lib/market/history-quality';
-import {riskConnection} from '../src/lib/market/history-store';
+import {riskConnection,persistVerifiedBrazilRepairs} from '../src/lib/market/history-store';
 import seed from '../data/usa-cvm-universe.json';
 import {Candidate} from '../src/lib/foundation/contracts';
 import {readBoundedJson} from '../src/lib/request-body';
@@ -11,7 +11,7 @@ import {inspectBrazilAdjustments} from '../src/lib/market/brazil-adjustment-diag
 import {checkBrazilRisk} from './check-brazil-risk';
 import {historyEvidenceError} from '../src/lib/market/evidence-errors';
 
-/** Read-only startup canary. Never invokes a model or writes user workspace data. */
+/** Startup checks with an explicitly gated PETR4 snapshot repair; no model calls or holdings changes. */
 export async function checkIntegrations(){
  if(process.env.FINNHUB_API_KEY){
   try{
@@ -45,7 +45,9 @@ export async function checkIntegrations(){
    const q=checked.reconciliation;
    if(checked.brazilNormalization){const b=checked.brazilNormalization;console.log(JSON.stringify({kind:'integration_check',integration:'brazil_normalization',symbol:ticker,status:b.status,quality:checked.status,verifiedQuotes:b.verifiedQuotes,adjudicatedQuoteDates:b.adjudicatedQuoteDates.length,originalReturnConflicts:b.originalReturnConflicts,unresolved:b.unresolved,relayCompared:b.relayCompared,relayMissing:b.relayMissing.length,relayDuplicates:b.relayDuplicates.length,cashEvents:b.cash.length,metrics:checked.metrics,version:b.version}));}
    if(process.env.BRAZIL_HISTORY_RISK_CANARY==='true'&&checked.brazilNormalization?.status==='verified'){
-    try{console.log(JSON.stringify({kind:'integration_check',integration:'brazil_risk_consumer',...await checkBrazilRisk(h,base,token)}));}
+    try{const receipt=await checkBrazilRisk(h,base,token);console.log(JSON.stringify({kind:'integration_check',integration:'brazil_risk_consumer',...receipt}));
+     try{const repaired=await persistVerifiedBrazilRepairs(h,receipt.sourceHash);console.log(JSON.stringify({kind:'market_history_repair',symbol:h.symbol,status:'complete',repaired,sourceHash:receipt.sourceHash,reusedAcquisition:true}));}
+     catch{console.log(JSON.stringify({kind:'market_history_repair',symbol:h.symbol,status:'unverified'}));}}
     catch{console.log(JSON.stringify({kind:'integration_check',integration:'brazil_risk_consumer',status:'unverified'}));}
    }
    console.log(JSON.stringify({kind:'integration_check',integration:'independent_prices',symbol:ticker,provider:q.provider,status:q.status,compared:q.comparedSessions,missing:q.missingSessions,discrepancies:q.discrepancies.length,firstComparedDate:q.firstComparedDate,lastComparedDate:q.lastComparedDate,comparedReturns:q.comparedReturns,agreeingReturns:q.agreeingReturns,conflictingReturns:q.conflictingReturns,actionDateConflicts:q.actionDateConflicts,maxReturnDifference:q.maxReturnDifference,maxNormalizedDifference:q.maxNormalizedDifference,conflictSamples:q.conflictSamples,sensitivity:checked.priceSensitivity,witnesses:checked.reconciliations.map(r=>({provider:r.provider,status:r.status,compared:r.comparedSessions,missing:r.missingSessions,discrepancies:r.discrepancies.length})),acquisitionFailures:checked.secondaryAcquisitionFailures}));
