@@ -13,7 +13,17 @@ export function railwayRuntimeConfig(env:Record<string,string|undefined>=process
 }
 export class RailwayBrowserRuntime implements RuntimeProvider {
   private template?:ReturnType<typeof Sandbox.template>;
+  private health?:{key:string;at:number;running:boolean};
+  private retryAfter=0;
+  private failures=0;
   constructor(private config:ReturnType<typeof railwayRuntimeConfig>) {}
+  private permitted(){if(Date.now()<this.retryAfter)throw Error('runtime_provider_backoff');}
+  private failed(error:unknown,operation:string){
+    const status=(error as {status?:number})?.status;
+    const reason=status===429?'rate_limited':status===401||status===403?'unauthorized':'unavailable';
+    this.failures++;this.retryAfter=Date.now()+Math.min(300000,60000*2**Math.min(this.failures-1,3));
+    console.error(JSON.stringify({kind:'browser_provider',operation,reason,retryAfterMs:this.retryAfter-Date.now()}));
+  }
   private options(){return {token:this.config.token,authType:this.config.authType,environmentId:this.config.environmentId,
     endpoint:'https://backboard.railway.com/graphql/v2',verbose:false};}
   async prepare(release:string) {
@@ -47,15 +57,22 @@ export class RailwayBrowserRuntime implements RuntimeProvider {
     return await handle.detach();
   }
   async running(vmId:string,session:string) {
+    const key=vmId+':'+session;
+    // The DB worker heartbeat still runs every second and is checked each tick.
+    // Three GraphQL calls per five-second tick exceeded Hobby's hourly budget.
+    if(this.health?.key===key&&Date.now()-this.health.at<60000)return this.health.running;
+    this.permitted();
     try{
       const vm=await Sandbox.connect(vmId,this.options());await vm.heartbeat();
       const sessions=await vm.sessions();
       if(!sessions)throw Error('runtime_sessions_unavailable');
-      return sessions.some(s=>s.name===session&&s.kind==='EXEC'&&s.running);
-    }catch(e){if(e instanceof SandboxNotFoundError)return false;throw Error('runtime_health_unavailable');}
+      const running=sessions.some(s=>s.name===session&&s.kind==='EXEC'&&s.running);
+      this.health={key,at:Date.now(),running};this.failures=0;return running;
+    }catch(e){if(e instanceof SandboxNotFoundError)return false;this.failed(e,'health');throw Error('runtime_health_unavailable');}
   }
   async destroy(vmId:string) {
-    try{await (await Sandbox.connect(vmId,this.options())).destroy();}
-    catch(e){if(!(e instanceof SandboxNotFoundError))throw Error('runtime_destruction_unconfirmed');}
+    this.health=undefined;this.permitted();
+    try{await (await Sandbox.connect(vmId,this.options())).destroy();this.failures=0;}
+    catch(e){if(!(e instanceof SandboxNotFoundError)){this.failed(e,'destroy');throw Error('runtime_destruction_unconfirmed');}}
   }
 }
