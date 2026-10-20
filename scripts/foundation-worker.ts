@@ -3,10 +3,18 @@ import { claimJob, closeStore, finishJob } from '../src/lib/foundation/store';
 import { executeJob } from '../src/lib/foundation/runner';
 import { reapRuns } from '../src/lib/browser/store';
 import { superviseBrowserRuntime } from '../src/lib/browser/runtime-supervisor';
+import {processHistory} from '../src/lib/market/history-store';
+import {checkIntegrations} from './check-integrations';
 
 let stopping = false;
 let reaping=false;
+let historyRunning:Promise<void>|undefined;
+const historyTimer=setInterval(()=>{
+  if(stopping||historyRunning)return;
+  historyRunning=processHistory().catch(()=>console.error(JSON.stringify({kind:'market_history',status:'store_unavailable'}))).finally(()=>{historyRunning=undefined;});
+},5000);
 const runtimeStop=new AbortController();
+if(process.env.INTEGRATION_STARTUP_CHECK==='true')void checkIntegrations().catch(()=>console.error(JSON.stringify({kind:'integration_check',status:'unavailable'})));
 const runtimeTask=process.env.BROWSER_RUNTIME_ENABLED==='true'
   ?superviseBrowserRuntime(runtimeStop.signal).catch(()=>console.error(JSON.stringify({status:'browser_runtime_unavailable_check_configuration'})))
   :Promise.resolve();
@@ -29,4 +37,4 @@ try {
       } catch { await finishJob(job, null, 'run_failed'); console.error(JSON.stringify({ runId: job.id, status: 'failed' })); }
     } catch { console.error(JSON.stringify({ status: 'store_unavailable' })); await delay(5000); }
   }
-} finally { clearInterval(browserReaper);runtimeStop.abort();await runtimeTask;await closeStore(); }
+} finally { clearInterval(browserReaper);clearInterval(historyTimer);runtimeStop.abort();await Promise.allSettled([runtimeTask,historyRunning]);await closeStore(); }

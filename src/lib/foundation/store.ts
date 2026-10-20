@@ -4,6 +4,7 @@ import { getDatabaseUrl } from '../env';
 import { defaultProfile, JobRequest, Workspace } from './contracts';
 import type { JobRequest as JobInput } from './contracts';
 import seed from '../../../data/usa-cvm-universe.json';
+import {historyIdentity} from '../market/history-quality';
 
 let connection: ReturnType<typeof postgres> | undefined;
 export function sql() { return connection ??= postgres(getDatabaseUrl(), { max: 4, idle_timeout: 20, connect_timeout: 10 }); }
@@ -70,6 +71,13 @@ export async function finishJob(job: JobRow, output: unknown, errorCode: string 
     const rows = await tx`UPDATE gpi_foundation_jobs SET status=${errorCode ? 'failed' : 'complete'},
       output=${output === null ? null : tx.json(output as postgres.JSONValue)},error_code=${errorCode},finished_at=now(),lease_until=null
       WHERE id=${job.id} AND status='running' AND lease_token=${job.lease_token} AND lease_until > now() RETURNING id`;
+    if(rows.length===1&&!errorCode&&job.kind==='research'&&process.env.MARKET_HISTORY_ENABLED==='true'){
+      const candidate=job.input.workspace.candidates.find(c=>c.key===job.input.candidateKey);
+      if(candidate?.issuer){const identity=historyIdentity(candidate);
+        await tx`INSERT INTO gpi_market_history_jobs(id,owner_id,candidate_key,issuer_id,symbol,as_of)
+          VALUES(${randomUUID()},${job.owner_id},${identity.candidateKey},${identity.issuerId},${identity.symbol},CURRENT_DATE)
+          ON CONFLICT(owner_id,candidate_key,issuer_id,as_of) DO NOTHING`;}
+    }
     return rows.length === 1;
   });
 }

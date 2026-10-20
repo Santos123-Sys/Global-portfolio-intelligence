@@ -9,6 +9,7 @@ export async function generateResearchDraft(screen: ScreenResult, transport: typ
   const model = process.env.RESEARCH_MODEL_NAME;
   if (!token || !model) throw new Error('research_model_unconfigured');
   const evidence = screen.finance.snapshot.facts.filter(f => f.value !== null && ['single_source', 'verified'].includes(f.status)).slice(0, 40);
+  if(!evidence.length)return null;
   if (JSON.stringify(evidence).length > 28_000) throw new Error('research_context_budget_exhausted');
   const response = await transport('https://api.openai.com/v1/chat/completions', {
     method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30_000),

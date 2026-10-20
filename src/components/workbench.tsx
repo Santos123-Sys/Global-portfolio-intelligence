@@ -12,6 +12,8 @@ import { ResearchHub, ResearchManagerReport } from './research-hub';
 import { CorpusLibrary } from './corpus-library';
 import {InvestmentWorkspace} from './investment-workspace';
 import { PortfolioHub } from './portfolio-hub';
+import {MarketHistoryPanel} from './market-history-panel';
+import {researchState,financeRecovery} from '@/lib/foundation/research-state';
 import type { ResearchBrief } from '@/lib/research/contracts';
 
 type Job = { id: string; kind: 'screen' | 'research'; status: string; created_at: string; error_code: string | null;
@@ -109,11 +111,16 @@ export default function Workbench() {
       <button disabled={busy || !data}>Save profile</button></form><aside className="card"><h2>Unknown is a result</h2><p>Missing, conflicting, stale or unsupported data never passes a requested gate.</p><p>Liquidity requires a market-data contract. Income and preservation require additional external indicators. Selecting them currently produces an explicit unknown.</p><small>Changing a profile does not rewrite prior job snapshots.</small></aside></div>}
     {tab === 'Research' && <section className="card"><h2>Evidence-based research</h2><p className="muted">Evidence packs remain available without an LLM. Optional drafts are unapproved hypotheses, not recommendations.</p>
       {!reports.length && <div className="callout">Choose “Evidence pack” on a candidate to start.</div>}{reports.map(j => { if (j.output?.kind !== 'research') return null; const r = j.output.report; return <article className="evidence" key={j.id}>
-        <div className="section-head"><h3>{r.candidate.ticker} · {r.candidate.name}</h3><span className="badge">HUMAN REVIEW REQUIRED</span></div><small>{j.output.modelStatus} · <code>{j.id}</code></small>
+        <div className="section-head"><h3>{r.candidate.ticker} · {r.candidate.name}</h3><span className="badge">HUMAN REVIEW REQUIRED</span></div>
+        <p role="status">{researchState(j.output.modelStatus)}</p><small>Saved {new Date(j.created_at).toLocaleString()} · <code>{j.id}</code></small>
+        {r.screen.finance.status!=='ready'&&<div className="notice"><p>{financeRecovery(r.screen.finance.status)}</p><p>Current connection: {data?.integrations.finance==='configured_read_attempts'?'enabled; a new read still needs validation':'disabled'}.</p>
+        <button disabled={busy||!data} onClick={()=>launch('research',r.candidate.key)}>Retry evidence pack</button>
+        <button className="secondary" onClick={()=>{setWorkspaceCompany(r.candidate.key);setTab('Workspace');}}>Open company financial workspace</button></div>}
         {r.deepResearch && <ResearchManagerReport run={r.deepResearch} jobId={j.id} />}
         <div className="columns">{(['bull', 'bear'] as const).map(side => <div key={side}><h3>{side === 'bull' ? 'Positive case' : 'Countercase'}</h3>{r.questions[side].map(q => <p key={q}>{q}</p>)}
           {r.draft?.[side].map((claim, i) => <div className="claim" key={i}><p>{claim.text}</p><small>Falsifier: {claim.falsifier}</small><small className="break">Evidence: {claim.evidenceIds.join(', ')}</small></div>)}</div>)}</div>
-        <h3>FilingLens evidence</h3>{r.screen.finance.status !== 'ready' ? <div className="notice">{r.screen.finance.reason}</div> : <><small className="break">Snapshot: {r.screen.finance.snapshot.snapshotId}</small><div className="table-wrap"><table><thead><tr><th>METRIC</th><th>PERIOD</th><th>SOURCE VALUE / UNIT</th><th>STATUS / SOURCE</th></tr></thead><tbody>{r.screen.finance.snapshot.facts.map(f => <tr key={f.id}><td>{f.metric}</td><td>{f.periodEnd ?? f.periodLabel ?? f.fiscalYear}</td><td><span>{f.value ?? 'Unknown'} {f.unit ?? ''}</span>{f.currency !== f.unit && <small>{f.currency ?? 'Currency not supplied'}</small>}</td><td>{f.status}{f.sources.map((s, i) => <small key={i}><a href={s.url} target="_blank" rel="noreferrer">Regulator source</a></small>)}</td></tr>)}</tbody></table></div></>}
+        <h3>FilingLens evidence</h3>{r.screen.finance.status !== 'ready' ? <details><summary>Saved connection diagnostic</summary><p>{r.screen.finance.reason}</p></details> : <><small className="break">Snapshot: {r.screen.finance.snapshot.snapshotId}</small><div className="table-wrap"><table><thead><tr><th>METRIC</th><th>PERIOD</th><th>SOURCE VALUE / UNIT</th><th>STATUS / SOURCE</th></tr></thead><tbody>{r.screen.finance.snapshot.facts.map(f => <tr key={f.id}><td>{f.metric}</td><td>{f.periodEnd ?? f.periodLabel ?? f.fiscalYear}</td><td><span>{f.value ?? 'Unknown'} {f.unit ?? ''}</span>{f.currency !== f.unit && <small>{f.currency ?? 'Currency not supplied'}</small>}</td><td>{f.status}{f.sources.map((s, i) => <small key={i}><a href={s.url} target="_blank" rel="noreferrer">Regulator source</a></small>)}</td></tr>)}</tbody></table></div></>}
+        <MarketHistoryPanel candidate={r.candidate}/>
         <div className="callout">{r.valuation.reason}</div>{r.limitations.map((l, i) => <small key={i}>• {l}</small>)}
         <section className="callout"><h3>Human thesis review · GPI only</h3>
           <p>Reviewing creates a local audit record, not a FilingLens job, portfolio holding or trade.</p>
@@ -122,7 +129,7 @@ export default function Workbench() {
             onChange={e => setReviewNotes(v => ({ ...v, [j.id]: e.target.value }))} /></label>
           <label><input type="checkbox" checked={mappingChecks[j.id] === true}
             onChange={e => setMappingChecks(v => ({ ...v, [j.id]: e.target.checked }))} />
-            I checked this issuer's CIK/CNPJ and the official source before requesting further analysis.
+            I checked this issuer&apos;s CIK/CNPJ and the official source before requesting further analysis.
           </label>
           <div className="actions">
             <button disabled={busy} onClick={() => recordReview(j.id, 'request_analysis')}>Queue analysis handoff locally</button>

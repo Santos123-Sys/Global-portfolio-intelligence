@@ -4,6 +4,7 @@ import {readBoundedJson} from '../request-body';
 import {sql,loadWorkspace} from '../foundation/store';
 import {resolveIssuer,ValuationVersionV1} from './shared-contracts';
 import {readApprovedValuation} from './external-readers';
+import {historyIdentity,storedHistory} from '../market/history-store';
 const number=z.number().finite();
 const date=z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(v=>Number.isFinite(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v);
 export const Currency=z.enum(['USD','BRL','EUR','CHF','GBP','CAD','AUD','JPY','HKD','CNY','SEK','NOK','DKK','NZD','SGD','INR','MXN','ZAR']);
@@ -13,7 +14,7 @@ export const PortfolioRequest=z.object({
  idempotencyKey:z.string().uuid(), name:z.string().trim().min(1).max(100),confirmed:z.literal(true),
  baseCurrency:Currency.default('USD'),
  positions:z.array(z.object({symbol:z.string().regex(/^[A-Z0-9.-]{1,15}$/),shares:number.positive().max(1e9)}).strict()).min(1).max(10),
- range:z.enum(['6mo','1y','3y']),riskFreeRate:number.min(-.1).max(.4),
+ range:z.enum(['6mo','1y','3y','5y']),riskFreeRate:number.min(-.1).max(.4),
 }).strict().refine(v=>new Set(v.positions.map(p=>p.symbol)).size===v.positions.length,'Duplicate symbols');
 const Holding=z.object({symbol:z.string().max(15),shares:number.positive(),price:number.positive(),value:number.positive(),
  weight:number.min(0).max(1),volatility:number.nullable(),beta:number.nullable(),riskContribution:number.nullable(),
@@ -22,7 +23,8 @@ export const RiskResult=z.object({
  schemaVersion:z.literal('portfolio-analysis.v1'),portfolioId:z.string().uuid(),workspaceId:z.string().uuid(),runId:z.string().uuid(),
  baseCurrency:Currency.optional(),classifications:Classifications.optional(),
  exposures:z.object({sector:Exposure,country:Exposure,currency:Exposure,sectorCoverage:number.min(0).max(1.000001),countryCoverage:number.min(0).max(1.000001),countryBasis:z.literal('principal-office')}).optional(),
- fxSources:z.array(z.object({from:Currency,to:Currency,provider:z.literal('ECB via Frankfurter'),sourceUrl:z.literal('https://api.frankfurter.dev/v2/providers/ecb/rates'),retrievedAt:z.string().datetime(),firstDate:z.string(),lastDate:z.string(),rows:number.int().positive().max(1200)})).max(18).optional(),
+ fxSources:z.array(z.object({from:Currency,to:Currency,provider:z.literal('ECB via Frankfurter'),sourceUrl:z.literal('https://api.frankfurter.dev/v2/providers/ecb/rates'),retrievedAt:z.string().datetime(),firstDate:z.string(),lastDate:z.string(),rows:number.int().positive().max(1500)})).max(18).optional(),
+ historySnapshots:z.array(z.object({symbol:z.string(),snapshotId:z.string().regex(/^mh1_[a-f0-9]{64}$/),sourceHash:z.string().regex(/^[a-f0-9]{64}$/)})).max(10).optional(),
  retrievedAt:z.string().datetime(),asOf:date,
  holdings:z.array(Holding).min(1).max(10),metrics:z.record(number.nullable()),warnings:z.array(z.string().max(500)).max(30),
  sources:z.array(z.object({symbol:z.string(),provider:z.string().min(1).max(100),priceBasis:z.string().min(1).max(100),lastDate:date,rows:number.int().positive(),cached:z.boolean(),stale:z.boolean()})).max(11),
@@ -110,13 +112,19 @@ export async function runPortfolio(owner:string,workspace:string,raw:unknown,fet
  const base=new URL(process.env.PORTFOLIO_RISK_API_URL??''),token=process.env.PORTFOLIO_RISK_API_TOKEN??'';
  if(base.protocol!=='https:'||base.pathname!=='/'||base.username||base.password||base.search||base.hash||token.length<32||/[\r\n]/.test(token))throw Error('provider_not_configured');
  const runId=randomUUID();
+ const marketHistories=input.range==='5y'?await Promise.all(bindings.map(({candidate})=>{
+  if(!candidate)throw Error('history_candidate_required');
+  return storedHistory(owner,historyIdentity(candidate));
+ })):undefined;
  const response=await fetcher(new URL('/v1/portfolio-analyze',base),{method:'POST',redirect:'error',cache:'no-store',
  headers:{'content-type':'application/json',authorization:'Bearer '+token},
- body:JSON.stringify({...input,workspaceId:workspace,portfolioId:input.idempotencyKey,runId,valuations:applicable,issuers}),signal:AbortSignal.timeout(60_000)});
+ body:JSON.stringify({...input,workspaceId:workspace,portfolioId:input.idempotencyKey,runId,valuations:applicable,issuers,marketHistories}),signal:AbortSignal.timeout(60_000)});
  if(!response.ok){await response.body?.cancel();throw Error('risk_provider_unavailable');}
  const result=await readBoundedJson(new Request('https://response.invalid',{method:'POST',headers:{'content-type':response.headers.get('content-type')??''},body:response.body,duplex:'half'} as RequestInit),128_000);
  if(!result.ok)throw Error('invalid_provider_response');
  const analysis=RiskResult.parse(result.value);
+ if(marketHistories&&(!analysis.historySnapshots||analysis.historySnapshots.length!==marketHistories.length||
+  marketHistories.some(s=>!analysis.historySnapshots!.some(r=>r.symbol===s.history.symbol&&r.snapshotId===s.snapshotId&&r.sourceHash===s.sourceHash))))throw Error('history_lineage_mismatch');
  if(analysis.baseCurrency!==input.baseCurrency||!analysis.exposures||!analysis.classifications||!analysis.fxSources||analysis.classifications.some(c=>!issuers.some(r=>r.symbol===c.symbol&&r.issuerId===c.issuerId)))throw Error('identity_mismatch');
  if(analysis.valuationDiagnostics.some(v=>!applicable.some(a=>a.symbol===v.symbol&&a.valuationVersionId===v.valuationVersionId&&Number(a.impliedValuePerShare)===v.impliedValuePerShare)) ||
    analysis.valuationDiagnostics.length!==applicable.length)throw Error('identity_mismatch');
