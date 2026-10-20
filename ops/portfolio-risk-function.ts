@@ -181,9 +181,9 @@ async function integratedServe(req){
      const source=b.marketHistories.find(s=>s.history?.symbol===p.symbol),issuer=b.issuers.find(i=>i.symbol===p.symbol);
      if(!source||!issuer||source.snapshotId!=='mh1_'+source.sourceHash||await historyHash(source.history)!==source.sourceHash)throw Error('Prepared history quality failed');
      const quality=assessHistory(source.history,issuer);
-     if(quality.status!=='ready'||(Bun.env.PRICE_RECONCILIATION_REQUIRED==='true'&&quality.reconciliation.status!=='matched'))throw Error('Prepared history quality failed');
-     const h=source.history;lookup.set(p.symbol,{symbol:h.symbol,currency:h.currency,provider:h.provider,priceBasis:'adjusted close',cached:true,stale:false,
-       rows:h.rows.map(r=>({date:r.date,price:r.adjustedClose,close:r.close}))});
+     if(quality.status!=='ready'||(Bun.env.PRICE_RECONCILIATION_REQUIRED==='true'&&quality.reconciliation.status!=='matched'&&quality.brazilNormalization?.status!=='verified'))throw Error('Prepared history quality failed');
+     const h=source.history;lookup.set(p.symbol,{symbol:h.symbol,currency:h.currency,provider:quality.brazilNormalization?.status==='verified'?'BrAPI raw / Yahoo / Cota B3; reviewed issuer cash':h.provider,priceBasis:quality.brazilNormalization?.version??'adjusted close',cached:true,stale:false,
+       rows:quality.calculationRows.map(r=>({date:r.date,price:r.adjustedClose,close:r.close}))});
     }
     if(!lookup.has('SPY')){const benchmark=await marketHistory('SPY','us:0000884394');
      if(assessHistory(benchmark,{symbol:'SPY',issuerId:'us:0000884394'}).status!=='ready')throw Error('Benchmark quality failed');
@@ -196,7 +196,7 @@ async function integratedServe(req){
    const context=await globalContext(b,lookup);
    const analysis=integrationAnalysis(b,context.lookup,context);
    if(b.range==='5y'){
-    const message='Prepared histories use one unofficial Yahoo feed; internal quality checks do not independently certify prices or corporate-action adjustments.';
+    const message=b.marketHistories.some(s=>s.history.brazilEvidence)?'Brazilian gross-entitlement histories retain source disagreements and quote/cash adjudication receipts. They exclude withholding and monetary income; upstream independence and point-in-time availability are not certified.':'Prepared histories use one unofficial Yahoo feed; internal quality checks do not independently certify prices or corporate-action adjustments.';
     analysis.warnings.push(message);analysis.feedback.push({kind:'data_quality',message});
     analysis.methodology+=' Five-year inputs are immutable GPI datasets, aligned on common sessions.';
    }

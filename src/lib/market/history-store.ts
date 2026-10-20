@@ -61,7 +61,7 @@ export async function processHistory(fetcher:typeof fetch=fetch) {
 }
 export async function listHistory(owner:string) {
   const jobs=await sql()`SELECT candidate_key,symbol,status,error_code,snapshot_id,as_of,attempts FROM gpi_market_history_jobs WHERE owner_id=${owner} ORDER BY as_of DESC,created_at DESC LIMIT 100`;
-  const snapshots=await sql()<{id:string;candidate_key:string;symbol:string;source_hash:string;quality:Omit<ReturnType<typeof assessHistory>,'returns'>;retrieved_at:string;created_at:string}[]>`SELECT id,candidate_key,symbol,source_hash,quality - 'returns' AS quality,payload->>'retrievedAt' AS retrieved_at,created_at FROM gpi_market_history_snapshots WHERE owner_id=${owner} ORDER BY created_at DESC LIMIT 100`;
+  const snapshots=await sql()<{id:string;candidate_key:string;symbol:string;source_hash:string;quality:Omit<ReturnType<typeof assessHistory>,'returns'|'calculationRows'>;retrieved_at:string;created_at:string}[]>`SELECT id,candidate_key,symbol,source_hash,(quality - 'returns' - 'calculationRows') #- '{brazilNormalization,quotes}' #- '{brazilNormalization,sourceReturnChecks}' AS quality,payload->>'retrievedAt' AS retrieved_at,created_at FROM gpi_market_history_snapshots WHERE owner_id=${owner} ORDER BY created_at DESC LIMIT 100`;
   return {jobs,snapshots:snapshots.map(s=>({...s,stale:Date.now()-Date.parse(s.retrieved_at)>8*86400000}))};
 }
 export async function readHistory(owner:string,id:string){
@@ -81,6 +81,6 @@ export async function storedHistory(owner:string,identity:ReturnType<typeof hist
   if(await historyHash(row.payload)!==row.source_hash||row.id!=='mh1_'+row.source_hash)throw Error('history_integrity_failed');
   const quality=assessHistory(row.payload,identity);
   if(quality.status!=='ready')throw Error('history_quality_blocked');
-  if(process.env.PRICE_RECONCILIATION_REQUIRED==='true'&&quality.reconciliation.status!=='matched')throw Error('history_reconciliation_required');
+  if(process.env.PRICE_RECONCILIATION_REQUIRED==='true'&&quality.reconciliation.status!=='matched'&&quality.brazilNormalization?.status!=='verified')throw Error('history_reconciliation_required');
   return {snapshotId:row.id as string,sourceHash:row.source_hash as string,history:row.payload as MarketHistory};
 }
