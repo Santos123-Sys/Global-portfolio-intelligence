@@ -11,6 +11,7 @@ export function historyIdentity(c:Candidate) {
 export type PriceRow = {date:string;close:number;adjustedClose:number;volume:number};
 export type MarketHistory = {
   brazilEvidence?:BrazilEvidence;
+  brazilAcquisitionFailure?:string;
   secondary?:SecondaryPrices;
   secondarySupport?:SecondaryPrices[];
   secondaryAcquisitionFailures?:{provider:string;reason:string}[];
@@ -68,6 +69,10 @@ export function assessHistory(raw:unknown,expected:{symbol:string;issuerId:strin
   const missing=h.reference.dates.filter(d=>d>=first&&d<=last&&!observed.has(d));
   const unexpected=h.rows.filter(r=>!reference.has(r.date)).length;
   const issues:string[]=[];
+  if(h.brazilAcquisitionFailure!==undefined){
+    if(!brazil||!/^history_brazil_[a-z_0-9]{1,80}$/.test(h.brazilAcquisitionFailure))throw Error('history_brazil_failure_invalid');
+    issues.push('brazil_evidence_unavailable');
+  }
   if(missing.length)issues.push('missing_sessions');
   if(unexpected)issues.push('unexpected_sessions');
   if(last!==h.reference.dates.at(-1)||now-Date.parse(last)>8*day)issues.push('stale_last_session');

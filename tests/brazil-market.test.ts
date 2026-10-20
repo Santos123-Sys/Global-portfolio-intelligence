@@ -1,3 +1,4 @@
+import {acquireSecondaryEvidence} from '../src/lib/market/secondary-evidence';
 import {integratedServe} from '../ops/portfolio-risk-function';
 import {historyFixture} from './market-history-fixture';
 import {historyHash} from '../src/lib/market/history-quality';
@@ -17,7 +18,7 @@ function fixture(symbol='VALE3'){
   identity:{symbol,cnpj:issuer.slice(3),assetType:'stock',subType:symbol.endsWith('11')?'unit':'stock',profileUrl:'https://brapi.dev/api/v2/stocks/profile',coverageUrl:'https://brapi.dev/api/v2/tickers/coverage',profileSha256:'d'.repeat(64),coverageSha256:'e'.repeat(64)}});
  return h;
 }
-it.each(['VALE3','ITUB4','ABEV3','WEGE3','SANB11'])('evaluates %s through one engine without borrowing Petrobras exceptions',symbol=>{
+it.each(['VALE3','ITUB4','ABEV3','WEGE3','SANB11','B3SA3'])('evaluates %s through one engine without borrowing Petrobras exceptions',symbol=>{
  const h=fixture(symbol),q=assessHistory(h,h,now);expect(q.status).toBe('ready');expect(q.brazilNormalization?.version).toBe('brazil-gross-entitlement.v2');
  expect(q.metrics!.annualizedVolatility).toBe(0);expect(q.brazilNormalization!.cash).toEqual([]);
 });
@@ -79,9 +80,9 @@ it('discovers the full paginated catalog with no credentials and no automatic po
  const listing=(symbol:string)=>({symbol,name:symbol,assetType:'stock',subType:symbol.endsWith('11')?'unit':'stock',currency:'BRL',exchange:'B3',isActive:true});
  const fetcher=vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
   const page=Number(new URL(String(input)).searchParams.get('page'));expect(JSON.stringify(init)).not.toContain('authorization');
-  return Response.json({results:[listing(page===1?'VALE3':'SANB11')],pagination:{page,totalItems:2,hasNextPage:page===1}});
+  return Response.json({results:[listing(page===1?'B3SA3':'SANB11')],pagination:{page,totalItems:2,hasNextPage:page===1}});
  });
- const catalog=await brazilMarketCatalog(fetcher);expect(catalog.listings.map(l=>l.symbol)).toEqual(['VALE3','SANB11']);expect(catalog.receipts).toHaveLength(2);
+ const catalog=await brazilMarketCatalog(fetcher);expect(catalog.listings.map(l=>l.symbol)).toEqual(['B3SA3','SANB11']);expect(catalog.receipts).toHaveLength(2);
  await expect(brazilMarketCatalog(async()=>Response.json({results:[listing('VALE3')],pagination:{page:1,totalItems:2,hasNextPage:false}}))).rejects.toThrow('history_brazil_catalog_incomplete');
 });
 
@@ -99,4 +100,13 @@ it('Risk Studio consumes v2 rows under strict reconciliation with exact dataset 
  const response=await integratedServe(new Request('https://risk.test/v1/portfolio-analyze',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({workspaceId:crypto.randomUUID(),portfolioId:crypto.randomUUID(),runId:crypto.randomUUID(),positions:[{symbol:h.symbol,shares:1}],issuers:[{symbol:h.symbol,issuerId:h.issuerId}],valuations:[],baseCurrency:'BRL',riskFreeRate:0,range:'5y',confirmed:true,marketHistories:[{history:h,sourceHash,snapshotId}]})}));
  expect(response.status).toBe(200);const body=await response.json();expect(body.metrics.volatility).toBeLessThan(1e-9);expect(body.historySnapshots[0]).toEqual({symbol:h.symbol,sourceHash,snapshotId});
  expect(body.sources.some((s:{symbol:string;priceBasis:string})=>s.symbol===h.symbol&&s.priceBasis==='brazil-gross-entitlement.v2')).toBe(true);
+});
+
+it('retains a failed optional acquisition as an explicitly blocked dataset with no approved risk',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(now);
+ vi.stubEnv('PRICE_RECONCILIATION_ENABLED','true');vi.stubEnv('BRAZIL_HISTORY_NORMALIZATION_ENABLED','true');
+ vi.stubEnv('BRAZIL_MARKET_NORMALIZATION_ENABLED','true');vi.stubEnv('BRAZIL_HISTORY_BRAPI_PUBLIC','false');vi.stubEnv('BRAPI_API_KEY','');
+ const h=fixture('B3SA3');delete h.brazilEvidence;
+ const evidence=await acquireSecondaryEvidence(h,vi.fn());expect(evidence.brazilAcquisitionFailure).toBe('history_brazil_credential_required');
+ Object.assign(h,evidence);const q=assessHistory(h,h,now);expect(q.status).toBe('quarantined');expect(q.issues).toContain('brazil_evidence_unavailable');expect(q.metrics).toBeNull();
 });
