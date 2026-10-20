@@ -7,6 +7,7 @@ import {readBoundedJson} from '../src/lib/request-body';
 import {acquireSecondaryEvidence} from '../src/lib/market/secondary-evidence';
 import {configuredSecondary} from '../src/lib/market/available-secondary';
 import type {MarketHistory} from '../src/lib/market/history-quality';
+import {inspectBrazilAdjustments} from '../src/lib/market/brazil-adjustment-diagnostics';
 
 /** Read-only startup canary. Never invokes a model or writes user workspace data. */
 export async function checkIntegrations(){
@@ -41,6 +42,11 @@ export async function checkIntegrations(){
    const checked=assessHistory(h,identity);
    const q=checked.reconciliation;
    console.log(JSON.stringify({kind:'integration_check',integration:'independent_prices',symbol:ticker,provider:q.provider,status:q.status,compared:q.comparedSessions,missing:q.missingSessions,discrepancies:q.discrepancies.length,firstComparedDate:q.firstComparedDate,lastComparedDate:q.lastComparedDate,comparedReturns:q.comparedReturns,agreeingReturns:q.agreeingReturns,conflictingReturns:q.conflictingReturns,actionDateConflicts:q.actionDateConflicts,maxReturnDifference:q.maxReturnDifference,maxNormalizedDifference:q.maxNormalizedDifference,conflictSamples:q.conflictSamples,sensitivity:checked.priceSensitivity,witnesses:checked.reconciliations.map(r=>({provider:r.provider,status:r.status,compared:r.comparedSessions,missing:r.missingSessions,discrepancies:r.discrepancies.length})),acquisitionFailures:checked.secondaryAcquisitionFailures}));
+   const diagnostic=await inspectBrazilAdjustments(h);
+   if(diagnostic){const {pairs,...summary}=diagnostic;
+    console.log(JSON.stringify({kind:'integration_check',integration:'price_adjustment_diagnostics',...summary}));
+    for(const pair of pairs)console.log(JSON.stringify({kind:'integration_check',integration:'price_adjustment_pair',symbol:h.symbol,...pair}));
+   }
   }catch(e){console.log(JSON.stringify({kind:'integration_check',integration:'independent_prices',symbol:ticker,provider:configuredSecondary(h),status:'unavailable',reason:e instanceof Error&&/^history_secondary_[a-z_0-9]+$/.test(e.message)?e.message:'secondary_invalid'}));}
  }catch{console.error(JSON.stringify({kind:'integration_check',integration:'market_history',symbol:ticker,status:'unavailable'}));}
  }
