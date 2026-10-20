@@ -25,7 +25,7 @@ export async function acquireBrazilEvidence(h:MarketHistory,fetcher:typeof fetch
  const signal=AbortSignal.timeout(20000);
  async function read(url:URL,init:RequestInit={},limit=2000000){
   const r=await fetcher(url,{...init,redirect:'error',cache:'no-store',signal});
-  if(!r.ok){await r.body?.cancel();throw Error('history_brazil_http_'+r.status);}
+  if(!r.ok){await r.body?.cancel();const source=url.hostname==='cotab3.com.br'?'relay':url.pathname.endsWith('/historical')?'raw':'events';throw Error('history_brazil_'+source+'_http_'+r.status);}
   const reader=r.body?.getReader();if(!reader)throw Error('history_brazil_empty');const chunks:Uint8Array[]=[];let size=0;
   try{while(true){const p=await reader.read();if(p.done)break;size+=p.value.length;if(size>limit)throw Error('history_brazil_oversized');chunks.push(p.value);}}
   finally{await reader.cancel();reader.releaseLock();}

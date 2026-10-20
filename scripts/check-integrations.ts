@@ -9,6 +9,7 @@ import {configuredSecondary} from '../src/lib/market/available-secondary';
 import type {MarketHistory} from '../src/lib/market/history-quality';
 import {inspectBrazilAdjustments} from '../src/lib/market/brazil-adjustment-diagnostics';
 import {checkBrazilRisk} from './check-brazil-risk';
+import {historyEvidenceError} from '../src/lib/market/evidence-errors';
 
 /** Read-only startup canary. Never invokes a model or writes user workspace data. */
 export async function checkIntegrations(){
@@ -53,7 +54,7 @@ export async function checkIntegrations(){
     console.log(JSON.stringify({kind:'integration_check',integration:'price_adjustment_diagnostics',...summary}));
     for(const pair of pairs)console.log(JSON.stringify({kind:'integration_check',integration:'price_adjustment_pair',symbol:h.symbol,...pair}));
    }
-  }catch(e){console.log(JSON.stringify({kind:'integration_check',integration:'independent_prices',symbol:ticker,provider:configuredSecondary(h),status:'unavailable',reason:e instanceof Error&&/^history_secondary_[a-z_0-9]+$/.test(e.message)?e.message:'secondary_invalid'}));}
+  }catch(e){console.log(JSON.stringify({kind:'integration_check',integration:'independent_prices',symbol:ticker,provider:configuredSecondary(h),status:'unavailable',reason:historyEvidenceError(e)}));}
  }catch{console.error(JSON.stringify({kind:'integration_check',integration:'market_history',symbol:ticker,status:'unavailable'}));}
  }
 }

@@ -75,7 +75,7 @@ it('acquires three bounded fixed sources and never sends the BrAPI key to the pu
   const data=u.pathname.endsWith('historical')?{usedInterval:'1d',historicalDataPrice:h.rows.map(r=>({date:Date.parse(r.date)/1000,rawClose:r.close,adjustedClose:r.adjustedClose}))}:{cashDividends:[],stockDividends:[]};return Response.json({results:[{requestedSymbol:'PETR4',symbol:'PETR4',changed:false,data}]});
  });
  Object.assign(h,await acquireBrazilEvidence(h,mock));expect(normalizeBrazil(h,now)!.status).toBe('verified');expect(mock).toHaveBeenCalledTimes(3);
- await expect(acquireBrazilEvidence(h,async()=>new Response('',{status:403}))).rejects.toThrow('history_brazil_http_403');
+ await expect(acquireBrazilEvidence(h,async()=>new Response('',{status:403}))).rejects.toThrow('history_brazil_raw_http_403');
 });
 it('Risk Studio consumes canonical gross rows under strict reconciliation and rejects a lost quote witness',async()=>{
  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(now);const h=base();h.rows[30].close=99;h.rows[30].adjustedClose=99;
