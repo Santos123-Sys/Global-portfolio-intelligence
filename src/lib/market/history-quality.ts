@@ -1,3 +1,4 @@
+import {reconcilePrices,type SecondaryPrices} from './price-reconciliation';
 /** Portable deterministic contract shared by GPI and the Risk Studio function. */
 import type {Candidate} from '../foundation/contracts';
 export function historyIdentity(c:Candidate) {
@@ -7,6 +8,7 @@ export function historyIdentity(c:Candidate) {
 }
 export type PriceRow = {date:string;close:number;adjustedClose:number;volume:number};
 export type MarketHistory = {
+  secondary?:SecondaryPrices;
   schemaVersion:'market-history.v1';symbol:string;issuerId:string;currency:'USD'|'BRL';
   exchange:string;timezone:string;provider:'Yahoo Finance (unofficial)';sourceUrl:string;
   retrievedAt:string;requestedStart:string;requestedEnd:string;priceBasis:'vendor-adjusted-close';
@@ -72,16 +74,18 @@ export function assessHistory(raw:unknown,expected:{symbol:string;issuerId:strin
   });
   const daily=returns.flatMap(r=>r.simpleReturn===null?[]:[r.simpleReturn]);
   if(daily.some(r=>Math.abs(r)>.5))issues.push('extreme_return_review');
+  const reconciliation=reconcilePrices(h,h.secondary,now);
+  if(['incomplete','disputed'].includes(reconciliation.status))issues.push('independent_price_'+reconciliation.status);
   const status=issues.length?'quarantined':shortHistory?'short_history':'ready';
   const mean=daily.reduce((s,v)=>s+v,0)/daily.length;
   const variance=daily.reduce((s,v)=>s+(v-mean)**2,0)/(daily.length-1);
   let peak=0,drawdown=0;for(const r of h.rows){peak=Math.max(peak,r.adjustedClose);drawdown=Math.min(drawdown,r.adjustedClose/peak-1);}
   const sorted=[...daily].sort((a,b)=>a-b),q=sorted[Math.floor((sorted.length-1)*.05)],tail=sorted.filter(r=>r<=q);
-  return {version:'history-quality.v1' as const,status,issues,firstDate:first,lastDate:last,observations:h.rows.length,
+  return {version:'history-quality.v1' as const,status,issues,reconciliation,firstDate:first,lastDate:last,observations:h.rows.length,
     expectedSessions:h.reference.dates.length,missingSessions:missing,returns,
     metrics:status==='ready'?{annualizedVolatility:Math.sqrt(variance*252),maxDrawdown:drawdown,
       historicalVar95:Math.max(0,-q),historicalCvar95:Math.max(0,-tail.reduce((s,v)=>s+v,0)/tail.length),
       cumulativeReturn:h.rows.at(-1)!.adjustedClose/h.rows[0].adjustedClose-1}:null,
     methodology:'Vendor-adjusted simple/log daily returns; 252-session sample volatility; historical daily VaR/CVaR at 95%; no gap filling. Reference ETF sessions are a coverage proxy, not an official exchange calendar.',
-    limitations:['Single unofficial provider; no independent price reconciliation.','Provider adjustments are retained, not independently certified.','Short histories and quarantined series cannot feed the five-year risk calculation.']};
+    limitations:[reconciliation.status==='matched'?'Second-provider adjusted prices match within configured tolerances; vendor upstream independence is not certified.':'Independent price reconciliation has not passed; this dataset is not independently verified.','Provider adjustments are retained, not independently certified.','Short histories and quarantined series cannot feed the five-year risk calculation.']};
 }

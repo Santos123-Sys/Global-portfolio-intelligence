@@ -2,7 +2,7 @@
   "asOf": "2026-09-25",
   "limitations": [
     "Pinned starter watchlist, not a complete equity universe.",
-    "Brazil CNPJ mappings are deliberately absent until independently verified.",
+    "Brazil starter issuer mappings matched to active CVM registrations on 2026-10-20; listing continuity is not certified.",
     "SEC mappings retained from the prior sourced snapshot; no new live identity verification claimed."
   ],
   "candidates": [
@@ -12,8 +12,11 @@
       "exchange": "BVMF",
       "market": "br",
       "name": "PETROLEO BRASILEIRO S A PETROBRAS",
-      "issuer": null,
-      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/5493000J801JZRCMFE49"
+      "issuer": {
+        "jurisdiction": "br",
+        "registryId": "33000167000101"
+      },
+      "identitySourceUrl": "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv"
     },
     {
       "key": "BVMF:PETR4",
@@ -21,8 +24,11 @@
       "exchange": "BVMF",
       "market": "br",
       "name": "PETROLEO BRASILEIRO S A PETROBRAS",
-      "issuer": null,
-      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/5493000J801JZRCMFE49"
+      "issuer": {
+        "jurisdiction": "br",
+        "registryId": "33000167000101"
+      },
+      "identitySourceUrl": "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv"
     },
     {
       "key": "BVMF:VALE3",
@@ -30,8 +36,11 @@
       "exchange": "BVMF",
       "market": "br",
       "name": "VALE S.A.",
-      "issuer": null,
-      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/254900SMTWBX7RU2SR20"
+      "issuer": {
+        "jurisdiction": "br",
+        "registryId": "33592510000154"
+      },
+      "identitySourceUrl": "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv"
     },
     {
       "key": "BVMF:ITUB4",
@@ -39,8 +48,11 @@
       "exchange": "BVMF",
       "market": "br",
       "name": "ITAÚ UNIBANCO HOLDING S.A.",
-      "issuer": null,
-      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/5493002W2IVG62O3ZJ94"
+      "issuer": {
+        "jurisdiction": "br",
+        "registryId": "60872504000123"
+      },
+      "identitySourceUrl": "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv"
     },
     {
       "key": "BVMF:BBDC4",
@@ -48,8 +60,11 @@
       "exchange": "BVMF",
       "market": "br",
       "name": "BANCO BRADESCO S.A.",
-      "issuer": null,
-      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/549300CTUU1RFXHQJE44"
+      "issuer": {
+        "jurisdiction": "br",
+        "registryId": "60746948000112"
+      },
+      "identitySourceUrl": "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv"
     },
     {
       "key": "BVMF:BBAS3",
@@ -57,8 +72,11 @@
       "exchange": "BVMF",
       "market": "br",
       "name": "BANCO DO BRASIL SA",
-      "issuer": null,
-      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/QE0Q0253K88YAGNPE356"
+      "issuer": {
+        "jurisdiction": "br",
+        "registryId": "00000000000191"
+      },
+      "identitySourceUrl": "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv"
     },
     {
       "key": "BVMF:ABEV3",
@@ -66,8 +84,11 @@
       "exchange": "BVMF",
       "market": "br",
       "name": "AMBEV S.A.",
-      "issuer": null,
-      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/549300TH5Q6VRP8OT012"
+      "issuer": {
+        "jurisdiction": "br",
+        "registryId": "07526557000100"
+      },
+      "identitySourceUrl": "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv"
     },
     {
       "key": "BVMF:WEGE3",
@@ -75,8 +96,11 @@
       "exchange": "BVMF",
       "market": "br",
       "name": "WEG SA",
-      "issuer": null,
-      "identitySourceUrl": "https://api.gleif.org/api/v1/lei-records/254900NKQV127YFRO022"
+      "issuer": {
+        "jurisdiction": "br",
+        "registryId": "84429695000111"
+      },
+      "identitySourceUrl": "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv"
     },
     {
       "key": "XNAS:AAPL",

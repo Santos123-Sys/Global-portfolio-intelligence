@@ -90,3 +90,8 @@ describe('five-year history quality gates',()=>{
   expect(financeRecovery('disabled')).toContain('saved run');
  });
 });
+
+it('propagates independent price disagreement into the portfolio quality gate',()=>{
+ const h=historyFixture();h.secondary={provider:'Alpha Vantage',sourceUrl:'https://www.alphavantage.co/query',symbol:h.symbol,issuerId:h.issuerId,currency:'USD',timezone:'US/Eastern',retrievedAt:h.retrievedAt,rawSha256:'a'.repeat(64),priceBasis:'split-dividend-adjusted',rows:h.rows.map((r,i)=>({date:r.date,adjustedClose:r.adjustedClose*(i===100?1.02:1)}))};
+ const q=assessHistory(h,identity,now);expect(q.status).toBe('quarantined');expect(q.metrics).toBeNull();expect(q.issues).toContain('independent_price_disputed');
+});
