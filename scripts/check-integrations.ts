@@ -8,6 +8,7 @@ import {acquireSecondaryEvidence} from '../src/lib/market/secondary-evidence';
 import {configuredSecondary} from '../src/lib/market/available-secondary';
 import type {MarketHistory} from '../src/lib/market/history-quality';
 import {inspectBrazilAdjustments} from '../src/lib/market/brazil-adjustment-diagnostics';
+import {checkBrazilRisk} from './check-brazil-risk';
 
 /** Read-only startup canary. Never invokes a model or writes user workspace data. */
 export async function checkIntegrations(){
@@ -41,6 +42,11 @@ export async function checkIntegrations(){
   try{Object.assign(h,await acquireSecondaryEvidence(h));
    const checked=assessHistory(h,identity);
    const q=checked.reconciliation;
+   if(checked.brazilNormalization){const b=checked.brazilNormalization;console.log(JSON.stringify({kind:'integration_check',integration:'brazil_normalization',symbol:ticker,status:b.status,quality:checked.status,verifiedQuotes:b.verifiedQuotes,adjudicatedQuoteDates:b.adjudicatedQuoteDates.length,originalReturnConflicts:b.originalReturnConflicts,unresolved:b.unresolved,relayCompared:b.relayCompared,relayMissing:b.relayMissing.length,relayDuplicates:b.relayDuplicates.length,cashEvents:b.cash.length,metrics:checked.metrics,version:b.version}));}
+   if(process.env.BRAZIL_HISTORY_RISK_CANARY==='true'&&checked.brazilNormalization?.status==='verified'){
+    try{console.log(JSON.stringify({kind:'integration_check',integration:'brazil_risk_consumer',...await checkBrazilRisk(h,base,token)}));}
+    catch{console.log(JSON.stringify({kind:'integration_check',integration:'brazil_risk_consumer',status:'unverified'}));}
+   }
    console.log(JSON.stringify({kind:'integration_check',integration:'independent_prices',symbol:ticker,provider:q.provider,status:q.status,compared:q.comparedSessions,missing:q.missingSessions,discrepancies:q.discrepancies.length,firstComparedDate:q.firstComparedDate,lastComparedDate:q.lastComparedDate,comparedReturns:q.comparedReturns,agreeingReturns:q.agreeingReturns,conflictingReturns:q.conflictingReturns,actionDateConflicts:q.actionDateConflicts,maxReturnDifference:q.maxReturnDifference,maxNormalizedDifference:q.maxNormalizedDifference,conflictSamples:q.conflictSamples,sensitivity:checked.priceSensitivity,witnesses:checked.reconciliations.map(r=>({provider:r.provider,status:r.status,compared:r.comparedSessions,missing:r.missingSessions,discrepancies:r.discrepancies.length})),acquisitionFailures:checked.secondaryAcquisitionFailures}));
    const diagnostic=await inspectBrazilAdjustments(h);
    if(diagnostic){const {pairs,...summary}=diagnostic;

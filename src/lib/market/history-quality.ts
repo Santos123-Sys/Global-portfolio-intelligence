@@ -1,5 +1,6 @@
 import {reconcilePrices,type SecondaryPrices} from './price-reconciliation';
 import {priceSensitivity} from './price-sensitivity';
+import {normalizeBrazil,type BrazilEvidence} from './brazil-normalization';
 /** Portable deterministic contract shared by GPI and the Risk Studio function. */
 import type {Candidate} from '../foundation/contracts';
 export function historyIdentity(c:Candidate) {
@@ -9,6 +10,7 @@ export function historyIdentity(c:Candidate) {
 }
 export type PriceRow = {date:string;close:number;adjustedClose:number;volume:number};
 export type MarketHistory = {
+  brazilEvidence?:BrazilEvidence;
   secondary?:SecondaryPrices;
   secondarySupport?:SecondaryPrices[];
   secondaryAcquisitionFailures?:{provider:string;reason:string}[];
@@ -72,8 +74,11 @@ export function assessHistory(raw:unknown,expected:{symbol:string;issuerId:strin
   if(Date.parse(h.reference.dates[0])-Date.parse(h.requestedStart)>10*day)issues.push('reference_window_incomplete');
   const shortHistory=Date.parse(first)-Date.parse(h.requestedStart)>10*day;
   const referenceIndex=new Map(h.reference.dates.map((d,i)=>[d,i]));
-  const returns=h.rows.map((r,i)=>{
-    const p=h.rows[i-1];const adjacent=p&&referenceIndex.has(r.date)&&referenceIndex.get(r.date)===referenceIndex.get(p.date)!+1;
+  const brazilResult=normalizeBrazil(h,now),calculationRows=brazilResult?.status==='verified'?brazilResult.calculationRows:h.rows;
+  const brazilNormalization=brazilResult?(({calculationRows:_,...details})=>{void _;return details;})(brazilResult):null;
+  if(brazilResult?.status==='blocked')issues.push('brazil_adjudication_blocked');
+  const returns=calculationRows.map((r,i)=>{
+    const p=calculationRows[i-1];const adjacent=p&&referenceIndex.has(r.date)&&referenceIndex.get(r.date)===referenceIndex.get(p.date)!+1;
     return {date:r.date,simpleReturn:adjacent?r.adjustedClose/p.adjustedClose-1:null,logReturn:adjacent?Math.log(r.adjustedClose/p.adjustedClose):null};
   });
   const daily=returns.flatMap(r=>r.simpleReturn===null?[]:[r.simpleReturn]);
@@ -86,17 +91,17 @@ export function assessHistory(raw:unknown,expected:{symbol:string;issuerId:strin
   // No majority vote: any price conflict blocks even if another witness fully agrees.
   const reconciliation=[...reconciliations].sort((a,b)=>priority(b.status)-priority(a.status)||b.comparedSessions-a.comparedSessions)[0]??reconcilePrices(h,undefined,now);
   const selected=witnesses.find(s=>s.provider===reconciliation.provider);
-  if(['incomplete','disputed'].includes(reconciliation.status))issues.push('independent_price_'+reconciliation.status);
+  if(['incomplete','disputed'].includes(reconciliation.status)&&brazilNormalization?.status!=='verified')issues.push('independent_price_'+reconciliation.status);
   const status=issues.length?'quarantined':shortHistory?'short_history':'ready';
   const mean=daily.reduce((s,v)=>s+v,0)/daily.length;
   const variance=daily.reduce((s,v)=>s+(v-mean)**2,0)/(daily.length-1);
-  let peak=0,drawdown=0;for(const r of h.rows){peak=Math.max(peak,r.adjustedClose);drawdown=Math.min(drawdown,r.adjustedClose/peak-1);}
+  let peak=0,drawdown=0;for(const r of calculationRows){peak=Math.max(peak,r.adjustedClose);drawdown=Math.min(drawdown,r.adjustedClose/peak-1);}
   const sorted=[...daily].sort((a,b)=>a-b),q=sorted[Math.floor((sorted.length-1)*.05)],tail=sorted.filter(r=>r<=q);
-  return {version:'history-quality.v1' as const,status,issues,reconciliation,reconciliations,secondaryAcquisitionFailures:h.secondaryAcquisitionFailures??[],priceSensitivity:priceSensitivity(h,selected),firstDate:first,lastDate:last,observations:h.rows.length,
+  return {version:'history-quality.v1' as const,status,issues,reconciliation,reconciliations,brazilNormalization,calculationRows,secondaryAcquisitionFailures:h.secondaryAcquisitionFailures??[],priceSensitivity:priceSensitivity(h,selected),firstDate:first,lastDate:last,observations:h.rows.length,
     expectedSessions:h.reference.dates.length,missingSessions:missing,returns,
     metrics:status==='ready'?{annualizedVolatility:Math.sqrt(variance*252),maxDrawdown:drawdown,
       historicalVar95:Math.max(0,-q),historicalCvar95:Math.max(0,-tail.reduce((s,v)=>s+v,0)/tail.length),
-      cumulativeReturn:h.rows.at(-1)!.adjustedClose/h.rows[0].adjustedClose-1}:null,
-    methodology:'Vendor-adjusted simple/log daily returns; 252-session sample volatility; historical daily VaR/CVaR at 95%; no gap filling. Reference index/ETF sessions are a coverage proxy, not an official exchange calendar.',
-    limitations:[reconciliation.status==='matched'?'Second-provider adjusted prices match within configured tolerances; vendor upstream independence is not certified.':reconciliation.status==='partial'?`Only ${reconciliation.comparedSessions} of ${h.rows.length} sessions were corroborated; the full five-year history is not independently verified.`:'Independent price reconciliation has not passed; this dataset is not independently verified.','Provider adjustments are retained, not independently certified.','Corporate-action dates are Yahoo evidence, not proof that an adjustment disagreement is resolved.','Short histories and quarantined series cannot feed the five-year risk calculation.']};
+      cumulativeReturn:calculationRows.at(-1)!.adjustedClose/calculationRows[0].adjustedClose-1}:null,
+    methodology:(brazilNormalization?.status==='verified'?brazilNormalization.methodology:'Vendor-adjusted simple/log daily returns;')+' 252-session sample volatility; historical daily VaR/CVaR at 95%; no interpolation. Reference index/ETF sessions are a coverage proxy, not an official exchange calendar.',
+    limitations:[brazilNormalization?.status==='verified'?'Original vendor-adjusted disagreements remain visible. Risk uses the separately reconstructed gross-entitlement series and field-level quote receipts.':reconciliation.status==='matched'?'Second-provider adjusted prices match within configured tolerances; vendor upstream independence is not certified.':reconciliation.status==='partial'?`Only ${reconciliation.comparedSessions} of ${h.rows.length} sessions were corroborated; the full five-year history is not independently verified.`:'Independent price reconciliation has not passed; this dataset is not independently verified.','Provider adjustments are retained, not independently certified.','Corporate-action dates alone do not resolve an adjustment disagreement.','Short histories and quarantined series cannot feed the five-year risk calculation.']};
 }

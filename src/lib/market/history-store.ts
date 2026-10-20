@@ -16,6 +16,17 @@ export async function queueHistory(owner:string,key:string,refresh=false) {
     ON CONFLICT(owner_id,candidate_key,issuer_id,as_of) DO UPDATE SET
       status=CASE WHEN (gpi_market_history_jobs.status='failed' OR (${refresh} AND gpi_market_history_jobs.status='complete')) AND gpi_market_history_jobs.attempts<3 THEN 'queued' ELSE gpi_market_history_jobs.status END`;
 }
+/** One explicitly enabled repair pass; respects the existing UTC-day attempt cap and leases. */
+export async function queueExistingBrazilRepairs(){
+ if(process.env.BRAZIL_HISTORY_NORMALIZATION_ENABLED!=='true'||process.env.BRAZIL_HISTORY_REPAIR_EXISTING!=='true')return 0;
+ const rows=await sql()`UPDATE gpi_market_history_jobs j SET status='queued',error_code=null
+  WHERE j.symbol='PETR4.SA' AND j.issuer_id='br:33000167000101' AND j.status='complete' AND j.attempts<3
+  AND j.as_of=(now() AT TIME ZONE 'UTC')::date
+  AND EXISTS(SELECT 1 FROM gpi_market_history_snapshots s WHERE s.owner_id=j.owner_id AND s.id=j.snapshot_id
+   AND s.symbol=j.symbol AND s.issuer_id=j.issuer_id AND s.quality->>'status'='quarantined' AND NOT(s.payload ? 'brazilEvidence'))
+  RETURNING j.symbol`;
+ return rows.length;
+}
 export function riskConnection() {
   const base=new URL(process.env.PORTFOLIO_RISK_API_URL??''),token=process.env.PORTFOLIO_RISK_API_TOKEN??'';
   if(base.protocol!=='https:'||base.pathname!=='/'||base.username||base.password||base.search||base.hash||token.length<32||/[\r\n]/.test(token))throw Error('risk_provider_not_configured');
@@ -44,15 +55,16 @@ export async function processHistory(fetcher:typeof fetch=fetch) {
     Object.assign(history,await acquireSecondaryEvidence(history,fetcher));
     const quality=assessHistory(history,{symbol:job.symbol,issuerId:job.issuer_id});
     const hash=await historyHash(body.value),id='mh1_'+hash;
-    await sql().begin(async tx=>{
+    const saved=await sql().begin(async tx=>{
       const held=await tx`SELECT id FROM gpi_market_history_jobs WHERE id=${job.id} AND status='running' AND lease_token=${lease} AND lease_until>now() FOR UPDATE`;
-      if(!held.length)return;
+      if(!held.length)return false;
       await tx`INSERT INTO gpi_market_history_snapshots(id,owner_id,candidate_key,issuer_id,symbol,source_hash,payload,quality)
         VALUES(${id},${job.owner_id},${job.candidate_key},${job.issuer_id},${job.symbol},${hash},${tx.json(body.value as never)},${tx.json(quality)})
         ON CONFLICT(owner_id,id) DO NOTHING`;
       await tx`UPDATE gpi_market_history_jobs SET status='complete',snapshot_id=${id},error_code=null,lease_until=null WHERE id=${job.id} AND lease_token=${lease}`;
+      return true;
     });
-    console.log(JSON.stringify({kind:'market_history',status:quality.status,symbol:job.symbol,observations:quality.observations}));
+    console.log(JSON.stringify({kind:'market_history',status:saved?quality.status:'lease_lost',symbol:job.symbol,observations:quality.observations,...(saved?{snapshotId:id,calculationBasis:quality.brazilNormalization?.version??history.priceBasis}:{})}));
   }catch(e){
     const reason=e instanceof Error&&/^history_[a-z_]+$/.test(e.message)?e.message:'history_validation_failed';
     await sql()`UPDATE gpi_market_history_jobs SET status='failed',error_code=${reason},lease_until=null WHERE id=${job.id} AND lease_token=${lease}`;
@@ -61,7 +73,7 @@ export async function processHistory(fetcher:typeof fetch=fetch) {
 }
 export async function listHistory(owner:string) {
   const jobs=await sql()`SELECT candidate_key,symbol,status,error_code,snapshot_id,as_of,attempts FROM gpi_market_history_jobs WHERE owner_id=${owner} ORDER BY as_of DESC,created_at DESC LIMIT 100`;
-  const snapshots=await sql()<{id:string;candidate_key:string;symbol:string;source_hash:string;quality:Omit<ReturnType<typeof assessHistory>,'returns'>;retrieved_at:string;created_at:string}[]>`SELECT id,candidate_key,symbol,source_hash,quality - 'returns' AS quality,payload->>'retrievedAt' AS retrieved_at,created_at FROM gpi_market_history_snapshots WHERE owner_id=${owner} ORDER BY created_at DESC LIMIT 100`;
+  const snapshots=await sql()<{id:string;candidate_key:string;symbol:string;source_hash:string;quality:Omit<ReturnType<typeof assessHistory>,'returns'|'calculationRows'>;retrieved_at:string;created_at:string}[]>`SELECT id,candidate_key,symbol,source_hash,(quality - 'returns' - 'calculationRows') #- '{brazilNormalization,quotes}' #- '{brazilNormalization,sourceReturnChecks}' AS quality,payload->>'retrievedAt' AS retrieved_at,created_at FROM gpi_market_history_snapshots WHERE owner_id=${owner} ORDER BY created_at DESC LIMIT 100`;
   return {jobs,snapshots:snapshots.map(s=>({...s,stale:Date.now()-Date.parse(s.retrieved_at)>8*86400000}))};
 }
 export async function readHistory(owner:string,id:string){
@@ -70,8 +82,11 @@ export async function readHistory(owner:string,id:string){
   const row=rows[0];if(!row)throw Error('history_not_found');
   if(await historyHash(row.payload)!==row.source_hash||id!=='mh1_'+row.source_hash)throw Error('history_integrity_failed');
   const history=row.payload as MarketHistory;
+  // Evidence is acquired after the primary feed. Reproduce the immutable snapshot
+  // at its last acquisition time, not at the earlier primary-feed timestamp.
+  const acquiredAt=Math.min(Date.now(),Math.max(...[history.retrievedAt,history.secondary?.retrievedAt,history.brazilEvidence?.retrievedAt].map(t=>Date.parse(t??'')).filter(Number.isFinite)));
   return {snapshotId:id,sourceHash:row.source_hash,history,
-    quality:assessHistory(history,history,Date.parse(history.retrievedAt)),
+    quality:assessHistory(history,history,acquiredAt),
     stale:Date.now()-Date.parse(history.retrievedAt)>8*86400000};
 }
 export async function storedHistory(owner:string,identity:ReturnType<typeof historyIdentity>) {
@@ -81,6 +96,6 @@ export async function storedHistory(owner:string,identity:ReturnType<typeof hist
   if(await historyHash(row.payload)!==row.source_hash||row.id!=='mh1_'+row.source_hash)throw Error('history_integrity_failed');
   const quality=assessHistory(row.payload,identity);
   if(quality.status!=='ready')throw Error('history_quality_blocked');
-  if(process.env.PRICE_RECONCILIATION_REQUIRED==='true'&&quality.reconciliation.status!=='matched')throw Error('history_reconciliation_required');
+  if(process.env.PRICE_RECONCILIATION_REQUIRED==='true'&&quality.reconciliation.status!=='matched'&&quality.brazilNormalization?.status!=='verified')throw Error('history_reconciliation_required');
   return {snapshotId:row.id as string,sourceHash:row.source_hash as string,history:row.payload as MarketHistory};
 }

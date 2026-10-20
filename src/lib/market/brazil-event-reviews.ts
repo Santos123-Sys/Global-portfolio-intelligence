@@ -1,0 +1,9 @@
+/** Issuer-reviewed exceptions. Values are facts, never a general vendor preference. */
+export const brazilEventReviews:Record<string,{brapiTotal:number;yahooTotal:number;principal:number;sourceUrl:string;reason:string}>={
+ '2022-04-14':{brapiTotal:2.9702487,yahooTotal:2.970249,principal:2.8610762,sourceUrl:'https://www.latibex.com/docs/Documentos/LED/2022/05/11/TRACN_20220510_183454_A99_979565_20220510_DOC001.pdf',reason:'Separate the declared dividend from the later SELIC update.'},
+ '2022-11-22':{brapiTotal:3.3489,yahooTotal:1.748708,principal:3.3489,sourceUrl:'https://agencia.petrobras.com.br/pt/w/petrobras-informa-sobre-remuneracao-aos-acionistas-2',reason:'The issuer declared two installments totaling 3.3489; Yahoo omits part of the entitlement.'},
+ '2023-11-22':{brapiTotal:1.3453475,yahooTotal:1.371248,principal:1.3453475,sourceUrl:'https://agencia.petrobras.com.br/w/atualizacao-do-valor-por-acao-de-dividendos-e-jcp-do-3t23',reason:'Use the issuer-updated gross entitlement before later monetary updates.'},
+ '2024-12-26':{brapiTotal:1.98177169,yahooTotal:1.356891,principal:1.32820661,sourceUrl:'https://www.investidorpetrobras.com.br/acoes-dividendos-e-dividas/dividendos-e-jcp/',reason:'The 0.65356508 March installment is a dividend, not an additional JCP installment; exclude later monetary updates.'},
+ '2025-12-23':{brapiTotal:.94320755,yahooTotal:.952128,principal:.94320755,sourceUrl:'https://agencia.petrobras.com.br/w/petrobras-informa-sobre-a-forma-de-distribui%C3%A7%C3%A3o-da-remunera%C3%A7%C3%A3o-aos-acionistas-relativa-ao-3t25',reason:'Use declared gross JCP plus dividend before withholding and later SELIC updates.'},
+};
+export const june2024Review='https://api.mziq.com/mzfilemanager/v2/d/25fdf098-34f5-4608-b7fa-17d60b2de47d/462c286d-30e9-746b-0795-ac5befd741c6';
