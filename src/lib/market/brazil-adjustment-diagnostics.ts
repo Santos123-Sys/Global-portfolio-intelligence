@@ -20,7 +20,26 @@ export async function inspectBrazilAdjustments(h:MarketHistory,fetcher:typeof fe
   if(envelope.results?.length!==1||result?.requestedSymbol!=='PETR4'||result.symbol!=='PETR4'||result.changed!==false||!result.data)throw Error('identity_invalid');
   return {data:result.data,hash:createHash('sha256').update(JSON.stringify(body.value)).digest('hex')};
  }
- const results=await Promise.allSettled([request('historical'),request('dividends')]);
+ async function fmpEvidence(){
+  if(!process.env.FMP_API_KEY)return null;
+  const signal=AbortSignal.timeout(20000);
+  async function read(path:string){
+   const url=new URL('https://financialmodelingprep.com/stable/'+path);url.search=new URLSearchParams({symbol:'PETR4.SA',from:h.requestedStart,to:h.requestedEnd,apikey:process.env.FMP_API_KEY!}).toString();
+   const response=await fetcher(url,{redirect:'error',cache:'no-store',signal});
+   if(!response.ok){await response.body?.cancel();throw Error('http_'+response.status);}
+   const body=await readBoundedJson(new Request('https://response.invalid',{method:'POST',body:response.body,headers:{'content-type':'application/json'},duplex:'half'} as RequestInit),2000000);
+   if(!body.ok||!Array.isArray(body.value))throw Error('invalid_response');
+   return body.value as JsonRecord[];
+  }
+  const profile=await read('profile'),p=profile[0];
+  if(profile.length!==1||p.symbol!=='PETR4.SA'||p.currency!=='BRL'||p.isin!=='BRPETRACNPR6'||p.country!=='BR'||p.isAdr!==false)throw Error('identity_invalid');
+  const [closes,adjusted]=await Promise.all([read('historical-price-eod/full'),read('historical-price-eod/dividend-adjusted')]);
+  if([closes,adjusted].some(rows=>rows.length<2||rows.length>1500||rows.some(r=>r.symbol!=='PETR4.SA'||typeof r.date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(r.date))))throw Error('invalid_response');
+  return {profile:{symbol:p.symbol,currency:p.currency,isin:p.isin,exchange:p.exchange,country:p.country},closes,adjusted,hash:createHash('sha256').update(JSON.stringify({profile,closes,adjusted})).digest('hex')};
+ }
+ const results=await Promise.allSettled([request('historical'),request('dividends'),fmpEvidence()]);
+ const third=results[2].status==='fulfilled'?results[2].value:null;
+ const thirdCloses=new Map(third?.closes.map(r=>[r.date,r.close])),thirdAdjusted=new Map(third?.adjusted.map(r=>[r.date,r.adjClose]));
  const raw=results[0].status==='fulfilled'?results[0].value:null,events=results[1].status==='fulfilled'?results[1].value:null;
  const status=(r:typeof results[number])=>r.status==='fulfilled'?'available':r.reason instanceof Error&&/^(http_\d{3}|invalid_response|identity_invalid)$/.test(r.reason.message)?r.reason.message:'unavailable';
  const rawRows=Array.isArray(raw?.data.historicalDataPrice)?raw.data.historicalDataPrice as JsonRecord[]:[];
@@ -34,11 +53,11 @@ export async function inspectBrazilAdjustments(h:MarketHistory,fetcher:typeof fe
  const pairs=h.rows.flatMap((r,i)=>{
   if(!conflictDates.has(r.date))return [];
   const p=h.rows[i-1],rawCurrent=rawMap.get(r.date),rawPrevious=rawMap.get(p.date);
-  return [{date:r.date,previousDate:p.date,primaryClose:r.close,previousPrimaryClose:p.close,primaryAdjusted:r.adjustedClose,previousPrimaryAdjusted:p.adjustedClose,secondaryAdjusted:secondary.get(r.date),previousSecondaryAdjusted:secondary.get(p.date),rawClose:number(rawCurrent?.rawClose),previousRawClose:number(rawPrevious?.rawClose),reportedClose:number(rawCurrent?.close),yahooEvents:h.corporateActions.filter(a=>a.date===r.date),brapiEvents:actions.filter(a=>a.exDate===r.date||a.lastDatePrior===p.date||a.lastDatePrior===r.date)}];
+  return [{date:r.date,previousDate:p.date,primaryClose:r.close,previousPrimaryClose:p.close,primaryAdjusted:r.adjustedClose,previousPrimaryAdjusted:p.adjustedClose,secondaryAdjusted:secondary.get(r.date),previousSecondaryAdjusted:secondary.get(p.date),rawClose:number(rawCurrent?.rawClose),previousRawClose:number(rawPrevious?.rawClose),reportedClose:number(rawCurrent?.close),thirdClose:number(thirdCloses.get(r.date)),previousThirdClose:number(thirdCloses.get(p.date)),thirdAdjusted:number(thirdAdjusted.get(r.date)),previousThirdAdjusted:number(thirdAdjusted.get(p.date)),yahooEvents:h.corporateActions.filter(a=>a.date===r.date),brapiEvents:actions.filter(a=>a.exDate===r.date||a.lastDatePrior===p.date||a.lastDatePrior===r.date)}];
  });
  const rawComparison=h.rows.flatMap(r=>{const close=number(rawMap.get(r.date)?.rawClose);return close===null?[]:[{date:r.date,difference:Math.abs(close-r.close)}];});
  const fitsCent=(value:number)=>Math.abs(value-Math.round(value*100)/100)<=Math.max(1,value)*2**-23;
- return {symbol:h.symbol,rawStatus:status(results[0]),eventStatus:status(results[1]),rawHash:raw?.hash??null,eventHash:events?.hash??null,rawObservations:rawRows.length,eventObservations:actions.length,
+ return {symbol:h.symbol,rawStatus:status(results[0]),eventStatus:status(results[1]),thirdStatus:status(results[2]),thirdProfile:third?.profile??null,thirdHash:third?.hash??null,thirdObservations:third?.closes.length??0,rawHash:raw?.hash??null,eventHash:events?.hash??null,rawObservations:rawRows.length,eventObservations:actions.length,
   rawCompared:rawComparison.length,rawMatchesWithinHalfCent:rawComparison.filter(r=>r.difference<=.005).length,rawMaxDifference:rawComparison.length?Math.max(...rawComparison.map(r=>r.difference)):null,
   rawConflictSamples:rawComparison.filter(r=>r.difference>.005).slice(0,5),primaryAdjustedOnCentGrid:h.rows.filter(r=>fitsCent(r.adjustedClose)).length,primaryClosesOnCentGrid:h.rows.filter(r=>fitsCent(r.close)).length,
   conflicts:pairs.length,pairs};
