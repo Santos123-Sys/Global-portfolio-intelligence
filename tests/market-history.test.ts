@@ -82,6 +82,13 @@ describe('five-year history quality gates',()=>{
   const r=await integratedServe(request());expect(r.status).toBe(200);const result=await r.json();
   expect(result.historySnapshots).toEqual([{symbol:'AAPL',snapshotId,sourceHash}]);
   expect(result.warnings.join(' ')).toContain('do not independently certify');
+  vi.stubGlobal('Bun',{env:{PORTFOLIO_RISK_API_TOKEN:token,PRICE_RECONCILIATION_REQUIRED:'true'}});
+  expect((await integratedServe(request())).status).toBe(422);
+  h.secondary={provider:'EODHD',sourceUrl:'https://eodhd.com/api/eod/AAPL.US',symbol:h.symbol,issuerId:h.issuerId,currency:'USD',timezone:'America/New_York',retrievedAt:h.retrievedAt,rawSha256:'a'.repeat(64),priceBasis:'split-dividend-adjusted',rows:h.rows.slice(-251).map(r=>({date:r.date,adjustedClose:r.adjustedClose}))};
+  const attach=async()=>{const hash=await historyHash(h);body.marketHistories=[{history:h,sourceHash:hash,snapshotId:'mh1_'+hash}];};await attach();
+  expect((await integratedServe(request())).status).toBe(422);
+  vi.stubGlobal('Bun',{env:{PORTFOLIO_RISK_API_TOKEN:token}});expect((await integratedServe(request())).status).toBe(200);
+  h.secondary.rows[5].adjustedClose*=1.02;await attach();expect((await integratedServe(request())).status).toBe(422);
   h.rows[2].adjustedClose=1;expect((await integratedServe(request())).status).toBe(422);
   vi.restoreAllMocks();
  });
@@ -94,4 +101,12 @@ describe('five-year history quality gates',()=>{
 it('propagates independent price disagreement into the portfolio quality gate',()=>{
  const h=historyFixture();h.secondary={provider:'Alpha Vantage',sourceUrl:'https://www.alphavantage.co/query',symbol:h.symbol,issuerId:h.issuerId,currency:'USD',timezone:'US/Eastern',retrievedAt:h.retrievedAt,rawSha256:'a'.repeat(64),priceBasis:'split-dividend-adjusted',rows:h.rows.map((r,i)=>({date:r.date,adjustedClose:r.adjustedClose*(i===100?1.02:1)}))};
  const q=assessHistory(h,identity,now);expect(q.status).toBe('quarantined');expect(q.metrics).toBeNull();expect(q.issues).toContain('independent_price_disputed');
+});
+it('allows explicitly limited corroboration under optional verification without claiming a full-history pass',()=>{
+ const h=historyFixture();h.secondary={provider:'EODHD',sourceUrl:'https://eodhd.com/api/eod/AAPL.US',symbol:h.symbol,issuerId:h.issuerId,currency:'USD',timezone:'America/New_York',retrievedAt:h.retrievedAt,rawSha256:'a'.repeat(64),priceBasis:'split-dividend-adjusted',rows:h.rows.slice(-251).map(r=>({date:r.date,adjustedClose:r.adjustedClose}))};
+ const q=assessHistory(h,identity,now);expect(q.status).toBe('ready');expect(q.metrics).not.toBeNull();expect(q.reconciliation.status).toBe('partial');
+ expect(q.reconciliation.agreeingReturns).toBe(250);expect(q.priceSensitivity!.diagnosticOnly).toBe(true);
+ expect(q.limitations.join(' ')).toContain('full five-year history is not independently verified');
+ h.secondary.rows[4].adjustedClose*=1.02;
+ const conflict=assessHistory(h,identity,now);expect(conflict.reconciliation.status).toBe('disputed');expect(conflict.status).toBe('quarantined');expect(conflict.metrics).toBeNull();
 });

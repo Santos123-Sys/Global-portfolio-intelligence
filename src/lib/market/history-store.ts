@@ -6,7 +6,7 @@ export {historyIdentity} from './history-quality';
 import type {MarketHistory} from './history-quality';
 import {readBoundedJson} from '../request-body';
 
-export async function queueHistory(owner:string,key:string) {
+export async function queueHistory(owner:string,key:string,refresh=false) {
   if(process.env.MARKET_HISTORY_ENABLED!=='true')throw Error('history_disabled');
   const candidate=(await loadWorkspace(owner)).candidates.find(c=>c.key===key);
   if(!candidate)throw Error('candidate_not_found');
@@ -14,7 +14,7 @@ export async function queueHistory(owner:string,key:string) {
   await sql()`INSERT INTO gpi_market_history_jobs(id,owner_id,candidate_key,issuer_id,symbol,as_of)
     VALUES(${randomUUID()},${owner},${key},${identity.issuerId},${identity.symbol},CURRENT_DATE)
     ON CONFLICT(owner_id,candidate_key,issuer_id,as_of) DO UPDATE SET
-      status=CASE WHEN gpi_market_history_jobs.status='failed' AND gpi_market_history_jobs.attempts<3 THEN 'queued' ELSE gpi_market_history_jobs.status END`;
+      status=CASE WHEN (gpi_market_history_jobs.status='failed' OR (${refresh} AND gpi_market_history_jobs.status='complete')) AND gpi_market_history_jobs.attempts<3 THEN 'queued' ELSE gpi_market_history_jobs.status END`;
 }
 export function riskConnection() {
   const base=new URL(process.env.PORTFOLIO_RISK_API_URL??''),token=process.env.PORTFOLIO_RISK_API_TOKEN??'';
@@ -60,7 +60,7 @@ export async function processHistory(fetcher:typeof fetch=fetch) {
   }
 }
 export async function listHistory(owner:string) {
-  const jobs=await sql()`SELECT candidate_key,symbol,status,error_code,snapshot_id,as_of FROM gpi_market_history_jobs WHERE owner_id=${owner} ORDER BY created_at DESC LIMIT 100`;
+  const jobs=await sql()`SELECT candidate_key,symbol,status,error_code,snapshot_id,as_of,attempts FROM gpi_market_history_jobs WHERE owner_id=${owner} ORDER BY as_of DESC,created_at DESC LIMIT 100`;
   const snapshots=await sql()<{id:string;candidate_key:string;symbol:string;source_hash:string;quality:Omit<ReturnType<typeof assessHistory>,'returns'>;retrieved_at:string;created_at:string}[]>`SELECT id,candidate_key,symbol,source_hash,quality - 'returns' AS quality,payload->>'retrievedAt' AS retrieved_at,created_at FROM gpi_market_history_snapshots WHERE owner_id=${owner} ORDER BY created_at DESC LIMIT 100`;
   return {jobs,snapshots:snapshots.map(s=>({...s,stale:Date.now()-Date.parse(s.retrieved_at)>8*86400000}))};
 }

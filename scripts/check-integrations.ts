@@ -39,7 +39,8 @@ export async function checkIntegrations(){
   console.log(JSON.stringify({kind:'integration_check',integration:'market_history',symbol:ticker,status:q.status,observations:q.observations,firstDate:q.firstDate,lastDate:q.lastDate,reference:h.reference.symbol}));
   try{const secondary=await secondaryPrices(h);if(secondary)h.secondary=secondary;
    const checked=assessHistory(h,identity);
-   console.log(JSON.stringify({kind:'integration_check',integration:'independent_prices',symbol:ticker,provider:configuredSecondary(h),status:checked.reconciliation.status,compared:checked.reconciliation.comparedSessions,missing:checked.reconciliation.missingSessions,discrepancies:checked.reconciliation.discrepancies.length}));
+   const q=checked.reconciliation;
+   console.log(JSON.stringify({kind:'integration_check',integration:'independent_prices',symbol:ticker,provider:configuredSecondary(h),status:q.status,compared:q.comparedSessions,missing:q.missingSessions,discrepancies:q.discrepancies.length,firstComparedDate:q.firstComparedDate,lastComparedDate:q.lastComparedDate,comparedReturns:q.comparedReturns,agreeingReturns:q.agreeingReturns,conflictingReturns:q.conflictingReturns,actionDateConflicts:q.actionDateConflicts,maxReturnDifference:q.maxReturnDifference,maxNormalizedDifference:q.maxNormalizedDifference,conflictSamples:q.conflictSamples,sensitivity:checked.priceSensitivity}));
   }catch(e){console.log(JSON.stringify({kind:'integration_check',integration:'independent_prices',symbol:ticker,provider:configuredSecondary(h),status:'unavailable',reason:e instanceof Error&&/^history_secondary_[a-z_0-9]+$/.test(e.message)?e.message:'secondary_invalid'}));}
  }catch{console.error(JSON.stringify({kind:'integration_check',integration:'market_history',symbol:ticker,status:'unavailable'}));}
  }

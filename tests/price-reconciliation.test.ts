@@ -14,9 +14,26 @@ afterEach(()=>vi.unstubAllEnvs());
 describe('independent price checks',()=>{
  it('never claims reconciliation without a second dataset',()=>expect(reconcilePrices(primary,undefined,now).status).toBe('not_configured'));
  it('accepts matching returns with a different adjustment anchor',()=>expect(reconcilePrices(primary,{...secondary,rows:rows.map(r=>({...r,adjustedClose:r.adjustedClose*2}))},now).status).toBe('matched'));
- it('quarantines divergence and incomplete overlap',()=>{
+ it('quarantines divergence but labels agreeing limited coverage partial',()=>{
   expect(reconcilePrices(primary,{...secondary,rows:rows.map((r,i)=>({...r,adjustedClose:r.adjustedClose*(i===100?1.02:1)}))},now).status).toBe('disputed');
-  expect(reconcilePrices(primary,{...secondary,rows:rows.slice(1)},now).status).toBe('incomplete');
+  expect(reconcilePrices(primary,{...secondary,rows:rows.slice(1)},now).status).toBe('partial');
+ });
+ it('anchors on the last shared session without inventing conflicts for missing dates',()=>{
+  const r=reconcilePrices(primary,{...secondary,rows:rows.slice(-251,-1).map(r=>({...r,adjustedClose:r.adjustedClose*2}))},now);
+  expect(r.status).toBe('partial');expect(r.comparedSessions).toBe(250);expect(r.missingSessions).toBe(950);expect(r.discrepancies).toEqual([]);
+  expect(r.lastComparedDate).toBe(rows.at(-2)!.date);expect(r.comparedReturns).toBe(249);
+ });
+ it('never hides a conflict behind partial coverage or calls nonadjacent points a matched return',()=>{
+  const r=reconcilePrices(primary,{...secondary,rows:rows.slice(-251).map((r,i)=>({...r,adjustedClose:r.adjustedClose*(i===3?1.02:1)}))},now);
+  expect(r.status).toBe('disputed');expect(r.conflictingReturns).toBe(2);expect(r.conflictSamples).toHaveLength(2);
+  const isolated=reconcilePrices(primary,{...secondary,rows:[rows[0],rows[2]]},now);
+  expect(isolated.status).toBe('incomplete');expect(isolated.comparedReturns).toBe(0);
+ });
+ it('records corporate-action clues without excusing conflicts or joining agreement ranges across gaps',()=>{
+  const altered=rows.map((r,i)=>({...r,adjustedClose:r.adjustedClose*(i>=100?1.02:1)}));
+  const r=reconcilePrices({...primary,corporateActions:[{date:rows[100].date,kind:'dividend',value:1}]},{...secondary,rows:altered.filter((_,i)=>i!==200)},now);
+  expect(r.status).toBe('disputed');expect(r.conflictingReturns).toBe(1);expect(r.actionDateConflicts).toBe(1);
+  expect(r.agreementRanges).toHaveLength(3);expect(r.agreementRanges[1].end).toBe(rows[199].date);expect(r.agreementRanges[2].start).toBe(rows[201].date);
  });
  it('rejects wrong identity, stale, unsorted, malformed, nonpositive and forged sources',()=>{
   for(const patch of [{symbol:'MSFT'},{currency:'BRL'},{retrievedAt:'2020-01-01'},{sourceUrl:'https://evil.example'},{rows:[...rows].reverse()},{rows:rows.map((r,i)=>i===1?{...r,adjustedClose:0}:r)}])expect(()=>reconcilePrices(primary,{...secondary,...patch} as SecondaryPrices,now)).toThrow();

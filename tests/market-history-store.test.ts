@@ -47,3 +47,24 @@ it('bounds provider failure retries and does not publish failed responses',async
  for(let i=0;i<4;i++){await queueHistory(owner,'XNAS:AAPL');await processHistory(transport as typeof fetch);}
  expect(transport).toHaveBeenCalledTimes(3);expect((await listHistory(owner)).jobs[0].status).toBe('failed');
 });
+it('refreshes completed jobs once, preserves snapshots, persists partial coverage and enforces the strict gate and daily cap',async()=>{
+ await state.db!.query("UPDATE gpi_market_history_jobs SET status='complete',attempts=0 WHERE owner_id=$1",[owner]);
+ const oldSnapshots=(await state.db!.query<{id:string;payload:unknown}>('SELECT id,payload FROM gpi_market_history_snapshots WHERE owner_id=$1 ORDER BY id',[owner])).rows;
+ vi.stubEnv('EODHD_API_KEY','synthetic');vi.stubEnv('PRICE_RECONCILIATION_ENABLED','true');
+ const transport=vi.fn(async(url:RequestInfo|URL)=>{
+  const h=payload();return Response.json(String(url).startsWith('https://eodhd.com/')?h.rows.slice(-251).map(r=>({date:r.date,adjusted_close:r.adjustedClose})):h);
+ });
+ try{
+  await queueHistory(owner,'XNAS:AAPL');await processHistory(transport as typeof fetch);expect(transport).not.toHaveBeenCalled();
+  await queueHistory(owner,'XNAS:AAPL',true);await queueHistory(owner,'XNAS:AAPL',true);
+  await processHistory(transport as typeof fetch);await processHistory(transport as typeof fetch);expect(transport).toHaveBeenCalledTimes(2);
+  const prepared=await storedHistory(owner,identity),q=(await readHistory(owner,prepared.snapshotId)).quality;
+  expect(q.status).toBe('ready');expect(q.reconciliation.status).toBe('partial');expect(q.reconciliation.comparedSessions).toBe(251);
+  expect(q.limitations.join(' ')).toContain('full five-year history is not independently verified');
+  vi.stubEnv('PRICE_RECONCILIATION_REQUIRED','true');await expect(storedHistory(owner,identity)).rejects.toThrow('history_reconciliation_required');
+  vi.stubEnv('PRICE_RECONCILIATION_REQUIRED','false');
+  for(let i=0;i<3;i++){await queueHistory(owner,'XNAS:AAPL',true);await processHistory(transport as typeof fetch);}
+  expect(transport).toHaveBeenCalledTimes(6);expect((await listHistory(owner)).jobs[0].attempts).toBe(3);
+  for(const old of oldSnapshots){const actual=await state.db!.query<{payload:unknown}>('SELECT payload FROM gpi_market_history_snapshots WHERE owner_id=$1 AND id=$2',[owner,old.id]);expect(actual.rows[0].payload).toEqual(old.payload);}
+ }finally{vi.stubEnv('PRICE_RECONCILIATION_ENABLED','false');vi.stubEnv('EODHD_API_KEY','');vi.stubEnv('PRICE_RECONCILIATION_REQUIRED','false');}
+});

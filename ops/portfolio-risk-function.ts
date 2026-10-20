@@ -179,8 +179,9 @@ async function integratedServe(req){
     if(!Array.isArray(b.marketHistories)||b.marketHistories.length!==b.positions.length)throw Error('Prepared history required');
     for(const p of b.positions){
      const source=b.marketHistories.find(s=>s.history?.symbol===p.symbol),issuer=b.issuers.find(i=>i.symbol===p.symbol);
-     if(!source||!issuer||source.snapshotId!=='mh1_'+source.sourceHash||await historyHash(source.history)!==source.sourceHash||
-       assessHistory(source.history,issuer).status!=='ready')throw Error('Prepared history quality failed');
+     if(!source||!issuer||source.snapshotId!=='mh1_'+source.sourceHash||await historyHash(source.history)!==source.sourceHash)throw Error('Prepared history quality failed');
+     const quality=assessHistory(source.history,issuer);
+     if(quality.status!=='ready'||(Bun.env.PRICE_RECONCILIATION_REQUIRED==='true'&&quality.reconciliation.status!=='matched'))throw Error('Prepared history quality failed');
      const h=source.history;lookup.set(p.symbol,{symbol:h.symbol,currency:h.currency,provider:h.provider,priceBasis:'adjusted close',cached:true,stale:false,
        rows:h.rows.map(r=>({date:r.date,price:r.adjustedClose,close:r.close}))});
     }

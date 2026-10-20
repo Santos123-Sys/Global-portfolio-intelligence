@@ -1,8 +1,13 @@
 /** Independent acquisition, not a claim that vendor upstream sources are independent. */
 export type SecondaryPrices={provider:'Alpha Vantage'|'EODHD'|'BrAPI';sourceUrl:string;symbol:string;issuerId:string;currency:'USD'|'BRL';timezone:'US/Eastern'|'America/New_York'|'America/Sao_Paulo';retrievedAt:string;priceBasis:'split-dividend-adjusted';rawSha256:string;rows:{date:string;adjustedClose:number}[]};
-type Primary={symbol:string;issuerId:string;currency:string;requestedStart:string;requestedEnd:string;rows:{date:string;adjustedClose:number}[]};
+type Primary={symbol:string;issuerId:string;currency:string;requestedStart:string;requestedEnd:string;rows:{date:string;adjustedClose:number}[];reference?:{dates:string[]};corporateActions?:{date:string;kind:string;value:number}[]};
 export function reconcilePrices(primary:Primary,secondary:SecondaryPrices|undefined,now=Date.now()){
- const base={version:'price-reconciliation.v1',provider:secondary?.provider??null,returnTolerance:0.001,levelTolerance:0.005};
+ const base={version:'price-reconciliation.v2',provider:secondary?.provider??null,returnTolerance:0.001,levelTolerance:0.005,
+  firstComparedDate:null as string|null,lastComparedDate:null as string|null,
+  comparedReturns:0,agreeingReturns:0,conflictingReturns:0,actionDateConflicts:0,
+  maxReturnDifference:0,maxNormalizedDifference:0,
+  agreementRanges:[] as {start:string;end:string;returns:number}[],
+  conflictSamples:[] as {date:string;primaryReturn:number;secondaryReturn:number;corporateActionDate:boolean}[]};
  if(!secondary)return {...base,status:'not_configured',comparedSessions:0,missingSessions:0,discrepancies:[] as string[]};
  const providerValid=secondary.provider==='Alpha Vantage'?secondary.sourceUrl==='https://www.alphavantage.co/query'&&primary.issuerId.startsWith('us:'):
   secondary.provider==='EODHD'?secondary.sourceUrl==='https://eodhd.com/api/eod/'+encodeURIComponent(primary.symbol+'.US')&&primary.issuerId.startsWith('us:'):
@@ -14,14 +19,35 @@ export function reconcilePrices(primary:Primary,secondary:SecondaryPrices|undefi
   !Array.isArray(secondary.rows)||secondary.rows.length<2||secondary.rows.length>1500||secondary.rows.some((r,i)=>!/^\d{4}-\d{2}-\d{2}$/.test(r.date)||!Number.isFinite(Date.parse(r.date))||new Date(r.date).toISOString().slice(0,10)!==r.date||!Number.isFinite(r.adjustedClose)||r.adjustedClose<=0||r.date<primary.requestedStart||r.date>primary.requestedEnd||(i>0&&r.date<=secondary.rows[i-1].date)))throw Error('history_secondary_invalid');
  const map=new Map(secondary.rows.map(r=>[r.date,r.adjustedClose]));
  const missing=primary.rows.filter(r=>!map.has(r.date)).length;
- // Rebase levels to the common final session: vendors can use different adjustment anchors.
- const last=primary.rows.at(-1)!,anchor=map.get(last.date);
+ // Anchor only on a shared session. An absent last date is missing coverage, not a price conflict.
+ const shared=primary.rows.filter(r=>map.has(r.date)),last=shared.at(-1),anchor=last?map.get(last.date):undefined;
+ base.firstComparedDate=shared[0]?.date??null;base.lastComparedDate=last?.date??null;
+ const actionDates=new Set(primary.corporateActions?.map(a=>a.date)??[]);
+ const sessionIndex=primary.reference?new Map(primary.reference.dates.map((d,i)=>[d,i])):null;
  const discrepancies:string[]=[];let compared=0;
  primary.rows.forEach((r,i)=>{
   const second=map.get(r.date),prev=primary.rows[i-1],prior=prev?map.get(prev.date):undefined;
   if(second===undefined)return;compared++;
-  if(!anchor||Math.abs((second/anchor)/(r.adjustedClose/last.adjustedClose)-1)>base.levelTolerance)discrepancies.push(r.date+':normalized_level');
-  if(prev&&prior&&Math.abs(second/prior-r.adjustedClose/prev.adjustedClose)>base.returnTolerance)discrepancies.push(r.date+':daily_return');
+  const levelDifference=Math.abs((second/anchor!)/(r.adjustedClose/last!.adjustedClose)-1);
+  base.maxNormalizedDifference=Math.max(base.maxNormalizedDifference,levelDifference);
+  if(levelDifference>base.levelTolerance)discrepancies.push(r.date+':normalized_level');
+  if(prev&&prior&&(!sessionIndex||(sessionIndex.has(prev.date)&&sessionIndex.get(r.date)===sessionIndex.get(prev.date)!+1))){
+   const primaryReturn=r.adjustedClose/prev.adjustedClose-1,secondaryReturn=second/prior-1;
+   const difference=Math.abs(secondaryReturn-primaryReturn);base.comparedReturns++;
+   base.maxReturnDifference=Math.max(base.maxReturnDifference,difference);
+   if(difference>base.returnTolerance){
+    discrepancies.push(r.date+':daily_return');base.conflictingReturns++;
+    const corporateActionDate=actionDates.has(r.date);if(corporateActionDate)base.actionDateConflicts++;
+    if(base.conflictSamples.length<5)base.conflictSamples.push({date:r.date,primaryReturn,secondaryReturn,corporateActionDate});
+   }else{
+    base.agreeingReturns++;
+    const range=base.agreementRanges.at(-1);
+    if(range?.end===prev.date){range.end=r.date;range.returns++;}
+    else base.agreementRanges.push({start:prev.date,end:r.date,returns:1});
+   }
+  }
  });
- return {...base,status:missing||compared<1100?'incomplete':discrepancies.length?'disputed':'matched',comparedSessions:compared,missingSessions:missing,discrepancies};
+ // A conflict always wins over limited coverage. Never extrapolate an agreement to missing dates.
+ const status=discrepancies.length?'disputed':!missing&&compared>=1100?'matched':base.comparedReturns>0?'partial':'incomplete';
+ return {...base,status,comparedSessions:compared,missingSessions:missing,discrepancies};
 }
