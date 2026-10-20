@@ -34,6 +34,6 @@ export async function checkBrazilMarket(fetcher:typeof fetch=fetch){
    }
    console.log(JSON.stringify({kind:'brazil_market_canary',symbol,status:quality.status,normalization:normalization?.status??'absent',observations:quality.observations,
     unresolved:normalization?.unresolved??[],sourceHashBasis:normalization?.version??history.priceBasis,consumer,stateless:true}));
-  }catch(error){console.log(JSON.stringify({kind:'brazil_market_canary',symbol,status:'unavailable_or_review_required',reason:historyEvidenceError(error),stateless:true}));}
+  }catch(error){console.log(JSON.stringify({kind:'brazil_market_canary',symbol,status:'unavailable_or_review_required',reason:error instanceof Error&&/^risk_canary_[a-z_0-9]{1,80}$/.test(error.message)?error.message:historyEvidenceError(error),stateless:true}));}
  }
 }

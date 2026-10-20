@@ -25,9 +25,9 @@ export function normalizeBrazilMarket(h:MarketHistory,e:BrazilEvidence,now:numbe
   e.events.sourceUrl!=='https://brapi.dev/api/v2/stocks/dividends'||e.relay.sourceUrl!=='https://cotab3.com.br/cotacoes'||
   ![e.raw.rawSha256,e.events.rawSha256,e.relay.rawSha256].every(digest)||!Number.isFinite(Date.parse(e.retrievedAt))||
   Date.parse(e.retrievedAt)>now+30000||now-Date.parse(e.retrievedAt)>8*86400000||h.secondary?.provider!=='BrAPI'||
-  h.secondary.symbol!==h.symbol||h.secondary.issuerId!==h.issuerId||
+  h.secondary.symbol!==h.symbol||h.secondary.issuerId!==h.issuerId||h.secondary.rawSha256!==e.raw.rawSha256||
   e.raw.rows.length!==h.rows.length||h.secondary.rows.length!==h.rows.length||e.raw.rows.length>1500||
-  e.events.cash.length>500||e.events.stock.length>100||e.relay.rows.length>1600)invalid();
+  e.events.cash.length>500||e.events.stock.length>100||!Array.isArray(e.events.subscriptions)||e.events.subscriptions.length>500||e.relay.rows.length>1600)invalid();
  const unresolved:string[]=[],splits=new Map<string,number>(),yahooSplits=new Map<string,number>(),dates=new Map(h.reference.dates.map((d,i)=>[d,i]));
  const inWindow=(d:string)=>d>=h.requestedStart&&d<=h.requestedEnd;
  for(const a of h.corporateActions.filter(a=>a.kind==='split')){

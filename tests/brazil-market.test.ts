@@ -10,7 +10,7 @@ import {brazilMarketCatalog} from '../src/lib/market/brazil-market-catalog';
 const now=Date.parse('2026-10-19T13:00:00Z');
 afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals();vi.useRealTimers();});
 function fixture(symbol='VALE3'){
- const h=brazilHistoryFixture(),issuer='br:33592510000154';
+ const h=brazilHistoryFixture(),issuer='br:33592510000154';h.brazilEvidence!.events.subscriptions=[];
  h.symbol=symbol+'.SA';h.issuerId=issuer;h.sourceUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+h.symbol;
  Object.assign(h.secondary!,{symbol:h.symbol,issuerId:issuer});
  Object.assign(h.brazilEvidence!,{version:'brazil-evidence.v2',symbol:h.symbol,issuerId:issuer,isin:'BRVALEACNOR0',

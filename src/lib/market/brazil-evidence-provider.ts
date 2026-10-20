@@ -74,15 +74,17 @@ export async function acquireBrazilEvidence(h:MarketHistory,fetcher:typeof fetch
   identity={symbol,cnpj,assetType:coverage.assetType,subType:coverage.subType,profileUrl,coverageUrl,
    profileSha256:result.value.profile.rawSha256,coverageSha256:result.value.coverage.rawSha256};
  }
- if(raw.usedInterval!=='1d'||!Array.isArray(raw.historicalDataPrice)||!Array.isArray(events.cashDividends)||!Array.isArray(events.stockDividends)||raw.historicalDataPrice.length>1500||events.cashDividends.length>500||events.stockDividends.length>100)throw Error('history_brazil_contract');
+ if(raw.usedInterval!=='1d'||!Array.isArray(raw.historicalDataPrice)||!Array.isArray(events.cashDividends)||!Array.isArray(events.stockDividends)||raw.historicalDataPrice.length>1500||events.cashDividends.length>(legacy?500:5000)||events.stockDividends.length>(legacy?100:1000)||(!legacy&&(!Array.isArray(events.subscriptions)||events.subscriptions.length>500)))throw Error('history_brazil_contract');
  const iso=(v:unknown)=>typeof v==='string'?v.slice(0,10):'';
  const today=new Date().toISOString().slice(0,10),retrievedAt=new Date().toISOString();
  const rows=raw.historicalDataPrice.map((r:RecordValue)=>({date:typeof r.date==='number'?new Date(r.date*1000).toISOString().slice(0,10):'',close:r.rawClose as number,adjustedClose:r.adjustedClose as number})).filter((r:{date:string})=>r.date>=h.requestedStart&&r.date<=h.requestedEnd&&r.date<today);
+ const cashEvents=legacy?events.cashDividends:events.cashDividends.filter((a:RecordValue)=>{const d=iso(a.lastDatePrior);return !/^\d{4}-\d{2}-\d{2}$/.test(d)||d>=h.requestedStart&&d<=h.requestedEnd;});
+ const stockEvents=legacy?events.stockDividends:events.stockDividends.filter((a:RecordValue)=>{const d=iso(a.exDate??a.lastDatePrior);return !/^\d{4}-\d{2}-\d{2}$/.test(d)||d>=h.requestedStart&&d<=h.requestedEnd;});
  const secondary:SecondaryPrices={provider:'BrAPI',sourceUrl:rawUrl,symbol:h.symbol,issuerId:h.issuerId,currency:'BRL',timezone:'America/Sao_Paulo',retrievedAt,priceBasis:'split-dividend-adjusted',rawSha256:values[0].rawSha256,rows:rows.map((r:{date:string;adjustedClose:number})=>({date:r.date,adjustedClose:r.adjustedClose}))};
  const brazilEvidence:BrazilEvidence={version:legacy?'brazil-evidence.v1':'brazil-evidence.v2',symbol:h.symbol,issuerId:h.issuerId,
-  isin:legacy?'BRPETRACNPR6':String(events.cashDividends[0]?.isinCode??events.stockDividends[0]?.isinCode??''),retrievedAt,...(identity?{identity}:{}),
+  isin:legacy?'BRPETRACNPR6':String(cashEvents[0]?.isinCode??stockEvents[0]?.isinCode??''),retrievedAt,...(identity?{identity}:{}),
   raw:{sourceUrl:rawUrl,rawSha256:values[0].rawSha256,rows},
-  events:{sourceUrl:eventsUrl,rawSha256:values[1].rawSha256,cash:events.cashDividends.map((a:RecordValue)=>({exDate:a.exDate===null?null:iso(a.exDate),recordDate:iso(a.lastDatePrior),paymentDate:iso(a.paymentDate),label:a.label,rawRate:a.rawRate,isin:a.isinCode,verified:a.verified})),stock:events.stockDividends.map((a:RecordValue)=>({date:iso(legacy?(a.exDate??a.lastDatePrior):a.exDate),factor:a.factor,...(!legacy?{isin:a.isinCode,label:a.label,recordDate:iso(a.lastDatePrior)}:{})})),...(!legacy?{subscriptions:events.subscriptions??[]}:{})},
+  events:{sourceUrl:eventsUrl,rawSha256:values[1].rawSha256,cash:cashEvents.map((a:RecordValue)=>({exDate:a.exDate===null?null:iso(a.exDate),recordDate:iso(a.lastDatePrior),paymentDate:iso(a.paymentDate),label:a.label,rawRate:a.rawRate,isin:a.isinCode,verified:a.verified})),stock:stockEvents.map((a:RecordValue)=>({date:iso(legacy?(a.exDate??a.lastDatePrior):a.exDate),factor:a.factor,...(!legacy?{isin:a.isinCode,label:a.label,recordDate:iso(a.lastDatePrior)}:{})})),...(!legacy?{subscriptions:events.subscriptions??[]}:{})},
   relay:{sourceUrl:relayUrl,rawSha256:values[2].rawSha256,rows:parseCotaPrices(values[2].text,symbol).filter(r=>r.date<today)}};
  return {secondary,brazilEvidence};
 }
