@@ -68,3 +68,13 @@ it('refreshes completed jobs once, preserves snapshots, persists partial coverag
   for(const old of oldSnapshots){const actual=await state.db!.query<{payload:unknown}>('SELECT payload FROM gpi_market_history_snapshots WHERE owner_id=$1 AND id=$2',[owner,old.id]);expect(actual.rows[0].payload).toEqual(old.payload);}
  }finally{vi.stubEnv('PRICE_RECONCILIATION_ENABLED','false');vi.stubEnv('EODHD_API_KEY','');vi.stubEnv('PRICE_RECONCILIATION_REQUIRED','false');}
 });
+it('keeps the daily refresh key on UTC even when the database session uses a different day',async()=>{
+ const timezone=new Date().getUTCHours()>=10?'Pacific/Kiritimati':'Etc/GMT+12';
+ try{
+  await state.db!.exec(`SET TIME ZONE '${timezone}'`);
+  await queueHistory(owner,'XNAS:AAPL',true);
+  expect((await listHistory(owner)).jobs).toHaveLength(1);
+  const result=await state.db!.query<{valid:boolean}>("SELECT bool_and(as_of=(now() AT TIME ZONE 'UTC')::date) AS valid FROM gpi_market_history_jobs WHERE owner_id=$1",[owner]);
+  expect(result.rows[0].valid).toBe(true);
+ }finally{await state.db!.exec("SET TIME ZONE 'UTC'");}
+});

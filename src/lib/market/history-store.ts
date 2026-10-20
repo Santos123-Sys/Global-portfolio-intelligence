@@ -12,7 +12,7 @@ export async function queueHistory(owner:string,key:string,refresh=false) {
   if(!candidate)throw Error('candidate_not_found');
   const identity=historyIdentity(candidate);
   await sql()`INSERT INTO gpi_market_history_jobs(id,owner_id,candidate_key,issuer_id,symbol,as_of)
-    VALUES(${randomUUID()},${owner},${key},${identity.issuerId},${identity.symbol},CURRENT_DATE)
+    VALUES(${randomUUID()},${owner},${key},${identity.issuerId},${identity.symbol},(now() AT TIME ZONE 'UTC')::date)
     ON CONFLICT(owner_id,candidate_key,issuer_id,as_of) DO UPDATE SET
       status=CASE WHEN (gpi_market_history_jobs.status='failed' OR (${refresh} AND gpi_market_history_jobs.status='complete')) AND gpi_market_history_jobs.attempts<3 THEN 'queued' ELSE gpi_market_history_jobs.status END`;
 }
