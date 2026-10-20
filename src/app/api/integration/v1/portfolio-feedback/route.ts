@@ -23,6 +23,8 @@ export async function POST(req:Request){
  const result=imported.success?await importValuation(s.auth.userId,s.auth.accountId,imported.data.candidateKey,imported.data.valuationVersionId):await runPortfolio(s.auth.userId,s.auth.accountId,body.value);
  return NextResponse.json(result,{headers});
  }catch(e){const message=e instanceof Error?e.message:'unavailable';
- return NextResponse.json({error:['idempotency_conflict','feedback_quota_reached','issuer_unmapped','candidate_not_found','identity_mismatch'].includes(message)?message:'Portfolio request failed; check holdings, provider availability and valuation scope'},{status:e instanceof z.ZodError?422:503,headers});}
+ const historyProblem=message.startsWith('history_');
+ return NextResponse.json({error:historyProblem?'Five-year history is missing, stale or has failed quality checks. Prepare fresh history for each holding in your GPI company list.':
+ ['idempotency_conflict','feedback_quota_reached','issuer_unmapped','candidate_not_found','identity_mismatch'].includes(message)?message:'Portfolio request failed; check holdings, provider availability and valuation scope'},{status:e instanceof z.ZodError||historyProblem?422:503,headers});}
 }
 

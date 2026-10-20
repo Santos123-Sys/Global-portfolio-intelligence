@@ -1,6 +1,7 @@
 'use client';
 import {useState,useEffect} from 'react';
 import {ValuationEvidence} from './valuation-evidence';
+import {MarketHistoryPanel} from './market-history-panel';
 import useSWR from 'swr';
 import type {Candidate} from '@/lib/foundation/contracts';
 import type {z} from 'zod';
@@ -57,11 +58,13 @@ export function PortfolioHub({candidates,onResearch}:{candidates:Candidate[];onR
  <h3>2. Synchronized reviewed valuations</h3><p>FilingLens now notifies GPI after approved publication. Returning from FilingLens also retries automatically when delivery was delayed. Manual import remains available for recovery.</p><input aria-label="Approved valuation version" value={version} onChange={e=>setVersion(e.target.value)} placeholder="flv1_…"/>
  <button disabled={!version||busy} onClick={()=>void post('/api/integration/v1/portfolio-feedback',{action:'import_valuation',candidateKey:key,valuationVersionId:version})}>Retry valuation import</button>
  <ul>{data?.valuations.map(v=><li key={v.valuation.valuationVersionId}>{v.candidateKey}: <ValuationEvidence candidateKey={v.candidateKey} valuation={v.valuation}/> · reviewed {new Date(v.valuation.approvedAt).toLocaleDateString()}</li>)}</ul>
+ <MarketHistoryPanel candidate={candidates.find(c=>c.key===key)}/>
  <h3>3. Allocate and monitor</h3><input aria-label="Portfolio name" value={name} onChange={e=>{setName(e.target.value);setConsent(false);}}/>
  <textarea aria-label="Portfolio holdings" value={csv} onChange={e=>{setCsv(e.target.value);setConsent(false);}} placeholder={'AAPL,12\nMSFT,8\nNVDA,5'}/>
  <p>Use market symbols (for example PETR4.SA for B3). Each quote currency is verified with the price provider.</p>
  <label>Portfolio base currency <select aria-label="Portfolio base currency" value={baseCurrency} onChange={e=>{setBaseCurrency(e.target.value);setConsent(false);}}>{['USD','BRL','EUR','CHF','GBP','CAD','AUD','JPY','HKD','CNY','SEK','NOK','DKK','NZD','SGD','INR','MXN','ZAR'].map(c=><option key={c}>{c}</option>)}</select></label>
- <select aria-label="Risk lookback" value={range} onChange={e=>{setRange(e.target.value);setConsent(false);}}><option value="6mo">6 months</option><option value="1y">1 year</option><option value="3y">3 years</option></select>
+ <select aria-label="Risk lookback" value={range} onChange={e=>{setRange(e.target.value);setConsent(false);}}><option value="6mo">6 months</option><option value="1y">1 year</option><option value="3y">3 years</option><option value="5y">5 years · prepared datasets required</option></select>
+ {range==='5y'&&<p>Prepare fresh five-year datasets for every holding in your company list. Missing, short or quarantined histories stop this calculation.</p>}
  <label>Annual risk-free assumption (%) <input type="number" min="-10" max="40" value={rf} onChange={e=>{setRf(e.target.value);setConsent(false);}}/></label>
  <label><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/> Share these holdings with Portfolio Risk Studio and retain the results in this GPI account.</label>
  <button disabled={busy||!consent||!csv||!data?.providerConfigured} onClick={()=>void run()}>{busy?'Working…':'Calculate and save risk feedback'}</button>

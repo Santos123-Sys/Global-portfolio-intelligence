@@ -15,7 +15,8 @@ export async function GET(req: Request) {
       analysisRequests: process.env.INTEGRATION_SIGNING_SECRET?'human_workspace_handoff_available':'disabled' },
     portfolioRiskStudio: { portfolioExposures: process.env.PORTFOLIO_RISK_API_TOKEN?'account_snapshot_storage_available':'disabled',
       riskRuns: process.env.PORTFOLIO_RISK_API_TOKEN?'authenticated_calculation_configured':'disabled', outboundHandoffs: 'explicit_user_sharing',
-      returns:'current_holdings_reconstruction',sectorCountryCoverage:'unclassified',fx:'unsupported' },
+      returns:'current_holdings_reconstruction',sectorCountryCoverage:'reported_per_snapshot',fx:'dated_ecb_reference_rates',
+      marketHistory:process.env.MARKET_HISTORY_ENABLED==='true'?'five_year_quality_gated':'disabled' },
     trading: 'disabled',
   }, { headers: { 'cache-control': 'no-store' } });
 }

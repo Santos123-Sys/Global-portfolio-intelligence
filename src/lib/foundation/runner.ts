@@ -51,7 +51,8 @@ export async function executeJob(value: unknown, readFinance = financeForCandida
       trace: { ...trace, architecture: deepResearch.architecture, modelCalls: deepResearch.modelCalls, elapsedMs: Date.now() - started },
       stopReason: deepResearch.stopReason };
   }
-  let generated = null; let modelStatus = 'disabled_or_no_evidence';
+  let generated = null; let modelStatus = screen.finance.status!=='ready'?'finance_unavailable':
+    process.env.RESEARCH_MODEL_ENABLED!=='true'?'model_disabled':'no_supported_facts';
   try { generated = await draft(screen); if (generated) modelStatus = 'draft_requires_review'; }
   catch { modelStatus = 'model_failed_evidence_pack_retained'; }
   return { kind: 'research' as const, report: researchWorkbench(screen, generated?.draft ?? null), modelStatus,
