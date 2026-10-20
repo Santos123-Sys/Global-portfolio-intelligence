@@ -11,7 +11,7 @@ export function validBrazilIsin(s:string){
 }
 export function validateBrazilIdentity(h:MarketHistory,e:BrazilEvidence){
  const id=e.identity,symbol=h.symbol.slice(0,-3);
- if(!/^[A-Z]{4}\d{1,2}\.SA$/.test(h.symbol)||!/^br:\d{14}$/.test(h.issuerId)||h.currency!=='BRL'||
+ if(!/^[A-Z][A-Z0-9]{3}\d{1,2}\.SA$/.test(h.symbol)||!/^br:\d{14}$/.test(h.issuerId)||h.currency!=='BRL'||
   e.symbol!==h.symbol||e.issuerId!==h.issuerId||!id||id.symbol!==symbol||id.cnpj!==h.issuerId.slice(3)||
   id.profileUrl!=='https://brapi.dev/api/v2/stocks/profile'||id.coverageUrl!=='https://brapi.dev/api/v2/tickers/coverage'||
   !digest(id.profileSha256)||!digest(id.coverageSha256)||!['stock','unit'].includes(id.subType)||id.assetType!=='stock')throw Error('history_brazil_identity');

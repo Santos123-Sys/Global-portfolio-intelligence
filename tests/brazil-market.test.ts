@@ -17,7 +17,7 @@ function fixture(symbol='VALE3'){
   identity:{symbol,cnpj:issuer.slice(3),assetType:'stock',subType:symbol.endsWith('11')?'unit':'stock',profileUrl:'https://brapi.dev/api/v2/stocks/profile',coverageUrl:'https://brapi.dev/api/v2/tickers/coverage',profileSha256:'d'.repeat(64),coverageSha256:'e'.repeat(64)}});
  return h;
 }
-it.each(['VALE3','ITUB4','ABEV3','WEGE3','SANB11'])('evaluates %s through one engine without borrowing Petrobras exceptions',symbol=>{
+it.each(['VALE3','ITUB4','ABEV3','WEGE3','SANB11','B3SA3'])('evaluates %s through one engine without borrowing Petrobras exceptions',symbol=>{
  const h=fixture(symbol),q=assessHistory(h,h,now);expect(q.status).toBe('ready');expect(q.brazilNormalization?.version).toBe('brazil-gross-entitlement.v2');
  expect(q.metrics!.annualizedVolatility).toBe(0);expect(q.brazilNormalization!.cash).toEqual([]);
 });
@@ -79,9 +79,9 @@ it('discovers the full paginated catalog with no credentials and no automatic po
  const listing=(symbol:string)=>({symbol,name:symbol,assetType:'stock',subType:symbol.endsWith('11')?'unit':'stock',currency:'BRL',exchange:'B3',isActive:true});
  const fetcher=vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
   const page=Number(new URL(String(input)).searchParams.get('page'));expect(JSON.stringify(init)).not.toContain('authorization');
-  return Response.json({results:[listing(page===1?'VALE3':'SANB11')],pagination:{page,totalItems:2,hasNextPage:page===1}});
+  return Response.json({results:[listing(page===1?'B3SA3':'SANB11')],pagination:{page,totalItems:2,hasNextPage:page===1}});
  });
- const catalog=await brazilMarketCatalog(fetcher);expect(catalog.listings.map(l=>l.symbol)).toEqual(['VALE3','SANB11']);expect(catalog.receipts).toHaveLength(2);
+ const catalog=await brazilMarketCatalog(fetcher);expect(catalog.listings.map(l=>l.symbol)).toEqual(['B3SA3','SANB11']);expect(catalog.receipts).toHaveLength(2);
  await expect(brazilMarketCatalog(async()=>Response.json({results:[listing('VALE3')],pagination:{page:1,totalItems:2,hasNextPage:false}}))).rejects.toThrow('history_brazil_catalog_incomplete');
 });
 

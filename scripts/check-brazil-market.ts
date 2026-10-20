@@ -10,11 +10,13 @@ import seed from '../data/usa-cvm-universe.json';
 import {checkBrazilRisk} from './check-brazil-risk';
 /** Full catalog discovery plus a bounded, serial, stateless release sample. Never writes account data. */
 export async function checkBrazilMarket(fetcher:typeof fetch=fetch){
- const catalog=await brazilMarketCatalog(fetcher);
- console.log(JSON.stringify({kind:'brazil_market_coverage',status:'catalog_discovered',listings:catalog.listings.length,active:catalog.listings.filter(l=>l.isActive).length,receipts:catalog.receipts,sourceUrl:catalog.sourceUrl,
-  limitation:catalog.limitation,verified:0,notEvaluated:catalog.listings.length}));
+ try{
+  const catalog=await brazilMarketCatalog(fetcher);
+  console.log(JSON.stringify({kind:'brazil_market_coverage',status:'catalog_discovered',listings:catalog.listings.length,active:catalog.listings.filter(l=>l.isActive).length,receipts:catalog.receipts,sourceUrl:catalog.sourceUrl,
+   limitation:catalog.limitation,verified:0,notEvaluated:catalog.listings.length}));
+ }catch(error){console.log(JSON.stringify({kind:'brazil_market_coverage',status:'unavailable',reason:historyEvidenceError(error)}));}
  const symbols=(process.env.BRAZIL_MARKET_CANARY_SYMBOLS??'VALE3,ITUB4,BBDC4').split(',');
- if(symbols.length>8||new Set(symbols).size!==symbols.length||symbols.some(s=>!/^[A-Z]{4}\d{1,2}$/.test(s)))throw Error('history_brazil_canary_configuration');
+ if(symbols.length>8||new Set(symbols).size!==symbols.length||symbols.some(s=>!/^[A-Z][A-Z0-9]{3}\d{1,2}$/.test(s)))throw Error('history_brazil_canary_configuration');
  const {base,token}=riskConnection();
  for(const symbol of symbols){
   const candidate=seed.candidates.find(c=>c.ticker===symbol&&c.market==='br');

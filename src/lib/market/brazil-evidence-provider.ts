@@ -21,7 +21,7 @@ export function parseCotaPrices(html:string,symbol:string){
 /** Paced BrAPI reads and the relay share one 20s deadline and at most one same-request retry. */
 export async function acquireBrazilEvidence(h:MarketHistory,fetcher:typeof fetch=fetch):Promise<{secondary:SecondaryPrices;brazilEvidence:BrazilEvidence}>{
  const legacy=h.symbol==='PETR4.SA'&&h.issuerId==='br:33000167000101';
- if(!/^[A-Z]{4}\d{1,2}\.SA$/.test(h.symbol)||!/^br:\d{14}$/.test(h.issuerId)||h.currency!=='BRL')throw Error('history_brazil_not_configured');
+ if(!/^[A-Z][A-Z0-9]{3}\d{1,2}\.SA$/.test(h.symbol)||!/^br:\d{14}$/.test(h.issuerId)||h.currency!=='BRL')throw Error('history_brazil_not_configured');
  const symbol=h.symbol.slice(0,-3),publicMode=process.env.BRAZIL_HISTORY_BRAPI_PUBLIC==='true'&&['PETR4','VALE3','ITUB4','MGLU3'].includes(symbol);
  const key=publicMode?undefined:process.env.BRAPI_API_KEY;
  if(!legacy&&!publicMode&&!key)throw Error('history_brazil_credential_required');
