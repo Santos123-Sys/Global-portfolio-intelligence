@@ -55,15 +55,16 @@ export async function processHistory(fetcher:typeof fetch=fetch) {
     Object.assign(history,await acquireSecondaryEvidence(history,fetcher));
     const quality=assessHistory(history,{symbol:job.symbol,issuerId:job.issuer_id});
     const hash=await historyHash(body.value),id='mh1_'+hash;
-    await sql().begin(async tx=>{
+    const saved=await sql().begin(async tx=>{
       const held=await tx`SELECT id FROM gpi_market_history_jobs WHERE id=${job.id} AND status='running' AND lease_token=${lease} AND lease_until>now() FOR UPDATE`;
-      if(!held.length)return;
+      if(!held.length)return false;
       await tx`INSERT INTO gpi_market_history_snapshots(id,owner_id,candidate_key,issuer_id,symbol,source_hash,payload,quality)
         VALUES(${id},${job.owner_id},${job.candidate_key},${job.issuer_id},${job.symbol},${hash},${tx.json(body.value as never)},${tx.json(quality)})
         ON CONFLICT(owner_id,id) DO NOTHING`;
       await tx`UPDATE gpi_market_history_jobs SET status='complete',snapshot_id=${id},error_code=null,lease_until=null WHERE id=${job.id} AND lease_token=${lease}`;
+      return true;
     });
-    console.log(JSON.stringify({kind:'market_history',status:quality.status,symbol:job.symbol,observations:quality.observations}));
+    console.log(JSON.stringify({kind:'market_history',status:saved?quality.status:'lease_lost',symbol:job.symbol,observations:quality.observations,...(saved?{snapshotId:id,calculationBasis:quality.brazilNormalization?.version??history.priceBasis}:{})}));
   }catch(e){
     const reason=e instanceof Error&&/^history_[a-z_]+$/.test(e.message)?e.message:'history_validation_failed';
     await sql()`UPDATE gpi_market_history_jobs SET status='failed',error_code=${reason},lease_until=null WHERE id=${job.id} AND lease_token=${lease}`;
@@ -81,8 +82,11 @@ export async function readHistory(owner:string,id:string){
   const row=rows[0];if(!row)throw Error('history_not_found');
   if(await historyHash(row.payload)!==row.source_hash||id!=='mh1_'+row.source_hash)throw Error('history_integrity_failed');
   const history=row.payload as MarketHistory;
+  // Evidence is acquired after the primary feed. Reproduce the immutable snapshot
+  // at its last acquisition time, not at the earlier primary-feed timestamp.
+  const acquiredAt=Math.min(Date.now(),Math.max(...[history.retrievedAt,history.secondary?.retrievedAt,history.brazilEvidence?.retrievedAt].map(t=>Date.parse(t??'')).filter(Number.isFinite)));
   return {snapshotId:id,sourceHash:row.source_hash,history,
-    quality:assessHistory(history,history,Date.parse(history.retrievedAt)),
+    quality:assessHistory(history,history,acquiredAt),
     stale:Date.now()-Date.parse(history.retrievedAt)>8*86400000};
 }
 export async function storedHistory(owner:string,identity:ReturnType<typeof historyIdentity>) {

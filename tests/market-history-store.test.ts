@@ -12,6 +12,7 @@ vi.mock('postgres',()=>{
 import {queueHistory,queueExistingBrazilRepairs,processHistory,listHistory,storedHistory,readHistory} from '../src/lib/market/history-store';
 import {enqueue,claimJob,finishJob} from '../src/lib/foundation/store';
 import {defaultProfile} from '../src/lib/foundation/contracts';
+import {brazilHistoryFixture} from './brazil-history-fixture';
 const owner='550e8400-e29b-41d4-a716-446655440000',other='550e8400-e29b-41d4-a716-446655440001';
 const identity={candidateKey:'XNAS:AAPL',symbol:'AAPL',issuerId:'us:0000320193'};
 const candidate={key:'XNAS:AAPL',ticker:'AAPL',name:'Apple',exchange:'XNAS',market:'us',issuer:{jurisdiction:'us',registryId:'0000320193'},identitySourceUrl:'https://www.sec.gov/edgar/browse/?CIK=320193'};
@@ -88,4 +89,21 @@ it('requeues only the pinned existing quarantined dataset once and never bypasse
   await state.db!.query("UPDATE gpi_market_history_jobs SET status='complete',attempts=3 WHERE id=$1",[job]);expect(await queueExistingBrazilRepairs()).toBe(0);
   await state.db!.query("UPDATE gpi_market_history_jobs SET attempts=2 WHERE id=$1",[job]);await state.db!.query("UPDATE gpi_market_history_snapshots SET payload='{\"brazilEvidence\":{}}' WHERE id=$1",[id]);expect(await queueExistingBrazilRepairs()).toBe(0);
  }finally{vi.stubEnv('BRAZIL_HISTORY_NORMALIZATION_ENABLED','false');vi.stubEnv('BRAZIL_HISTORY_REPAIR_EXISTING','false');}
+});
+it('persists the repaired snapshot with real JSONB projections and passes the strict owner-scoped read',async()=>{
+ vi.stubEnv('BRAZIL_HISTORY_NORMALIZATION_ENABLED','true');vi.stubEnv('PRICE_RECONCILIATION_ENABLED','true');vi.stubEnv('BRAPI_API_KEY','synthetic');vi.stubEnv('PRICE_RECONCILIATION_REQUIRED','true');
+ try{
+  const h=brazilHistoryFixture(),primary={...h,retrievedAt:new Date(Date.now()-60000).toISOString(),brazilEvidence:undefined,secondary:undefined};
+  await state.db!.query("UPDATE gpi_market_history_jobs SET status='queued',attempts=0 WHERE owner_id=$1 AND symbol='PETR4.SA'",[owner]);
+  const transport=vi.fn(async(input:RequestInfo|URL)=>{
+   const u=new URL(String(input));if(u.hostname==='risk.example')return Response.json(primary);
+   if(u.hostname==='cotab3.com.br')return new Response('<input id="codigoNegociacao" value="PETR4">Histórico de pregões Fechamento<table>'+h.rows.map(r=>'<tr><td>'+r.date.slice(8)+'/'+r.date.slice(5,7)+'/'+r.date.slice(0,4)+'</td><td>100,00</td><td>100,00</td><td>100,00</td><td>100,00</td><td>0%</td><td>1</td></tr>').join('')+'</table>');
+   return Response.json({results:[{symbol:'PETR4',requestedSymbol:'PETR4',changed:false,data:u.pathname.endsWith('historical')?{usedInterval:'1d',historicalDataPrice:h.rows.map(r=>({date:Date.parse(r.date)/1000,rawClose:r.close,adjustedClose:r.adjustedClose}))}:{cashDividends:[],stockDividends:[]}}]});
+  });
+  await processHistory(transport);expect(transport).toHaveBeenCalledTimes(4);
+  const result=await storedHistory(owner,{candidateKey:'BVMF:PETR4',symbol:h.symbol,issuerId:h.issuerId}),read=await readHistory(owner,result.snapshotId);
+  expect(read.quality.brazilNormalization?.status).toBe('verified');expect(read.quality.status).toBe('ready');expect(read.quality.calculationRows).toHaveLength(h.rows.length);
+  const summary=(await listHistory(owner)).snapshots.find(s=>s.id===result.snapshotId)!;expect(summary.quality).not.toHaveProperty('calculationRows');expect(summary.quality.brazilNormalization).not.toHaveProperty('quotes');expect(summary.quality.brazilNormalization).not.toHaveProperty('sourceReturnChecks');
+  await expect(storedHistory(other,{candidateKey:'BVMF:PETR4',symbol:h.symbol,issuerId:h.issuerId})).rejects.toThrow('history_not_prepared');
+ }finally{vi.stubEnv('BRAZIL_HISTORY_NORMALIZATION_ENABLED','false');vi.stubEnv('PRICE_RECONCILIATION_ENABLED','false');vi.stubEnv('BRAPI_API_KEY','');vi.stubEnv('PRICE_RECONCILIATION_REQUIRED','false');}
 });
