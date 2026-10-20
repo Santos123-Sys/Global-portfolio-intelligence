@@ -19,6 +19,8 @@ Use complementary evidence, not a blended price. Keep Yahoo and the second vendo
 
 Tolerances are unchanged: daily return difference 0.001; rebased level difference 0.005. Source upstream independence remains uncertified even if vendors agree.
 
+An optional dedicated `FMP_API_KEY` enables the official FMP stable dividend-adjusted endpoint for USD US listings only. The provider's FAQ documents splits and dividends. It is a supporting witness, not an automatic replacement for EODHD: at most two fixed-endpoint reads run in parallel (20-second individual timeouts), every successful witness is retained, and **any disagreement vetoes a pass**. A full agreeing witness may corroborate dates outside a partial witness's range; partial histories are never extrapolated or stitched into fabricated data. Failed reads remain visible with sanitized reason codes. No FMP key is sent to EODHD, BrAPI, Alpha Vantage or the browser. A Railway reference can bind the already configured web-service FMP key to its worker without exposing its value. Actual entitlement still requires a live canary.
+
 ## Complementary risk diagnostics
 
 `priceSensitivity` computes separate Yahoo and secondary-provider sample annualized volatility (252 sessions) and historical daily VaR95 on **identical adjacent-session pairs**. It does not bridge a missing reference session or missing secondary point. Metrics need at least two paired returns. The result is explicitly diagnostic-only, not a confidence interval, full-history estimate, replacement series, automatic source vote or authorization to calculate a portfolio from disputed prices.

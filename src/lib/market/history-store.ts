@@ -1,4 +1,4 @@
-import {secondaryPrices} from './secondary-provider';
+import {acquireSecondaryEvidence} from './secondary-evidence';
 import {randomUUID} from 'node:crypto';
 import {sql,loadWorkspace} from '../foundation/store';
 import {assessHistory,historyHash,historyIdentity} from './history-quality';
@@ -41,7 +41,7 @@ export async function processHistory(fetcher:typeof fetch=fetch) {
     if(!body.ok)throw Error('history_contract_invalid');
     assessHistory(body.value,{symbol:job.symbol,issuerId:job.issuer_id});
     const history=body.value as MarketHistory;
-    const secondary=await secondaryPrices(history,fetcher);if(secondary)history.secondary=secondary;
+    Object.assign(history,await acquireSecondaryEvidence(history,fetcher));
     const quality=assessHistory(history,{symbol:job.symbol,issuerId:job.issuer_id});
     const hash=await historyHash(body.value),id='mh1_'+hash;
     await sql().begin(async tx=>{
