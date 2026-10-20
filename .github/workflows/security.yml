@@ -52,6 +52,8 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build:worker
+      - name: Build shared Risk Studio release source
+        run: RISK_BUNDLE_STDOUT=true node scripts/build-risk-function.mjs
       - run: npm test
       - name: Verify native PostgreSQL browser admission, claims and process loss
         run: BROWSER_POSTGRES_TEST_URL="$DATABASE_URL" node --import tsx scripts/verify-browser-postgres.ts

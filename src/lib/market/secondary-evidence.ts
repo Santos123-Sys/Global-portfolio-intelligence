@@ -25,7 +25,7 @@ export async function fmpPrices(h:MarketHistory,fetcher:typeof fetch=fetch):Prom
 /** At most two parallel fixed-endpoint reads, preserving every successful witness. */
 export async function acquireSecondaryEvidence(h:MarketHistory,fetcher:typeof fetch=fetch):Promise<Pick<MarketHistory,'secondary'|'secondarySupport'|'secondaryAcquisitionFailures'|'brazilEvidence'>>{
  if(process.env.PRICE_RECONCILIATION_ENABLED!=='true')return {};
- if(process.env.BRAZIL_HISTORY_NORMALIZATION_ENABLED==='true'&&h.symbol==='PETR4.SA'&&h.issuerId==='br:33000167000101')return acquireBrazilEvidence(h,fetcher);
+ if(process.env.BRAZIL_HISTORY_NORMALIZATION_ENABLED==='true'&&h.symbol.endsWith('.SA')&&h.issuerId.startsWith('br:')&&(h.symbol==='PETR4.SA'&&h.issuerId==='br:33000167000101'||process.env.BRAZIL_MARKET_NORMALIZATION_ENABLED==='true'))return acquireBrazilEvidence(h,fetcher);
  const providers=['configured_secondary','FMP'];
  const results=await Promise.allSettled([secondaryPrices(h,fetcher),fmpPrices(h,fetcher)]);
  const valid:SecondaryPrices[]=[],failures:{provider:string;reason:string}[]=[];
