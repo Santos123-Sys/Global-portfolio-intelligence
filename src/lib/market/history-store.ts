@@ -1,3 +1,4 @@
+import {secondaryPrices} from './secondary-provider';
 import {randomUUID} from 'node:crypto';
 import {sql,loadWorkspace} from '../foundation/store';
 import {assessHistory,historyHash,historyIdentity} from './history-quality';
@@ -38,7 +39,10 @@ export async function processHistory(fetcher:typeof fetch=fetch) {
     const body=await readBoundedJson(new Request('https://response.invalid',{method:'POST',body:response.body,
       headers:{'content-type':response.headers.get('content-type')??''},duplex:'half'} as RequestInit),700000);
     if(!body.ok)throw Error('history_contract_invalid');
-    const quality=assessHistory(body.value,{symbol:job.symbol,issuerId:job.issuer_id});
+    assessHistory(body.value,{symbol:job.symbol,issuerId:job.issuer_id});
+    const history=body.value as MarketHistory;
+    const secondary=await secondaryPrices(history,fetcher);if(secondary)history.secondary=secondary;
+    const quality=assessHistory(history,{symbol:job.symbol,issuerId:job.issuer_id});
     const hash=await historyHash(body.value),id='mh1_'+hash;
     await sql().begin(async tx=>{
       const held=await tx`SELECT id FROM gpi_market_history_jobs WHERE id=${job.id} AND status='running' AND lease_token=${lease} AND lease_until>now() FOR UPDATE`;
@@ -77,5 +81,6 @@ export async function storedHistory(owner:string,identity:ReturnType<typeof hist
   if(await historyHash(row.payload)!==row.source_hash||row.id!=='mh1_'+row.source_hash)throw Error('history_integrity_failed');
   const quality=assessHistory(row.payload,identity);
   if(quality.status!=='ready')throw Error('history_quality_blocked');
+  if(process.env.PRICE_RECONCILIATION_REQUIRED==='true'&&quality.reconciliation.status!=='matched')throw Error('history_reconciliation_required');
   return {snapshotId:row.id as string,sourceHash:row.source_hash as string,history:row.payload as MarketHistory};
 }

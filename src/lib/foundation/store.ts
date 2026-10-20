@@ -1,3 +1,4 @@
+import {verifiedStarterIdentity} from './verified-issuers';
 import { createHash, randomUUID } from 'node:crypto';
 import postgres from 'postgres';
 import { getDatabaseUrl } from '../env';
@@ -14,7 +15,8 @@ export type JobRow = { id: string; owner_id: string; kind: 'screen' | 'research'
 
 export async function loadWorkspace(owner: string) {
   const rows = await sql()`SELECT payload FROM gpi_foundation_workspaces WHERE owner_id = ${owner}`;
-  return Workspace.parse(rows[0]?.payload ?? { version: 1, profile: defaultProfile, candidates: seed.candidates });
+  const workspace=Workspace.parse(rows[0]?.payload ?? { version: 1, profile: defaultProfile, candidates: seed.candidates });
+  return {...workspace,candidates:workspace.candidates.map(verifiedStarterIdentity)};
 }
 export async function saveWorkspace(owner: string, value: unknown) {
   const parsed = Workspace.parse(value);

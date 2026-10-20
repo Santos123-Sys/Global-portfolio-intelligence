@@ -24,7 +24,8 @@ export function MarketHistoryPanel({candidate}:{candidate?:Candidate}){
  }}>Prepare or refresh {candidate.ticker} history</button>}
  {!data?.enabled&&<p>Automatic history preparation is not enabled.</p>}
  <p role="status">{job?`Latest request: ${job.status}${job.error_code?' · Provider or validation failed; retry preparation.':''}`:'No request for this company yet.'}</p>
- {snapshot&&<><p><strong>{stale?'Refresh required':snapshot.quality.status==='ready'?'Quality checks passed':snapshot.quality.status==='short_history'?'Less than five years available':'Quarantined: review required'}</strong> · {snapshot.quality.observations} daily observations · {snapshot.quality.firstDate}–{snapshot.quality.lastDate}</p>
+ {snapshot&&<><p><strong>{stale?'Refresh required':snapshot.quality.status==='ready'?'Structural checks passed':snapshot.quality.status==='short_history'?'Less than five years available':'Quarantined: review required'}</strong> · {snapshot.quality.observations} daily observations · {snapshot.quality.firstDate}–{snapshot.quality.lastDate}</p>
+ <p>Independent price check: <strong>{snapshot.quality.reconciliation?.status??'not configured'}</strong>. This is separate from completeness and return calculations.</p>
  <p>Retrieved {new Date(snapshot.retrieved_at).toLocaleString()}. {snapshot.quality.missingSessions.length} missing reference sessions. Returns are in the listing’s currency.</p>
  {snapshot.quality.metrics&&<p>Annualized volatility {pct(snapshot.quality.metrics.annualizedVolatility)} · Maximum drawdown {pct(snapshot.quality.metrics.maxDrawdown)} · Daily historical VaR 95% {pct(snapshot.quality.metrics.historicalVar95)}</p>}
  <details><summary>Inspect provenance, checks and limitations</summary><p>{snapshot.quality.methodology}</p><p>Provider: Yahoo Finance (unofficial).</p>

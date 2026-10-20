@@ -1,0 +1,85 @@
+{
+  "sourceSha256": "e5c911c89922ac0a62eaaf05015ab6859cf3c7fc866ed2aa92277325c5446843",
+  "mappings": [
+    {
+      "candidateKey": "BVMF:PETR3",
+      "name": "PETRÓLEO BRASILEIRO S.A. - PETROBRAS",
+      "cnpj": "33000167000101",
+      "cvmCode": "9512",
+      "status": "ATIVO",
+      "listingSourceUrl": "https://api.gleif.org/api/v1/lei-records/5493000J801JZRCMFE49",
+      "registrySourceUrl": "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv",
+      "verifiedOn": "2026-10-20"
+    },
+    {
+      "candidateKey": "BVMF:PETR4",
+      "name": "PETRÓLEO BRASILEIRO S.A. - PETROBRAS",
+      "cnpj": "33000167000101",
+      "cvmCode": "9512",
+      "status": "ATIVO",
+      "listingSourceUrl": "https://api.gleif.org/api/v1/lei-records/5493000J801JZRCMFE49",
+      "registrySourceUrl": "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv",
+      "verifiedOn": "2026-10-20"
+    },
+    {
+      "candidateKey": "BVMF:VALE3",
+      "name": "VALE S.A.",
+      "cnpj": "33592510000154",
+      "cvmCode": "4170",
+      "status": "ATIVO",
+      "listingSourceUrl": "https://api.gleif.org/api/v1/lei-records/254900SMTWBX7RU2SR20",
+      "registrySourceUrl": "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv",
+      "verifiedOn": "2026-10-20"
+    },
+    {
+      "candidateKey": "BVMF:ITUB4",
+      "name": "ITAÚ UNIBANCO HOLDING S.A.",
+      "cnpj": "60872504000123",
+      "cvmCode": "19348",
+      "status": "ATIVO",
+      "listingSourceUrl": "https://api.gleif.org/api/v1/lei-records/5493002W2IVG62O3ZJ94",
+      "registrySourceUrl": "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv",
+      "verifiedOn": "2026-10-20"
+    },
+    {
+      "candidateKey": "BVMF:BBDC4",
+      "name": "BANCO BRADESCO S.A.",
+      "cnpj": "60746948000112",
+      "cvmCode": "906",
+      "status": "ATIVO",
+      "listingSourceUrl": "https://api.gleif.org/api/v1/lei-records/549300CTUU1RFXHQJE44",
+      "registrySourceUrl": "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv",
+      "verifiedOn": "2026-10-20"
+    },
+    {
+      "candidateKey": "BVMF:BBAS3",
+      "name": "BANCO DO BRASIL S.A.",
+      "cnpj": "00000000000191",
+      "cvmCode": "1023",
+      "status": "ATIVO",
+      "listingSourceUrl": "https://api.gleif.org/api/v1/lei-records/QE0Q0253K88YAGNPE356",
+      "registrySourceUrl": "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv",
+      "verifiedOn": "2026-10-20"
+    },
+    {
+      "candidateKey": "BVMF:ABEV3",
+      "name": "AMBEV S.A.",
+      "cnpj": "07526557000100",
+      "cvmCode": "23264",
+      "status": "ATIVO",
+      "listingSourceUrl": "https://api.gleif.org/api/v1/lei-records/549300TH5Q6VRP8OT012",
+      "registrySourceUrl": "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv",
+      "verifiedOn": "2026-10-20"
+    },
+    {
+      "candidateKey": "BVMF:WEGE3",
+      "name": "WEG SA",
+      "cnpj": "84429695000111",
+      "cvmCode": "5410",
+      "status": "ATIVO",
+      "listingSourceUrl": "https://api.gleif.org/api/v1/lei-records/254900NKQV127YFRO022",
+      "registrySourceUrl": "https://dados.cvm.gov.br/dados/CIA_ABERTA/CAD/DADOS/cad_cia_aberta.csv",
+      "verifiedOn": "2026-10-20"
+    }
+  ]
+}
