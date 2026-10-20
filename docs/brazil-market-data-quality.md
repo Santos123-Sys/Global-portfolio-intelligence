@@ -23,7 +23,7 @@ flowchart TD
 
 ## Scope
 
-The reusable v2 path accepts ordinary/preferred B3 stocks and units with an exact issuer mapping. It is selected for Brazilian histories whenever the existing normalization setting is enabled. It has no ticker allowlist. PETR4 retains its reviewed v1 implementation and immutable historical records.
+The reusable v2 path accepts ordinary/preferred B3 stocks and units with an exact issuer mapping. It is selected for Brazilian histories when both BRAZIL_HISTORY_NORMALIZATION_ENABLED and BRAZIL_MARKET_NORMALIZATION_ENABLED are enabled. It has no ticker allowlist. PETR4 retains its reviewed v1 implementation and immutable historical records.
 
 Support is not a promise that every source can deliver every stock. The catalog includes inactive listings returned by the vendor; an absent delisted security is not claimed as covered. IPOs with less than five years remain short_history. Missing sessions, malformed raw fields, missing event evidence and unexplained factors remain blocked. The configured BrAPI plan must permit the requested history and raw fields; no purchase, credential switching or denial bypass occurs.
 
@@ -41,7 +41,7 @@ Identity cannot be manufactured from the ticker prefix. A saved verified CNPJ is
 ## Release and verification
 
 1. CI runs the existing security, type, unit, database, build, consumer and browser checks plus the v2 regressions.
-2. Deploy the Risk Studio bundle built by scripts/build-risk-function.mjs before routing new v2 datasets to production consumers.
+2. Deploy the Risk Studio bundle built by scripts/build-risk-function.mjs before enabling BRAZIL_MARKET_NORMALIZATION_ENABLED. CI emits a chunked, hashed public-source release receipt when RISK_BUNDLE_STDOUT=true; this permits byte-exact deployment through the remote connector when no local build workspace is available. No environment values or credentials are included in the source bundle. Only a fully successful CI run is eligible.
 3. Web and worker must run the same merged commit. Enable BRAZIL_MARKET_CANARY_ENABLED once with BRAZIL_MARKET_CANARY_SYMBOLS (maximum eight exact seed tickers). Catalog discovery and selected canaries are stateless and serial; they do not change holdings or repair account data.
 4. Record discovered, ready, short_history, unavailable and blocked outcomes separately. A successful sample cannot certify the entire market.
 5. Disable the one-time canary after reading results. Keep the ongoing normalization flag; every researched/imported mapped stock then uses its own deterministic assessment.

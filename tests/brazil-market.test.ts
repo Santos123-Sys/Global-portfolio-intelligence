@@ -1,3 +1,6 @@
+import {integratedServe} from '../ops/portfolio-risk-function';
+import {historyFixture} from './market-history-fixture';
+import {historyHash} from '../src/lib/market/history-quality';
 import {it,expect,vi,afterEach} from 'vitest';
 import {brazilHistoryFixture} from './brazil-history-fixture';
 import {assessHistory} from '../src/lib/market/history-quality';
@@ -5,7 +8,7 @@ import {validBrazilIsin} from '../src/lib/market/brazil-market-normalization';
 import {acquireBrazilEvidence} from '../src/lib/market/brazil-evidence-provider';
 import {brazilMarketCatalog} from '../src/lib/market/brazil-market-catalog';
 const now=Date.parse('2026-10-19T13:00:00Z');
-afterEach(()=>{vi.unstubAllEnvs();vi.useRealTimers();});
+afterEach(()=>{vi.unstubAllEnvs();vi.unstubAllGlobals();vi.useRealTimers();});
 function fixture(symbol='VALE3'){
  const h=brazilHistoryFixture(),issuer='br:33592510000154';
  h.symbol=symbol+'.SA';h.issuerId=issuer;h.sourceUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+h.symbol;
@@ -80,4 +83,20 @@ it('discovers the full paginated catalog with no credentials and no automatic po
  });
  const catalog=await brazilMarketCatalog(fetcher);expect(catalog.listings.map(l=>l.symbol)).toEqual(['VALE3','SANB11']);expect(catalog.receipts).toHaveLength(2);
  await expect(brazilMarketCatalog(async()=>Response.json({results:[listing('VALE3')],pagination:{page:1,totalItems:2,hasNextPage:false}}))).rejects.toThrow('history_brazil_catalog_incomplete');
+});
+
+it('Risk Studio consumes v2 rows under strict reconciliation with exact dataset lineage',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(now);const h=fixture();
+ const token='t'.repeat(40);vi.stubGlobal('Bun',{env:{PORTFOLIO_RISK_API_TOKEN:token,PRICE_RECONCILIATION_REQUIRED:'true'}});
+ const benchmark=historyFixture();
+ vi.stubGlobal('fetch',async(input:RequestInfo|URL)=>{
+  const u=new URL(String(input));
+  if(u.hostname.includes('yahoo'))return Response.json({chart:{result:[{meta:{symbol:'SPY',currency:'USD',exchangeName:'PCX',exchangeTimezoneName:'America/New_York'},timestamp:benchmark.rows.map(r=>Date.parse(r.date)/1000),indicators:{quote:[{close:benchmark.rows.map(r=>r.close),volume:benchmark.rows.map(r=>r.volume)}],adjclose:[{adjclose:benchmark.rows.map(r=>r.adjustedClose)}]}}]}});
+  if(u.hostname==='api.frankfurter.dev')return Response.json(benchmark.rows.map(r=>({date:r.date,base:'USD',quote:'BRL',rate:6/1.1})));
+  return new Response('',{status:503});
+ });
+ const sourceHash=await historyHash(h),snapshotId='mh1_'+sourceHash;
+ const response=await integratedServe(new Request('https://risk.test/v1/portfolio-analyze',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({workspaceId:crypto.randomUUID(),portfolioId:crypto.randomUUID(),runId:crypto.randomUUID(),positions:[{symbol:h.symbol,shares:1}],issuers:[{symbol:h.symbol,issuerId:h.issuerId}],valuations:[],baseCurrency:'BRL',riskFreeRate:0,range:'5y',confirmed:true,marketHistories:[{history:h,sourceHash,snapshotId}]})}));
+ expect(response.status).toBe(200);const body=await response.json();expect(body.metrics.volatility).toBeLessThan(1e-9);expect(body.historySnapshots[0]).toEqual({symbol:h.symbol,sourceHash,snapshotId});
+ expect(body.sources.some((s:{symbol:string;priceBasis:string})=>s.symbol===h.symbol&&s.priceBasis==='brazil-gross-entitlement.v2')).toBe(true);
 });
