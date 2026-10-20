@@ -1,19 +1,19 @@
 import {describe,it,expect,vi,afterEach} from 'vitest';
 import {assessHistory,fiveYearStart,historyHash} from '../src/lib/market/history-quality';
-import type {MarketHistory} from '../src/lib/market/history-quality';
-import {dailyChart,integratedServe} from '../ops/portfolio-risk-function';
+import {dailyChart,marketHistory,integratedServe} from '../ops/portfolio-risk-function';
 import {researchState,financeRecovery} from '../src/lib/foundation/research-state';
-export function historyFixture():MarketHistory {
- const end='2026-10-19',start=fiveYearStart(end),dates:string[]=[];
- for(let n=Date.parse(start);n<Date.parse(end);n+=86400000){const d=new Date(n);if(![0,6].includes(d.getUTCDay()))dates.push(d.toISOString().slice(0,10));}
- return {schemaVersion:'market-history.v1',symbol:'AAPL',issuerId:'us:0000320193',currency:'USD',exchange:'NMS',timezone:'America/New_York',
-  provider:'Yahoo Finance (unofficial)',sourceUrl:'https://query1.finance.yahoo.com/v8/finance/chart/AAPL',
-  retrievedAt:'2026-10-19T12:00:00Z',requestedStart:start,requestedEnd:end,priceBasis:'vendor-adjusted-close',corporateActions:[],
-  reference:{symbol:'SPY',dates},rows:dates.map((date,i)=>({date,adjustedClose:100*Math.exp(.0002*i),close:200*Math.exp(.0002*i),volume:1000}))};
-}
+import {historyFixture} from './market-history-fixture';
 const now=Date.parse('2026-10-19T13:00:00Z'),identity={symbol:'AAPL',issuerId:'us:0000320193'};
 afterEach(()=>{vi.unstubAllGlobals();vi.useRealTimers();});
 describe('five-year history quality gates',()=>{
+ it('uses the broad Brazilian index instead of the incomplete ETF and records its source',async()=>{
+  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(now);const fixture=historyFixture(),symbols:string[]=[];
+  vi.stubGlobal('fetch',async(input:RequestInfo|URL)=>{const symbol=decodeURIComponent(new URL(String(input)).pathname.split('/').at(-1)!);symbols.push(symbol);
+   return Response.json({chart:{result:[{meta:{symbol,currency:'BRL',exchangeName:'SAO',exchangeTimezoneName:'America/Sao_Paulo'},timestamp:fixture.rows.map(r=>Date.parse(r.date)/1000),indicators:{quote:[{close:fixture.rows.map(r=>r.close),volume:fixture.rows.map(r=>r.volume)}],adjclose:[{adjclose:fixture.rows.map(r=>r.adjustedClose)}]}}]}});});
+  const h=await marketHistory('PETR4.SA','br:33000167000101');expect(symbols).toEqual(['PETR4.SA','^BVSP']);
+  expect(assessHistory(h,h,now).status).toBe('ready');expect(h.reference.sourceUrl).toContain('%5EBVSP');
+  expect(()=>assessHistory({...h,reference:{...h.reference,sourceUrl:'https://evil.test'}},h,now)).toThrow('history_reference_source_invalid');
+ });
  it('recomputes daily returns and historical risk without using raw close',()=>{
   const q=assessHistory(historyFixture(),identity,now);
   expect(q.status).toBe('ready');expect(q.returns[0].simpleReturn).toBeNull();expect(q.returns[1].simpleReturn).toBeCloseTo(Math.exp(.0002)-1,12);
