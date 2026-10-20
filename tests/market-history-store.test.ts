@@ -9,7 +9,8 @@ vi.mock('postgres',()=>{
   fn.json=(v:unknown)=>JSON.stringify(v);fn.begin=(work:(tx:ReturnType<typeof tag>)=>Promise<unknown>)=>state.db!.transaction(tx=>work(tag(tx)));return fn;
  }return {default:()=>tag(state.db!)};
 });
-import {queueHistory,queueExistingBrazilRepairs,processHistory,listHistory,storedHistory,readHistory} from '../src/lib/market/history-store';
+import {queueHistory,queueExistingBrazilRepairs,persistVerifiedBrazilRepairs,processHistory,listHistory,storedHistory,readHistory} from '../src/lib/market/history-store';
+import {historyHash} from '../src/lib/market/history-quality';
 import {enqueue,claimJob,finishJob} from '../src/lib/foundation/store';
 import {defaultProfile} from '../src/lib/foundation/contracts';
 import {brazilHistoryFixture} from './brazil-history-fixture';
@@ -106,4 +107,27 @@ it('persists the repaired snapshot with real JSONB projections and passes the st
   const summary=(await listHistory(owner)).snapshots.find(s=>s.id===result.snapshotId)!;expect(summary.quality).not.toHaveProperty('calculationRows');expect(summary.quality.brazilNormalization).not.toHaveProperty('quotes');expect(summary.quality.brazilNormalization).not.toHaveProperty('sourceReturnChecks');
   await expect(storedHistory(other,{candidateKey:'BVMF:PETR4',symbol:h.symbol,issuerId:h.issuerId})).rejects.toThrow('history_not_prepared');
  }finally{vi.stubEnv('BRAZIL_HISTORY_NORMALIZATION_ENABLED','false');vi.stubEnv('PRICE_RECONCILIATION_ENABLED','false');vi.stubEnv('BRAPI_API_KEY','');vi.stubEnv('PRICE_RECONCILIATION_REQUIRED','false');}
+});
+it('persists a risk-verified acquisition for capped legacy jobs without fetching, changing attempts, or overwriting old evidence',async()=>{
+ vi.stubEnv('BRAZIL_HISTORY_NORMALIZATION_ENABLED','true');vi.stubEnv('BRAZIL_HISTORY_REPAIR_EXISTING','true');
+ const h=brazilHistoryFixture();h.requestedEnd=new Date().toISOString().slice(0,10);h.requestedStart=fiveYearStart(h.requestedEnd);
+ h.rows=h.rows.filter(r=>r.date>=h.requestedStart);h.reference.dates=h.reference.dates.filter(d=>d>=h.requestedStart);
+ h.secondary!.rows=h.secondary!.rows.filter(r=>r.date>=h.requestedStart);h.brazilEvidence!.raw.rows=h.brazilEvidence!.raw.rows.filter(r=>r.date>=h.requestedStart);h.brazilEvidence!.relay.rows=h.brazilEvidence!.relay.rows.filter(r=>r.date>=h.requestedStart);
+ h.retrievedAt=h.secondary!.retrievedAt=h.brazilEvidence!.retrievedAt=new Date().toISOString();
+ const hash=await historyHash(h),legacy='mh1_'+'e'.repeat(64),job=crypto.randomUUID(),foreign=crypto.randomUUID();
+ try{
+  await state.db!.query("INSERT INTO gpi_market_history_snapshots(id,owner_id,candidate_key,issuer_id,symbol,source_hash,payload,quality) VALUES($1,$2,'repair-test','br:33000167000101','PETR4.SA',$3,'{}','{\"status\":\"quarantined\"}')",[legacy,owner,'e'.repeat(64)]);
+  for(const [id,account] of [[job,owner],[foreign,other]])await state.db!.query("INSERT INTO gpi_market_history_jobs(id,owner_id,candidate_key,issuer_id,symbol,as_of,status,attempts,snapshot_id) VALUES($1,$2,'repair-test','br:33000167000101','PETR4.SA',(now() AT TIME ZONE 'UTC')::date,'complete',3,$3)",[id,account,legacy]);
+  await expect(persistVerifiedBrazilRepairs(h,'0'.repeat(64))).rejects.toThrow('history_brazil_repair_unverified');
+  expect(await persistVerifiedBrazilRepairs(h,hash)).toBe(1);expect(await persistVerifiedBrazilRepairs(h,hash)).toBe(0);
+  const result=(await state.db!.query<{attempts:number;snapshot_id:string}>("SELECT attempts,snapshot_id FROM gpi_market_history_jobs WHERE id=$1",[job])).rows[0];expect(result).toEqual({attempts:3,snapshot_id:'mh1_'+hash});
+  expect((await readHistory(owner,result.snapshot_id)).quality.brazilNormalization?.status).toBe('verified');
+  expect((await state.db!.query<{payload:unknown}>("SELECT payload FROM gpi_market_history_snapshots WHERE owner_id=$1 AND id=$2",[owner,legacy])).rows[0].payload).toEqual({});
+  expect((await state.db!.query<{snapshot_id:string}>("SELECT snapshot_id FROM gpi_market_history_jobs WHERE id=$1",[foreign])).rows[0].snapshot_id).toBe(legacy);
+  await expect(readHistory(other,result.snapshot_id)).rejects.toThrow('history_not_found');
+  await state.db!.query("UPDATE gpi_market_history_snapshots SET payload=jsonb_set(payload,'{rows,0,close}','1') WHERE owner_id=$1 AND id=$2",[owner,result.snapshot_id]);
+  await state.db!.query("UPDATE gpi_market_history_jobs SET snapshot_id=$1 WHERE id=$2",[legacy,job]);
+  await expect(persistVerifiedBrazilRepairs(h,hash)).rejects.toThrow('history_integrity_failed');
+  expect((await state.db!.query<{snapshot_id:string}>("SELECT snapshot_id FROM gpi_market_history_jobs WHERE id=$1",[job])).rows[0].snapshot_id).toBe(legacy);
+ }finally{vi.stubEnv('BRAZIL_HISTORY_NORMALIZATION_ENABLED','false');vi.stubEnv('BRAZIL_HISTORY_REPAIR_EXISTING','false');}
 });

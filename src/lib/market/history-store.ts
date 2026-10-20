@@ -27,6 +27,32 @@ export async function queueExistingBrazilRepairs(){
   RETURNING j.symbol`;
  return rows.length;
 }
+/** Reuse the risk-verified public acquisition, without another fetch or resetting attempt counts. */
+export async function persistVerifiedBrazilRepairs(history:MarketHistory,verifiedSourceHash:string){
+ if(process.env.BRAZIL_HISTORY_NORMALIZATION_ENABLED!=='true'||process.env.BRAZIL_HISTORY_REPAIR_EXISTING!=='true')return 0;
+ const quality=assessHistory(history,history),hash=await historyHash(history);
+ if(history.symbol!=='PETR4.SA'||history.issuerId!=='br:33000167000101'||history.requestedEnd!==new Date().toISOString().slice(0,10)||quality.status!=='ready'||quality.brazilNormalization?.status!=='verified'||hash!==verifiedSourceHash)throw Error('history_brazil_repair_unverified');
+ const id='mh1_'+hash;
+ return sql().begin(async tx=>{
+  const jobs=await tx`SELECT j.id,j.owner_id,j.candidate_key,j.snapshot_id FROM gpi_market_history_jobs j
+   JOIN gpi_market_history_snapshots s ON s.owner_id=j.owner_id AND s.id=j.snapshot_id
+   WHERE j.symbol=${history.symbol} AND j.issuer_id=${history.issuerId}
+   AND j.as_of=(now() AT TIME ZONE 'UTC')::date AND j.status IN ('complete','failed')
+   AND (j.lease_until IS NULL OR j.lease_until<now())
+   AND s.symbol=j.symbol AND s.issuer_id=j.issuer_id AND s.quality->>'status'='quarantined'
+   AND NOT(s.payload ? 'brazilEvidence') FOR UPDATE OF j SKIP LOCKED`;
+  for(const job of jobs){
+   await tx`INSERT INTO gpi_market_history_snapshots(id,owner_id,candidate_key,issuer_id,symbol,source_hash,payload,quality)
+    VALUES(${id},${job.owner_id},${job.candidate_key},${history.issuerId},${history.symbol},${hash},${tx.json(history as never)},${tx.json(quality)})
+    ON CONFLICT(owner_id,id) DO NOTHING`;
+   const saved=(await tx`SELECT source_hash,payload FROM gpi_market_history_snapshots WHERE owner_id=${job.owner_id} AND id=${id}`)[0];
+   if(!saved||saved.source_hash!==hash||await historyHash(saved.payload)!==hash)throw Error('history_integrity_failed');
+   await tx`UPDATE gpi_market_history_jobs SET status='complete',snapshot_id=${id},error_code=null,lease_token=null,lease_until=null
+    WHERE id=${job.id} AND owner_id=${job.owner_id} AND snapshot_id=${job.snapshot_id}`;
+  }
+  return jobs.length;
+ });
+}
 export function riskConnection() {
   const base=new URL(process.env.PORTFOLIO_RISK_API_URL??''),token=process.env.PORTFOLIO_RISK_API_TOKEN??'';
   if(base.protocol!=='https:'||base.pathname!=='/'||base.username||base.password||base.search||base.hash||token.length<32||/[\r\n]/.test(token))throw Error('risk_provider_not_configured');
