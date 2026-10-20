@@ -1,6 +1,6 @@
 import {historyEvidenceError} from './evidence-errors';
 import {createHash} from 'node:crypto';
-import {validDate,type MarketHistory} from './history-quality';
+import {validDate,assessHistory,type MarketHistory} from './history-quality';
 import {reconcilePrices,type SecondaryPrices} from './price-reconciliation';
 import {secondaryPrices} from './secondary-provider';
 import {acquireBrazilEvidence} from './brazil-evidence-provider';
@@ -28,7 +28,7 @@ export async function acquireSecondaryEvidence(h:MarketHistory,fetcher:typeof fe
  if(process.env.PRICE_RECONCILIATION_ENABLED!=='true')return {};
  if(process.env.BRAZIL_HISTORY_NORMALIZATION_ENABLED==='true'&&h.symbol.endsWith('.SA')&&h.issuerId.startsWith('br:')&&(h.symbol==='PETR4.SA'&&h.issuerId==='br:33000167000101'||process.env.BRAZIL_MARKET_NORMALIZATION_ENABLED==='true')){
   if(h.symbol==='PETR4.SA'&&h.issuerId==='br:33000167000101')return acquireBrazilEvidence(h,fetcher);
-  try{return await acquireBrazilEvidence(h,fetcher);}
+  try{const evidence=await acquireBrazilEvidence(h,fetcher);assessHistory({...h,...evidence},h);return evidence;}
   catch(error){const reason=historyEvidenceError(error);return {brazilAcquisitionFailure:reason.startsWith('history_brazil_')?reason:'history_brazil_acquisition_unavailable'};}
  }
  const providers=['configured_secondary','FMP'];
