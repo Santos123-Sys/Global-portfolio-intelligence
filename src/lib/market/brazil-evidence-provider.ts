@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {setTimeout as delay} from 'node:timers/promises';
 import type {MarketHistory} from './history-quality';
 import type {BrazilEvidence} from './brazil-normalization';
 import type {SecondaryPrices} from './price-reconciliation';
@@ -16,7 +17,7 @@ export function parseCotaPrices(html:string,symbol:string){
  if(rows.length<2||rows.length>1600)throw Error('history_brazil_relay_contract');
  return rows;
 }
-/** Three fixed, bounded reads share one 20s budget. No credential is sent to the public relay. */
+/** Paced BrAPI reads and the relay share one 20s deadline and at most one same-request retry. */
 export async function acquireBrazilEvidence(h:MarketHistory,fetcher:typeof fetch=fetch):Promise<{secondary:SecondaryPrices;brazilEvidence:BrazilEvidence}>{
  if(h.symbol!=='PETR4.SA'||h.issuerId!=='br:33000167000101'||h.currency!=='BRL')throw Error('history_brazil_not_configured');
  // BrAPI explicitly offers complete PETR4 data without a token. Select that
@@ -25,8 +26,15 @@ export async function acquireBrazilEvidence(h:MarketHistory,fetcher:typeof fetch
  const key=process.env.BRAZIL_HISTORY_BRAPI_PUBLIC==='true'?undefined:process.env.BRAPI_API_KEY;
  const brapiHeaders={accept:'application/json',...(key?{authorization:'Bearer '+key}:{})};
  const signal=AbortSignal.timeout(20000);
+ let retries=1;
  async function read(url:URL,init:RequestInit={},limit=2000000){
-  const r=await fetcher(url,{...init,redirect:'error',cache:'no-store',signal});
+  const request=()=>fetcher(url,{...init,redirect:'error',cache:'no-store',signal});
+  let r=await request();
+  if(r.status===429&&url.hostname==='brapi.dev'&&retries>0){
+   const value=r.headers.get('retry-after');
+   const wait=value===null?2000:/^\d+$/.test(value)?Number(value)*1000:Date.parse(value)-Date.now();
+   if(Number.isFinite(wait)&&wait>=0&&wait<=5000){await r.body?.cancel();retries--;await delay(Math.max(1000,wait),undefined,{signal});r=await request();}
+  }
   if(!r.ok){await r.body?.cancel();const source=url.hostname==='cotab3.com.br'?'relay':url.pathname.endsWith('/historical')?'raw':'events';throw Error('history_brazil_'+source+'_http_'+r.status);}
   const reader=r.body?.getReader();if(!reader)throw Error('history_brazil_empty');const chunks:Uint8Array[]=[];let size=0;
   try{while(true){const p=await reader.read();if(p.done)break;size+=p.value.length;if(size>limit)throw Error('history_brazil_oversized');chunks.push(p.value);}}
@@ -36,9 +44,11 @@ export async function acquireBrazilEvidence(h:MarketHistory,fetcher:typeof fetch
  const historical=new URL(rawUrl);historical.search=new URLSearchParams({symbols:'PETR4',startDate:h.requestedStart,endDate:h.requestedEnd,interval:'1d',sortOrder:'asc',includeRaw:'true'}).toString();
  const dividends=new URL(eventsUrl);dividends.search=new URLSearchParams({symbols:'PETR4',includeRaw:'true'}).toString();
  const dmy=(v:string)=>v.slice(8,10)+'/'+v.slice(5,7)+'/'+v.slice(0,4);
+ const rawRead=read(historical,{headers:brapiHeaders});
+ const cashRead=rawRead.then(async()=>{await delay(1100,undefined,{signal});return read(dividends,{headers:brapiHeaders});});
  const responses=await Promise.allSettled([
-  read(historical,{headers:brapiHeaders}),
-  read(dividends,{headers:brapiHeaders}),
+  rawRead,
+  cashRead,
   read(new URL(relayUrl),{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({codigoNegociacao:'PETR4',dataInicial:dmy(h.requestedStart),dataFinal:dmy(h.requestedEnd)})},3000000),
  ]);
  const values=responses.map(r=>{if(r.status==='rejected')throw r.reason;return r.value;});

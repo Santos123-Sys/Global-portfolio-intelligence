@@ -27,7 +27,11 @@ ADR conversion, interpolation, averaging or tolerance widening is used.
   Source: https://brapi.dev/blog/acesso-gratuito-ilimitado-acoes-teste-brapi .
 - Cota B3's public POST form at https://cotab3.com.br/cotacoes; exact ticker echo,
   table shape, completed session dates, positive cent prices, 3 MB bound. No key
-  is sent to this source. All three reads share a 20-second budget; no retries.
+  is sent to this source. All reads share a 20-second deadline. BrAPI requests
+  run serially, with a 1.1-second pause before the cash request. At most one
+  identical BrAPI GET is retried after HTTP 429: honor a valid Retry-After up
+  to five seconds, or use two seconds when absent. Longer/invalid delays stop
+  the acquisition. Credentials, mode and endpoints never change during retry.
 - Issuer exception receipts are versioned in `brazil-event-reviews.ts`.
   They distinguish the 2022 April SELIC update, incomplete 2022 November Yahoo
   entitlement, updated 2023 November principal, 2024 December cash classification
