@@ -4,7 +4,7 @@ import {riskConnection} from '../src/lib/market/history-store';
 import seed from '../data/usa-cvm-universe.json';
 import {Candidate} from '../src/lib/foundation/contracts';
 import {readBoundedJson} from '../src/lib/request-body';
-import {secondaryPrices} from '../src/lib/market/secondary-provider';
+import {acquireSecondaryEvidence} from '../src/lib/market/secondary-evidence';
 import {configuredSecondary} from '../src/lib/market/available-secondary';
 import type {MarketHistory} from '../src/lib/market/history-quality';
 
@@ -37,9 +37,10 @@ export async function checkIntegrations(){
   const body=await readBoundedJson(new Request('https://response.invalid',{method:'POST',body:r.body,headers:{'content-type':r.headers.get('content-type')??''},duplex:'half'} as RequestInit),700000);
   if(!body.ok)throw Error('invalid_response');const h=body.value as MarketHistory,q=assessHistory(h,identity);
   console.log(JSON.stringify({kind:'integration_check',integration:'market_history',symbol:ticker,status:q.status,observations:q.observations,firstDate:q.firstDate,lastDate:q.lastDate,reference:h.reference.symbol}));
-  try{const secondary=await secondaryPrices(h);if(secondary)h.secondary=secondary;
+  try{Object.assign(h,await acquireSecondaryEvidence(h));
    const checked=assessHistory(h,identity);
-   console.log(JSON.stringify({kind:'integration_check',integration:'independent_prices',symbol:ticker,provider:configuredSecondary(h),status:checked.reconciliation.status,compared:checked.reconciliation.comparedSessions,missing:checked.reconciliation.missingSessions,discrepancies:checked.reconciliation.discrepancies.length}));
+   const q=checked.reconciliation;
+   console.log(JSON.stringify({kind:'integration_check',integration:'independent_prices',symbol:ticker,provider:q.provider,status:q.status,compared:q.comparedSessions,missing:q.missingSessions,discrepancies:q.discrepancies.length,firstComparedDate:q.firstComparedDate,lastComparedDate:q.lastComparedDate,comparedReturns:q.comparedReturns,agreeingReturns:q.agreeingReturns,conflictingReturns:q.conflictingReturns,actionDateConflicts:q.actionDateConflicts,maxReturnDifference:q.maxReturnDifference,maxNormalizedDifference:q.maxNormalizedDifference,conflictSamples:q.conflictSamples,sensitivity:checked.priceSensitivity,witnesses:checked.reconciliations.map(r=>({provider:r.provider,status:r.status,compared:r.comparedSessions,missing:r.missingSessions,discrepancies:r.discrepancies.length})),acquisitionFailures:checked.secondaryAcquisitionFailures}));
   }catch(e){console.log(JSON.stringify({kind:'integration_check',integration:'independent_prices',symbol:ticker,provider:configuredSecondary(h),status:'unavailable',reason:e instanceof Error&&/^history_secondary_[a-z_0-9]+$/.test(e.message)?e.message:'secondary_invalid'}));}
  }catch{console.error(JSON.stringify({kind:'integration_check',integration:'market_history',symbol:ticker,status:'unavailable'}));}
  }

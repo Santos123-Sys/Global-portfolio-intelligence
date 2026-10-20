@@ -1,4 +1,5 @@
 import {reconcilePrices,type SecondaryPrices} from './price-reconciliation';
+import {priceSensitivity} from './price-sensitivity';
 /** Portable deterministic contract shared by GPI and the Risk Studio function. */
 import type {Candidate} from '../foundation/contracts';
 export function historyIdentity(c:Candidate) {
@@ -9,6 +10,8 @@ export function historyIdentity(c:Candidate) {
 export type PriceRow = {date:string;close:number;adjustedClose:number;volume:number};
 export type MarketHistory = {
   secondary?:SecondaryPrices;
+  secondarySupport?:SecondaryPrices[];
+  secondaryAcquisitionFailures?:{provider:string;reason:string}[];
   schemaVersion:'market-history.v1';symbol:string;issuerId:string;currency:'USD'|'BRL';
   exchange:string;timezone:string;provider:'Yahoo Finance (unofficial)';sourceUrl:string;
   retrievedAt:string;requestedStart:string;requestedEnd:string;priceBasis:'vendor-adjusted-close';
@@ -75,18 +78,25 @@ export function assessHistory(raw:unknown,expected:{symbol:string;issuerId:strin
   });
   const daily=returns.flatMap(r=>r.simpleReturn===null?[]:[r.simpleReturn]);
   if(daily.some(r=>Math.abs(r)>.5))issues.push('extreme_return_review');
-  const reconciliation=reconcilePrices(h,h.secondary,now);
+  if(h.secondarySupport&&(!h.secondary||!Array.isArray(h.secondarySupport)||h.secondarySupport.length>1||h.secondarySupport.some(s=>s.provider===h.secondary!.provider)))throw Error('history_secondary_invalid');
+  if(h.secondaryAcquisitionFailures&&(!Array.isArray(h.secondaryAcquisitionFailures)||h.secondaryAcquisitionFailures.length>2||h.secondaryAcquisitionFailures.some(f=>!['configured_secondary','FMP'].includes(f.provider)||!/^history_secondary_[a-z_0-9]+$/.test(f.reason))))throw Error('history_secondary_invalid');
+  const witnesses=[...(h.secondary?[h.secondary]:[]),...(h.secondarySupport??[])];
+  const reconciliations=witnesses.map(s=>reconcilePrices(h,s,now));
+  const priority=(status:string)=>status==='disputed'?5:status==='matched'?4:status==='partial'?3:status==='incomplete'?2:1;
+  // No majority vote: any price conflict blocks even if another witness fully agrees.
+  const reconciliation=[...reconciliations].sort((a,b)=>priority(b.status)-priority(a.status)||b.comparedSessions-a.comparedSessions)[0]??reconcilePrices(h,undefined,now);
+  const selected=witnesses.find(s=>s.provider===reconciliation.provider);
   if(['incomplete','disputed'].includes(reconciliation.status))issues.push('independent_price_'+reconciliation.status);
   const status=issues.length?'quarantined':shortHistory?'short_history':'ready';
   const mean=daily.reduce((s,v)=>s+v,0)/daily.length;
   const variance=daily.reduce((s,v)=>s+(v-mean)**2,0)/(daily.length-1);
   let peak=0,drawdown=0;for(const r of h.rows){peak=Math.max(peak,r.adjustedClose);drawdown=Math.min(drawdown,r.adjustedClose/peak-1);}
   const sorted=[...daily].sort((a,b)=>a-b),q=sorted[Math.floor((sorted.length-1)*.05)],tail=sorted.filter(r=>r<=q);
-  return {version:'history-quality.v1' as const,status,issues,reconciliation,firstDate:first,lastDate:last,observations:h.rows.length,
+  return {version:'history-quality.v1' as const,status,issues,reconciliation,reconciliations,secondaryAcquisitionFailures:h.secondaryAcquisitionFailures??[],priceSensitivity:priceSensitivity(h,selected),firstDate:first,lastDate:last,observations:h.rows.length,
     expectedSessions:h.reference.dates.length,missingSessions:missing,returns,
     metrics:status==='ready'?{annualizedVolatility:Math.sqrt(variance*252),maxDrawdown:drawdown,
       historicalVar95:Math.max(0,-q),historicalCvar95:Math.max(0,-tail.reduce((s,v)=>s+v,0)/tail.length),
       cumulativeReturn:h.rows.at(-1)!.adjustedClose/h.rows[0].adjustedClose-1}:null,
     methodology:'Vendor-adjusted simple/log daily returns; 252-session sample volatility; historical daily VaR/CVaR at 95%; no gap filling. Reference index/ETF sessions are a coverage proxy, not an official exchange calendar.',
-    limitations:[reconciliation.status==='matched'?'Second-provider adjusted prices match within configured tolerances; vendor upstream independence is not certified.':'Independent price reconciliation has not passed; this dataset is not independently verified.','Provider adjustments are retained, not independently certified.','Short histories and quarantined series cannot feed the five-year risk calculation.']};
+    limitations:[reconciliation.status==='matched'?'Second-provider adjusted prices match within configured tolerances; vendor upstream independence is not certified.':reconciliation.status==='partial'?`Only ${reconciliation.comparedSessions} of ${h.rows.length} sessions were corroborated; the full five-year history is not independently verified.`:'Independent price reconciliation has not passed; this dataset is not independently verified.','Provider adjustments are retained, not independently certified.','Corporate-action dates are Yahoo evidence, not proof that an adjustment disagreement is resolved.','Short histories and quarantined series cannot feed the five-year risk calculation.']};
 }

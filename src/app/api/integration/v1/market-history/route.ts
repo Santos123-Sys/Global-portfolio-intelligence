@@ -20,8 +20,8 @@ export async function POST(req:Request){
  const s=await authenticateRequest(req);if(!s.ok)return s.response;
  try{assertSameOrigin(req);if(!accountCanEdit(s.auth.role))throw Error();}catch{return NextResponse.json({error:'Forbidden'},{status:403,headers});}
  const body=await readBoundedJson(req,1000);if(!body.ok)return NextResponse.json({error:body.error},{status:body.status,headers});
- try{const input=z.object({candidateKey:z.string().max(60)}).strict().parse(body.value);
-  await queueHistory(s.auth.userId,input.candidateKey);return NextResponse.json({status:'queued_or_already_prepared'},{status:202,headers});
+ try{const input=z.object({candidateKey:z.string().max(60),refresh:z.boolean().default(false)}).strict().parse(body.value);
+  await queueHistory(s.auth.userId,input.candidateKey,input.refresh);return NextResponse.json({status:'queued_or_already_prepared',dailyAttemptLimit:3},{status:202,headers});
  }catch(e){const reason=e instanceof Error?e.message:'';
   return NextResponse.json({error:['history_disabled','issuer_unmapped','candidate_not_found'].includes(reason)?reason:'History request unavailable'},{status:422,headers});}
 }
