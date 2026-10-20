@@ -79,7 +79,9 @@ describe('five-year history quality gates',()=>{
   });
   const body={workspaceId:crypto.randomUUID(),portfolioId:crypto.randomUUID(),runId:crypto.randomUUID(),positions:[{symbol:'AAPL',shares:1}],issuers:[identity],valuations:[],baseCurrency:'USD',riskFreeRate:0,range:'5y',confirmed:true,marketHistories:[{history:h,sourceHash,snapshotId}]};
   const request=()=>new Request('https://risk.test/v1/portfolio-analyze',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify(body)});
-  const r=await integratedServe(request());expect(r.status).toBe(200);expect((await r.json()).historySnapshots).toEqual([{symbol:'AAPL',snapshotId,sourceHash}]);
+  const r=await integratedServe(request());expect(r.status).toBe(200);const result=await r.json();
+  expect(result.historySnapshots).toEqual([{symbol:'AAPL',snapshotId,sourceHash}]);
+  expect(result.warnings.join(' ')).toContain('do not independently certify');
   h.rows[2].adjustedClose=1;expect((await integratedServe(request())).status).toBe(422);
   vi.restoreAllMocks();
  });
