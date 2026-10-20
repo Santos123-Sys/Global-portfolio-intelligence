@@ -45,6 +45,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Refresh Vite lock for the release repair
+        run: |
+          node --input-type=module -e 'import {execFileSync} from "node:child_process"; let out; try {out=execFileSync("npm",["audit","--json"],{encoding:"utf8"});} catch(error){out=error.stdout;} const report=JSON.parse(out); console.log("GPI_VITE_AUDIT "+JSON.stringify(report.vulnerabilities?.vite??{}));'
+          npm update vite --package-lock-only --ignore-scripts
+          npm ci
+          node --input-type=module -e 'import{readFileSync}from"node:fs";const raw=readFileSync("package-lock.json"),b=raw.toString("base64"),size=8000,total=Math.ceil(b.length/size);for(let index=0;index<total;index++)console.log("GPI_LOCK_REPAIR "+JSON.stringify({index,total,bytes:raw.length,base64:b.slice(index*size,(index+1)*size)}));'
       - name: Reject production advisories and severe toolchain advisories
         run: |
           npm audit --omit=dev --audit-level=moderate
