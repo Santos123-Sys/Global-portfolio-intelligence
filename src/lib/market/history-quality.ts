@@ -12,7 +12,7 @@ export type MarketHistory = {
   schemaVersion:'market-history.v1';symbol:string;issuerId:string;currency:'USD'|'BRL';
   exchange:string;timezone:string;provider:'Yahoo Finance (unofficial)';sourceUrl:string;
   retrievedAt:string;requestedStart:string;requestedEnd:string;priceBasis:'vendor-adjusted-close';
-  rows:PriceRow[];reference:{symbol:string;dates:string[]};
+  rows:PriceRow[];reference:{symbol:string;dates:string[];sourceUrl?:string};
   corporateActions:{date:string;kind:'dividend'|'split';value:number}[];
 };
 const day=86400000;
@@ -50,7 +50,8 @@ export function assessHistory(raw:unknown,expected:{symbol:string;issuerId:strin
     Date.parse(h.requestedEnd)>now||now-Date.parse(h.requestedEnd)>8*day||
     !Number.isFinite(Date.parse(h.retrievedAt))||Date.parse(h.retrievedAt)>now+30000||now-Date.parse(h.retrievedAt)>8*day)throw Error('history_stale');
   if(!Array.isArray(h.rows)||h.rows.length<2||h.rows.length>1500||!Array.isArray(h.reference?.dates)||
-    h.reference.dates.length<1100||h.reference.dates.length>1500||h.reference.symbol!==(brazil?'BOVA11.SA':'SPY'))throw Error('history_coverage_invalid');
+    h.reference.dates.length<1100||h.reference.dates.length>1500||!(brazil?['BOVA11.SA','^BVSP']:['SPY']).includes(h.reference.symbol))throw Error('history_coverage_invalid');
+  if(h.reference.symbol==='^BVSP'&&!['https://query1.finance.yahoo.com/v8/finance/chart/%5EBVSP','https://query2.finance.yahoo.com/v8/finance/chart/%5EBVSP'].includes(h.reference.sourceUrl??''))throw Error('history_reference_source_invalid');
   const ordered=(dates:string[])=>dates.every((d,i)=>validDate(d)&&d>=h.requestedStart&&d<=h.requestedEnd&&(!i||d>dates[i-1]));
   if(!ordered(h.reference.dates)||!ordered(h.rows.map(r=>r.date))||h.rows.some(r=>
     !Number.isFinite(r.close)||r.close<=0||!Number.isFinite(r.adjustedClose)||r.adjustedClose<=0||
@@ -86,6 +87,6 @@ export function assessHistory(raw:unknown,expected:{symbol:string;issuerId:strin
     metrics:status==='ready'?{annualizedVolatility:Math.sqrt(variance*252),maxDrawdown:drawdown,
       historicalVar95:Math.max(0,-q),historicalCvar95:Math.max(0,-tail.reduce((s,v)=>s+v,0)/tail.length),
       cumulativeReturn:h.rows.at(-1)!.adjustedClose/h.rows[0].adjustedClose-1}:null,
-    methodology:'Vendor-adjusted simple/log daily returns; 252-session sample volatility; historical daily VaR/CVaR at 95%; no gap filling. Reference ETF sessions are a coverage proxy, not an official exchange calendar.',
+    methodology:'Vendor-adjusted simple/log daily returns; 252-session sample volatility; historical daily VaR/CVaR at 95%; no gap filling. Reference index/ETF sessions are a coverage proxy, not an official exchange calendar.',
     limitations:[reconciliation.status==='matched'?'Second-provider adjusted prices match within configured tolerances; vendor upstream independence is not certified.':'Independent price reconciliation has not passed; this dataset is not independently verified.','Provider adjustments are retained, not independently certified.','Short histories and quarantined series cannot feed the five-year risk calculation.']};
 }

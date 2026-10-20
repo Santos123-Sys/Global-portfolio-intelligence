@@ -1,10 +1,12 @@
 import {createHash} from 'node:crypto';
 import type {MarketHistory} from './history-quality';
 import type {SecondaryPrices} from './price-reconciliation';
+import {alternativePrices} from './available-secondary';
 /** Fixed official endpoint. No credential URLs, provider errors or response bodies are logged. */
 export async function secondaryPrices(history:MarketHistory,fetcher:typeof fetch=fetch):Promise<SecondaryPrices|undefined>{
  const key=process.env.ALPHA_VANTAGE_API_KEY;
- if(!key||process.env.PRICE_RECONCILIATION_ENABLED!=='true')return undefined;
+ if(process.env.PRICE_RECONCILIATION_ENABLED!=='true')return undefined;
+ if(!key||history.issuerId.startsWith('br:'))return alternativePrices(history,fetcher);
  // Global symbol conventions differ. Brazil needs a separately verified provider mapping.
  if(!history.issuerId.startsWith('us:')||history.currency!=='USD')return undefined;
  const url=new URL('https://www.alphavantage.co/query');url.search=new URLSearchParams({function:'TIME_SERIES_DAILY_ADJUSTED',symbol:history.symbol,outputsize:'full',apikey:key}).toString();

@@ -231,11 +231,13 @@ async function dailyChart(symbol,start,end){
  throw failure||Error('Market data unavailable');
 }
 async function marketHistory(symbol,issuerId){
- const requestedEnd=new Date().toISOString().slice(0,10),requestedStart=fiveYearStart(requestedEnd),referenceSymbol=symbol.endsWith('.SA')?'BOVA11.SA':'SPY';
+ // Use the broad index for Brazilian session coverage. ETF-specific missing prices
+ // must not prevent an otherwise complete issuer history from being evaluated.
+ const requestedEnd=new Date().toISOString().slice(0,10),requestedStart=fiveYearStart(requestedEnd),referenceSymbol=symbol.endsWith('.SA')?'^BVSP':'SPY';
  const stock=await dailyChart(symbol,requestedStart,requestedEnd),reference=symbol===referenceSymbol?stock:await dailyChart(referenceSymbol,requestedStart,requestedEnd);
  if(reference.rows.some(r=>!Number.isFinite(r.adjustedClose)||r.adjustedClose<=0))throw Error('Reference calendar unavailable');
  return {schemaVersion:'market-history.v1',symbol,issuerId,provider:'Yahoo Finance (unofficial)',priceBasis:'vendor-adjusted-close',
-  ...stock,retrievedAt:new Date().toISOString(),requestedStart,requestedEnd,reference:{symbol:referenceSymbol,dates:reference.rows.map(r=>r.date)}};
+  ...stock,retrievedAt:new Date().toISOString(),requestedStart,requestedEnd,reference:{symbol:referenceSymbol,sourceUrl:reference.sourceUrl,dates:reference.rows.map(r=>r.date)}};
 }
 export {marketHistory,dailyChart};
 
