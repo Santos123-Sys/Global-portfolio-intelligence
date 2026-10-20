@@ -4,6 +4,7 @@ import {historyFixture} from './market-history-fixture';
 afterEach(()=>{vi.unstubAllEnvs();vi.useRealTimers();});
 function fixture(){
  vi.stubEnv('FMP_API_KEY','');
+ vi.stubEnv('EODHD_API_KEY','');vi.stubEnv('MARKET_DATA_PROVIDER','');vi.stubEnv('PRICE_ADJUSTMENT_FMP_DIAGNOSTICS','true');
  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime('2026-10-19T13:00:00Z');
  const h=historyFixture();Object.assign(h,{symbol:'PETR4.SA',issuerId:'br:33000167000101',currency:'BRL',exchange:'SAO',timezone:'America/Sao_Paulo',sourceUrl:'https://query1.finance.yahoo.com/v8/finance/chart/PETR4.SA',reference:{...h.reference,symbol:'^BVSP',sourceUrl:'https://query1.finance.yahoo.com/v8/finance/chart/%5EBVSP'}});
  h.secondary={provider:'BrAPI',sourceUrl:'https://brapi.dev/api/v2/stocks/historical',symbol:h.symbol,issuerId:h.issuerId,currency:'BRL',timezone:'America/Sao_Paulo',priceBasis:'split-dividend-adjusted',retrievedAt:h.retrievedAt,rawSha256:'a'.repeat(64),rows:h.rows.map((r,i)=>({date:r.date,adjustedClose:r.adjustedClose*(i===20?1.02:1)}))};return h;
@@ -42,4 +43,13 @@ it('retains prices and ex/record/payment dates as evidence without changing a di
 it('records denied raw/event access once without retrying or fabricating prices',async()=>{
  const h=fixture();vi.stubEnv('PRICE_ADJUSTMENT_DIAGNOSTICS','true');vi.stubEnv('BRAPI_API_KEY','synthetic');const fetcher=vi.fn(async()=>new Response('',{status:403}));
  const r=(await inspectBrazilAdjustments(h,fetcher))!;expect(r.rawStatus).toBe('http_403');expect(r.eventStatus).toBe('http_403');expect(r.pairs[0].rawClose).toBeNull();expect(fetcher).toHaveBeenCalledTimes(2);
+});
+it('checks the documented Brazilian EODHD feed with only its attributed credential',async()=>{
+ const h=fixture();vi.stubEnv('PRICE_ADJUSTMENT_DIAGNOSTICS','true');vi.stubEnv('BRAPI_API_KEY','br-only');vi.stubEnv('MARKET_DATA_PROVIDER','eodhd');vi.stubEnv('MARKET_DATA_API_KEY','eod-only');
+ const fetcher=vi.fn(async(input:RequestInfo|URL)=>{
+  const u=new URL(String(input));if(u.hostname==='brapi.dev')return new Response('',{status:403});
+  expect(u.origin+u.pathname).toBe('https://eodhd.com/api/eod/PETR4.SA');expect(u.searchParams.get('api_token')).toBe('eod-only');expect(String(u)).not.toContain('br-only');
+  return Response.json(h.rows.map(r=>({date:r.date,close:r.close,adjusted_close:r.adjustedClose})));
+ });
+ const r=(await inspectBrazilAdjustments(h,fetcher))!;expect(r.otherStatus).toBe('available');expect(r.otherObservations).toBe(h.rows.length);expect(r.pairs[0].otherClose).toBe(h.rows[20].close);expect(fetcher).toHaveBeenCalledTimes(3);
 });
