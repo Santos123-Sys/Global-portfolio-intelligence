@@ -12,7 +12,7 @@ import {checkBrazilRisk} from './check-brazil-risk';
 export async function checkBrazilMarket(fetcher:typeof fetch=fetch){
  try{
   const catalog=await brazilMarketCatalog(fetcher);
-  console.log(JSON.stringify({kind:'brazil_market_coverage',status:'catalog_discovered',listings:catalog.listings.length,active:catalog.listings.filter(l=>l.isActive).length,receipts:catalog.receipts,sourceUrl:catalog.sourceUrl,
+  console.log(JSON.stringify({kind:'brazil_market_coverage',status:'catalog_discovered',listings:catalog.listings.length,active:catalog.listings.filter(l=>l.isActive).length,symbolsRequiringReview:catalog.listings.filter(l=>l.normalizationStatus==='symbol_review_required').length,symbolReviewSamples:catalog.listings.filter(l=>l.normalizationStatus==='symbol_review_required').slice(0,20).map(l=>l.symbol),receipts:catalog.receipts,sourceUrl:catalog.sourceUrl,
    limitation:catalog.limitation,verified:0,notEvaluated:catalog.listings.length}));
  }catch(error){console.log(JSON.stringify({kind:'brazil_market_coverage',status:'unavailable',reason:historyEvidenceError(error)}));}
  const symbols=(process.env.BRAZIL_MARKET_CANARY_SYMBOLS??'VALE3,ITUB4,BBDC4').split(',');

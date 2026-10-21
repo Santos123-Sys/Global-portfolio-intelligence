@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {readBoundedJson} from '../request-body';
-type Listing={symbol:string;name:string;subType:'stock'|'unit';isActive:boolean};
+type Listing={symbol:string;name:string;subType:'stock'|'unit';isActive:boolean;normalizationStatus:'supported'|'symbol_review_required'};
 function record(v:unknown):Record<string,unknown>{if(!v||typeof v!=='object'||Array.isArray(v))throw Error('history_brazil_catalog_contract');return v as Record<string,unknown>;}
 /** Discovery is not data certification. Never populate a portfolio or infer a CNPJ from a ticker. */
 export async function brazilMarketCatalog(fetcher:typeof fetch=fetch){
@@ -20,10 +20,10 @@ export async function brazilMarketCatalog(fetcher:typeof fetch=fetch){
   receipts.push({page,sha256:createHash('sha256').update(JSON.stringify(body.value)).digest('hex')});
   for(const raw of rows){
    const r=record(raw);
-   if(typeof r.symbol!=='string'||!/^[A-Z][A-Z0-9]{3}\d{1,2}$/.test(r.symbol))throw Error('history_brazil_catalog_symbol');
+   if(typeof r.symbol!=='string'||!/^[A-Z0-9.-]{1,30}$/.test(r.symbol))throw Error('history_brazil_catalog_symbol');
    if(typeof r.name!=='string'||!r.name||r.name.length>200||
     r.assetType!=='stock'||!['stock','unit'].includes(String(r.subType))||r.exchange!=='B3'||r.currency!=='BRL'||typeof r.isActive!=='boolean'||seen.has(r.symbol))throw Error('history_brazil_catalog_contract');
-   seen.add(r.symbol);listings.push({symbol:r.symbol,name:r.name,subType:r.subType==='unit'?'unit':'stock',isActive:r.isActive});
+   seen.add(r.symbol);listings.push({symbol:r.symbol,name:r.name,subType:r.subType==='unit'?'unit':'stock',isActive:r.isActive,normalizationStatus:/^[A-Z][A-Z0-9]{3}\d{1,2}$/.test(r.symbol)?'supported':'symbol_review_required'});
   }
   if(!pagination.hasNextPage){
    if(listings.length!==total)throw Error('history_brazil_catalog_incomplete');

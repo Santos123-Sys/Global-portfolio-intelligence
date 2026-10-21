@@ -110,3 +110,26 @@ it('retains a failed optional acquisition as an explicitly blocked dataset with 
  const evidence=await acquireSecondaryEvidence(h,vi.fn());expect(evidence.brazilAcquisitionFailure).toBe('history_brazil_credential_required');
  Object.assign(h,evidence);const q=assessHistory(h,h,now);expect(q.status).toBe('quarantined');expect(q.issues).toContain('brazil_evidence_unavailable');expect(q.metrics).toBeNull();
 });
+
+it('retains unfamiliar catalog symbols for review without passing them to normalization',async()=>{
+ const row={symbol:'ABEV3F',name:'Synthetic fractional-lot example',assetType:'stock',subType:'stock',currency:'BRL',exchange:'B3',isActive:true};
+ const catalog=await brazilMarketCatalog(async()=>Response.json({results:[row],pagination:{page:1,totalItems:1,hasNextPage:false}}));
+ expect(catalog.listings).toHaveLength(1);expect(catalog.listings[0].normalizationStatus).toBe('symbol_review_required');
+ const h=fixture('ABEV3F');expect(()=>assessHistory(h,h,now)).toThrow('history_brazil_identity');
+});
+it('preserves primary data when fetched v2 evidence fails deterministic validation',async()=>{
+ vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(now);
+ for(const flag of ['PRICE_RECONCILIATION_ENABLED','BRAZIL_HISTORY_NORMALIZATION_ENABLED','BRAZIL_MARKET_NORMALIZATION_ENABLED'])vi.stubEnv(flag,'true');
+ vi.stubEnv('BRAZIL_HISTORY_BRAPI_PUBLIC','false');vi.stubEnv('BRAPI_API_KEY','synthetic');
+ const h=fixture('ABEV3');delete h.brazilEvidence;const before=JSON.stringify(h);
+ const transport=async(input:RequestInfo|URL)=>{
+  const u=new URL(String(input));
+  if(u.hostname==='cotab3.com.br')return new Response(html(h));
+  if(u.pathname.endsWith('/coverage'))return Response.json({results:[{requestedSymbol:'ABEV3',symbol:'ABEV3',changed:false,status:'available',assetType:'stock',subType:'stock',availableData:{historical:true,stockDividends:true}}]});
+  const data=u.pathname.endsWith('/profile')?{cnpj:h.issuerId.slice(3)}:u.pathname.endsWith('/historical')?{usedInterval:'1d',historicalDataPrice:h.rows.map(r=>({date:Date.parse(r.date)/1000,rawClose:null,adjustedClose:100}))}:{cashDividends:[],stockDividends:[],subscriptions:[]};
+  return Response.json({results:[{requestedSymbol:'ABEV3',symbol:'ABEV3',changed:false,data}]});
+ };
+ const acquired=await acquireSecondaryEvidence(h,transport);expect(acquired.brazilAcquisitionFailure).toBe('history_brazil_evidence_invalid');
+ expect(acquired.brazilEvidence).toBeUndefined();expect(JSON.stringify(h)).toBe(before);
+ expect(assessHistory({...h,...acquired},h,now).status).toBe('quarantined');
+},10000);
