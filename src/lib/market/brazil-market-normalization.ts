@@ -1,3 +1,4 @@
+import {reviewedStockExDate,reviewedCashEntitlement,brazilIssuerEventReviews} from './brazil-issuer-event-reviews';
 import type {MarketHistory,PriceRow} from './history-quality';
 import type {BrazilEvidence} from './brazil-normalization';
 const validDate=(s:string)=>/^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s;
@@ -20,69 +21,77 @@ export function validateBrazilIdentity(h:MarketHistory,e:BrazilEvidence){
 /** Reusable engine. Issuer-specific PETR4 exceptions remain confined to the v1 engine. */
 export function normalizeBrazilMarket(h:MarketHistory,e:BrazilEvidence,now:number){
  validateBrazilIdentity(h,e);
- const invalid=()=>{throw Error('history_brazil_evidence_invalid');};
+ const invalid=(reason:string)=>{throw Error('history_brazil_evidence_invalid_'+reason);};
  if(e.version!=='brazil-evidence.v2'||e.raw.sourceUrl!=='https://brapi.dev/api/v2/stocks/historical'||
   e.events.sourceUrl!=='https://brapi.dev/api/v2/stocks/dividends'||e.relay.sourceUrl!=='https://cotab3.com.br/cotacoes'||
-  ![e.raw.rawSha256,e.events.rawSha256,e.relay.rawSha256].every(digest)||!Number.isFinite(Date.parse(e.retrievedAt))||
-  Date.parse(e.retrievedAt)>now+30000||now-Date.parse(e.retrievedAt)>8*86400000||h.secondary?.provider!=='BrAPI'||
-  h.secondary.symbol!==h.symbol||h.secondary.issuerId!==h.issuerId||h.secondary.rawSha256!==e.raw.rawSha256||
-  e.raw.rows.length!==h.rows.length||h.secondary.rows.length!==h.rows.length||e.raw.rows.length>1500||
-  e.events.cash.length>500||e.events.stock.length>100||!Array.isArray(e.events.subscriptions)||e.events.subscriptions.length>500||e.relay.rows.length>1600)invalid();
+  ![e.raw.rawSha256,e.events.rawSha256,e.relay.rawSha256].every(digest))invalid('source');
+ if(!Number.isFinite(Date.parse(e.retrievedAt))||
+  Date.parse(e.retrievedAt)>now+30000||now-Date.parse(e.retrievedAt)>8*86400000)invalid('freshness');
+ if(h.secondary?.provider!=='BrAPI'||
+  h.secondary.symbol!==h.symbol||h.secondary.issuerId!==h.issuerId||h.secondary.rawSha256!==e.raw.rawSha256)invalid('secondary_binding');
+ if(e.raw.rows.length!==h.rows.length||h.secondary!.rows.length!==h.rows.length||e.raw.rows.length>1500||
+  e.events.cash.length>500||e.events.stock.length>100||!Array.isArray(e.events.subscriptions)||e.events.subscriptions.length>500||e.relay.rows.length>1600)invalid('coverage');
+ const issuerReviews:{kind:string;date:string;sourceUrl:string;sourceSha256:string;version:string}[]= [];
  const unresolved:string[]=[],splits=new Map<string,number>(),yahooSplits=new Map<string,number>(),dates=new Map(h.reference.dates.map((d,i)=>[d,i]));
  const inWindow=(d:string)=>d>=h.requestedStart&&d<=h.requestedEnd;
  for(const a of h.corporateActions.filter(a=>a.kind==='split')){
-  if(yahooSplits.has(a.date)||!positive(a.value))invalid();yahooSplits.set(a.date,a.value);
+  if(yahooSplits.has(a.date)||!positive(a.value))invalid('primary_stock');yahooSplits.set(a.date,a.value);
  }
- for(const a of e.events.stock){
-  if(!validDate(a.date)||!positive(a.factor)||a.isin!==e.isin||!['DESDOBRAMENTO','GRUPAMENTO','BONIFICACAO','BONIFICAÇÃO'].includes(a.label??''))invalid();
+ for(const original of e.events.stock){
+  const review=reviewedStockExDate(h,e,original),a=review?{...original,date:review.exDate}:original;
+  if(review)issuerReviews.push({kind:'stock_ex_date',date:review.exDate,sourceUrl:review.sourceUrl,sourceSha256:review.sourceSha256,version:brazilIssuerEventReviews.version});
+  if(!validDate(a.date)||!positive(a.factor)||a.isin!==e.isin||!['DESDOBRAMENTO','GRUPAMENTO','BONIFICACAO','BONIFICAÇÃO'].includes(a.label??''))invalid('stock_event');
   if(!inWindow(a.date))continue;
   const recordIndex=a.recordDate?dates.get(a.recordDate):undefined;
   if(recordIndex===undefined||h.reference.dates[recordIndex+1]!==a.date)unresolved.push(a.date+':stock_record_ex_alignment');
-  if(splits.has(a.date))invalid();splits.set(a.date,a.factor);
+  if(splits.has(a.date))invalid('stock_duplicate');splits.set(a.date,a.factor);
   if(!near(yahooSplits.get(a.date)??NaN,a.factor,1e-8))unresolved.push(a.date+':stock_action_unresolved');
  }
  for(const d of yahooSplits.keys())if(!splits.has(d))unresolved.push(d+':stock_action_missing');
  if(e.events.subscriptions?.length)unresolved.push('subscription_requires_review');
  const future=new Map<string,number>();let splitProduct=1;
  for(let i=h.rows.length-1;i>=0;i--){const d=h.rows[i].date;future.set(d,splitProduct);splitProduct*=splits.get(d)??1;}
- if(!positive(splitProduct))invalid();
+ if(!positive(splitProduct))invalid('stock_factor');
  const relay=new Map<string,number>(),relayDuplicates:string[]=[];
  for(const r of e.relay.rows){
-  if(!validDate(r.date)||!inWindow(r.date)||!positive(r.close)||!h.rows.some(p=>p.date===r.date))invalid();
-  if(relay.has(r.date)){if(relay.get(r.date)!==r.close)invalid();relayDuplicates.push(r.date);}else relay.set(r.date,r.close);
+  if(!validDate(r.date)||!inWindow(r.date)||!positive(r.close)||!h.rows.some(p=>p.date===r.date))invalid('relay_row');
+  if(relay.has(r.date)){if(relay.get(r.date)!==r.close)invalid('relay_duplicate');relayDuplicates.push(r.date);}else relay.set(r.date,r.close);
  }
  const quotes:{date:string;close:number;rule:'two_raw_feeds_agree'|'relay_confirms_brapi';yahooClose:number;relayClose:number|null}[]=[];
  for(let i=0;i<h.rows.length;i++){
   const p=h.rows[i],b=e.raw.rows[i],s=h.secondary!.rows[i],w=relay.get(p.date);
-  if(b.date!==p.date||s.date!==p.date||!positive(b.close)||!positive(b.adjustedClose)||!near(b.adjustedClose,s.adjustedClose,1e-8))invalid();
+  if(b.date!==p.date||s.date!==p.date||!positive(b.close)||!positive(b.adjustedClose)||!near(b.adjustedClose,s.adjustedClose,1e-8))invalid('price_row');
   const yahooClose=p.close*future.get(p.date)!,agree=near(yahooClose,b.close,.005);
   if(w!==undefined&&!near(w,b.close,.005))unresolved.push(p.date+':relay_quote_conflict');
   if(!agree&&(w===undefined||!near(w,b.close,.005)))unresolved.push(p.date+':raw_quote_unresolved');
   quotes.push({date:p.date,close:b.close,rule:agree?'two_raw_feeds_agree':'relay_confirms_brapi',yahooClose,relayClose:w??null});
  }
  const yahooCash=new Map<string,number>();
- for(const a of h.corporateActions.filter(a=>a.kind==='dividend')){if(yahooCash.has(a.date))invalid();yahooCash.set(a.date,a.value*(future.get(a.date)??NaN));}
+ for(const a of h.corporateActions.filter(a=>a.kind==='dividend')){if(yahooCash.has(a.date))invalid('primary_cash_duplicate');yahooCash.set(a.date,a.value*(future.get(a.date)??NaN));}
  const groups=new Map<string,typeof e.events.cash>();
  for(const a of e.events.cash){
-  if(!validDate(a.recordDate))invalid();
+  if(!validDate(a.recordDate))invalid('cash_record_date');
   if(!inWindow(a.recordDate))continue;
-  if(a.isin!==e.isin||!positive(a.rawRate)||!['DIVIDENDO','JCP','RENDIMENTO'].includes(a.label)||!a.verified||!validDate(a.paymentDate))invalid();
+  if(a.isin!==e.isin||!positive(a.rawRate)||!['DIVIDENDO','JCP','RENDIMENTO'].includes(a.label)||!a.verified||!validDate(a.paymentDate))invalid('cash_event');
   if(a.exDate===null){unresolved.push(a.recordDate+':ex_date_missing');continue;}
-  if(!validDate(a.exDate))invalid();if(!inWindow(a.exDate))continue;
+  if(!validDate(a.exDate))invalid('cash_ex_date');if(!inWindow(a.exDate))continue;
   const index=dates.get(a.recordDate);
   if(index===undefined||h.reference.dates[index+1]!==a.exDate){unresolved.push(a.exDate+':record_ex_alignment');continue;}
   if(splits.has(a.exDate)){unresolved.push(a.exDate+':simultaneous_stock_cash_review');continue;}
   const g=groups.get(a.exDate)??[];
-  if(g.some(b=>b.paymentDate===a.paymentDate&&b.label===a.label&&near(b.rawRate,a.rawRate,1e-10)))invalid();
+  if(g.some(b=>b.paymentDate===a.paymentDate&&b.label===a.label&&near(b.rawRate,a.rawRate,1e-10)))invalid('cash_duplicate');
   g.push(a);groups.set(a.exDate,g);
  }
  const cash:{date:string;amount:number;vendorGross:number;yahooGross:number;sourceUrl:string;review:string}[]=[];
  const reported=new Map<string,{gross:number;taxable:number}>();
  for(const [d,g] of groups){
   const gross=g.reduce((s,a)=>s+a.rawRate,0),principal=g.filter(a=>a.label!=='RENDIMENTO').reduce((s,a)=>s+a.rawRate,0),y=yahooCash.get(d);
-  if(!near(gross,y??NaN))unresolved.push(d+':cash_unresolved');
+  const review=reviewedCashEntitlement(h,e,g,y??NaN);
+  const entitlement=review?.issuerGross??principal;
+  if(!near(gross,y??NaN)&&!review)unresolved.push(d+':cash_unresolved');
+  if(review)issuerReviews.push({kind:'cash_entitlement',date:d,sourceUrl:review.sourceUrl,sourceSha256:review.sourceSha256,version:brazilIssuerEventReviews.version});
   if(!positive(principal)){unresolved.push(d+':principal_requires_review');continue;}
-  cash.push({date:d,amount:principal,vendorGross:gross,yahooGross:y??0,sourceUrl:e.events.sourceUrl,review:'Corroborated gross entitlement; withholding and separately labelled monetary income excluded.'});
+  cash.push({date:d,amount:entitlement,vendorGross:gross,yahooGross:y??0,sourceUrl:review?.sourceUrl??e.events.sourceUrl,review:review?'Issuer-published final entitlement; original vendor gross retained for source-factor checks.':'Corroborated gross entitlement; withholding and separately labelled monetary income excluded.'});
   reported.set(d,{gross,taxable:g.filter(a=>['JCP','RENDIMENTO'].includes(a.label)).reduce((s,a)=>s+a.rawRate,0)});
  }
  for(const d of yahooCash.keys())if(!groups.has(d))unresolved.push(d+':cash_missing_brapi');
@@ -108,9 +117,9 @@ export function normalizeBrazilMarket(h:MarketHistory,e:BrazilEvidence,now:numbe
   const rule=raw?'closing_quote_adjudicated':amounts.has(d)?'gross_cash_basis':splits.has(d)?'corroborated_stock_action':'unexplained';
   if(rule==='unexplained')unresolved.push(d+':return_unexplained');return {date:d,rule};
  });
- return {version:'brazil-gross-entitlement.v2' as const,status:unresolved.length?'blocked' as const:'verified' as const,unresolved:[...new Set(unresolved)],
+ return {version:'brazil-gross-entitlement.v3' as const,status:unresolved.length?'blocked' as const:'verified' as const,unresolved:[...new Set(unresolved)],
   verifiedQuotes:unresolved.some(s=>s.includes('quote'))?0:quotes.length,adjudicatedQuoteDates:quotes.filter(q=>q.rule==='relay_confirms_brapi').map(q=>q.date),
   relayCompared:relay.size,relayMissing:h.rows.filter(r=>!relay.has(r.date)).map(r=>r.date),relayDuplicates,
-  originalReturnConflicts:conflictDates.length,decisions,quotes,cash,excluded:[] as {date:string;reason:string;sourceUrl:string}[],sourceReturnChecks,sourceReturnTolerance:.00005,calculationRows,
+  issuerReviews,originalReturnConflicts:conflictDates.length,decisions,quotes,cash,excluded:[] as {date:string;reason:string;sourceUrl:string}[],sourceReturnChecks,sourceReturnTolerance:.00005,calculationRows,
   methodology:'Versioned Brazilian gross-entitlement back adjustment; split factors corroborated across providers; per-share cash bound to class and raw-price scale. No interpolation, issuer-rule borrowing or automatic rename stitching. Upstream independence and point-in-time availability are not certified.'};
 }
