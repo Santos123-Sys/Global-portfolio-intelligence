@@ -44,6 +44,17 @@ export function ResearchManagerReport({ run,jobId }: { run: ResearchRun;jobId?:s
   return <section><h3>Managed research · {run.status}</h3><p>{run.brief.question}</p>
     {jobId&&<><button disabled={exportState==='Generating…'} onClick={async()=>{setExportState('Generating…');try{const res=await fetch(`/api/corpus/presentation?job=${jobId}`,{method:'POST'});if(!res.ok)throw new Error();const url=URL.createObjectURL(await res.blob());const a=document.createElement('a');a.href=url;a.download='GPI-Research.pptx';a.click();URL.revokeObjectURL(url);setExportState('Presentation downloaded.');}catch{setExportState('Presentation unavailable.');}}}>Download cited research slides</button><p role="status">{exportState}</p></>}
     <small>{run.architecture} · {run.promptVersion} · {run.modelCalls} model calls · {run.stopReason}</small>
+    {run.sourceSummary && <details><summary>Source relationships · {run.sourceSummary.recordCount} records</summary>
+      <p>{run.sourceSummary.groups.length} source-reference groups; independence has not been established.
+        Multiple records or different URLs do not prove independent corroboration.</p>
+      {run.sourceSummary.unresolvedRecordCount > 0 && <p>{run.sourceSummary.unresolvedRecordCount} records have no usable source reference.</p>}
+      <ul>{run.sourceSummary.groups.map(group => <li key={group.id}>
+        {group.evidenceIds.length} record(s) · {group.relation === 'unresolved' ? 'source reference unresolved' : 'source reference group'}
+        <ul>{group.evidenceIds.map(id => { const record = run.evidence.find(row => row.id === id);
+          return <li key={id}>{record ? `${record.metric} · FY ${record.fiscalYear} · ${record.sourceKind}` : 'Record unavailable'}</li>;
+        })}</ul>
+      </li>)}</ul>
+    </details>}
     {run.plan && <ul>{run.plan.questions.map((q, i) => <li key={i}>{q}</li>)}</ul>}
     {run.findings.map((f, i) => <div className="claim" key={i}><span className="badge">{f.perspective} · {f.kind}</span><p>{f.text}</p><small>Falsifier: {f.falsifier}</small>
       {f.citations.map(c => { const evidence = run.evidence.find(e => e.id === c.evidenceId); return <details key={c.evidenceId}>

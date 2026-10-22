@@ -37,6 +37,15 @@ export type Evidence = {
   id: string; metric: string; fiscalYear: number; text: string; sourceUrl: string;
   sourceKind: 'public_regulatory' | 'issuer_published_unaudited_pdf' | 'regulator_download' | 'user_upload' | 'issuer_download';
   documentId?: string; locator?: string;
+  // Raw-document hash supplied by verified corpus metadata, never by a model.
+  documentSha256?: string;
+};
+export type EvidenceSourceSummary = {
+  version: 'evidence-source-groups.v1';
+  recordCount: number;
+  groups: { id: string; evidenceIds: string[]; relation: 'shared_reference' | 'unresolved' }[];
+  unresolvedRecordCount: number;
+  independence: 'not_established';
 };
 export type ResearchRun = {
   architecture: 'bounded-research-manager-v1'; promptVersion: string;
@@ -45,4 +54,6 @@ export type ResearchRun = {
   evidence: Evidence[]; findings: z.infer<typeof Finding>[]; gaps: string[];
   trace: { stage: string; status: string; elapsedMs: number; count?: number; usage?: unknown }[];
   modelCalls: number; stopReason: string;
+  // Optional so previously saved research reports remain readable.
+  sourceSummary?: EvidenceSourceSummary;
 };

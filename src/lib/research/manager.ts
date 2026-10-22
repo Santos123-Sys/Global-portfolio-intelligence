@@ -4,7 +4,8 @@ import type { ScreenResult } from '../foundation/screening';
 import { readIssuerStatement } from '../integrations/issuer-statement-client';
 import { ResearchBrief, ResearchPlan, Findings, Critique, type Evidence, type ResearchRun } from './contracts';
 import { collectEvidence, coverageGaps, executeEvidenceTool } from './evidence-tools';
-import { PLANNER_PROMPT, ANALYST_PROMPT, CRITIC_PROMPT, PROMPT_VERSION } from './prompts';
+import { researchPrompts, type ResearchPromptProfile } from './rubric';
+import { summarizeEvidenceSources } from './source-groups';
 
 export type ModelCall = (system: string, input: unknown, signal: AbortSignal) => Promise<{ value: unknown; usage: unknown }>;
 export async function callResearchModel(system: string, input: unknown, signal: AbortSignal, transport: typeof fetch = fetch) {
@@ -44,10 +45,13 @@ export function validateFindings(value: unknown, evidence: Evidence[]) {
 /** Bounded supervisor: the model proposes a plan; application code owns authority and termination. */
 export async function runResearchManager(screen: ScreenResult, input: ResearchBrief, options: {
   call?: ModelCall; readIssuer?: typeof readIssuerStatement; narrative?: Evidence[]; acquisitionGaps?: string[];
+  // Server-owned option used by the paired evaluation runner, never an API request field.
+  promptProfile?: ResearchPromptProfile;
 } = {}): Promise<ResearchRun> {
   const brief = ResearchBrief.parse(input);
+  const prompts = researchPrompts(options.promptProfile ?? (process.env.RESEARCH_RUBRIC_ENABLED === 'true' ? 'curated' : 'baseline'));
   const started = Date.now();
-  const run: ResearchRun = { architecture: 'bounded-research-manager-v1', promptVersion: PROMPT_VERSION,
+  const run: ResearchRun = { architecture: 'bounded-research-manager-v1', promptVersion: prompts.version,
     brief, status: 'needs_sources', plan: null, evidence: [], findings: [], gaps: [], trace: [], modelCalls: 0, stopReason: 'no_usable_evidence' };
   let stage = 'collect_evidence';
   try {
@@ -63,7 +67,10 @@ export async function runResearchManager(screen: ScreenResult, input: ResearchBr
     }
     run.evidence = [...collectEvidence(screen, brief, issuer), ...(options.narrative ?? [])];
     if(new Set(run.evidence.map(e=>e.id)).size!==run.evidence.length)throw new Error('duplicate_evidence');
+    run.sourceSummary = summarizeEvidenceSources(run.evidence);
     run.gaps = [...coverageGaps(run.evidence, brief),...(options.acquisitionGaps??[])];
+    if (run.sourceSummary.groups.some(group => group.evidenceIds.length > 1))
+      run.gaps.push('Some evidence records share a source reference or document. Record counts are not independent corroboration.');
     if (!run.evidence.length) return run;
     if (process.env.RESEARCH_MANAGER_ENABLED !== 'true' || process.env.RESEARCH_MODEL_ENABLED !== 'true') {
       run.status = 'model_disabled'; run.stopReason = 'model_disabled'; return run;
@@ -79,7 +86,7 @@ export async function runResearchManager(screen: ScreenResult, input: ResearchBr
       return result.value;
     };
     const context = { brief, issuer: screen.candidate.issuer, company: screen.candidate.name };
-    run.plan = ResearchPlan.parse(await invoke('plan', PLANNER_PROMPT, { ...context,
+    run.plan = ResearchPlan.parse(await invoke('plan', prompts.planner, { ...context, sourceSummary: run.sourceSummary,
       inventory: run.evidence.map(({ id, metric, fiscalYear, sourceKind }) => ({ id, metric, fiscalYear, sourceKind })) }));
     stage = 'tools';
     const selected = new Map<string, Evidence>();
@@ -91,11 +98,12 @@ export async function runResearchManager(screen: ScreenResult, input: ResearchBr
     }
     const evidence = [...selected.values()];
     if (!evidence.length) { run.stopReason = 'no_retrieved_evidence'; return run; }
-    const draft = validateFindings(await invoke('analyse', ANALYST_PROMPT, { ...context, plan: run.plan, evidence, gaps: run.gaps,
+    const sourceSummary = summarizeEvidenceSources(evidence);
+    const draft = validateFindings(await invoke('analyse', prompts.analyst, { ...context, sourceSummary, plan: run.plan, evidence, gaps: run.gaps,
       toolReceipts: run.trace.filter(t => t.stage === 'search_evidence' || t.stage === 'inspect_coverage') }), evidence);
     run.gaps.push(...draft.gaps);
     if (!draft.findings.length) { run.stopReason = 'insufficient_evidence'; return run; }
-    const critique = Critique.parse(await invoke('review', CRITIC_PROMPT, { ...context, evidence, draft }));
+    const critique = Critique.parse(await invoke('review', prompts.critic, { ...context, sourceSummary, evidence, draft }));
     if (critique.reviews.length !== draft.findings.length || new Set(critique.reviews.map(r => r.findingIndex)).size !== draft.findings.length ||
       critique.reviews.some(r => r.findingIndex >= draft.findings.length)) throw new Error('incomplete_review');
     run.findings = draft.findings.filter((_, index) => critique.reviews.find(r => r.findingIndex === index)?.verdict === 'supported');

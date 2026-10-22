@@ -1,5 +1,9 @@
 # Bounded Research Hub: architecture and rollout
 
+Source-relationship summaries, the opt-in curated rubric and the paired evaluation runner
+are documented in [Curated research standards](research-rubric.md). The new rubric is
+disabled by default and does not add model calls or financial calculation authority.
+
 Decision date: 2026-10-11. Confidence: 4/5 for this bounded evidence slice;
 not a claim of measured investment-research quality.
 

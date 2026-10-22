@@ -15,5 +15,6 @@ coverage/
 test-results/
 playwright-report/
 tmp/
+evaluation-results/
 .DS_Store
 drizzle/meta/_journal.json.bak
