@@ -32,7 +32,8 @@ export function chunkDocument(doc: CorpusDocument) {
     if(end<doc.text.length){const boundary=doc.text.lastIndexOf('\n',end);if(boundary>start+1200)end=boundary;}
     result.push({id:`doc:${doc.metadata.id}:${start}:${end}`, metric:`${doc.metadata.form} narrative`, fiscalYear:doc.metadata.year,
       text:doc.text.slice(start,end), sourceUrl:doc.metadata.sourceUrl ?? `/api/corpus?download=${doc.metadata.id}`,
-      sourceKind:doc.metadata.provenance, documentId:doc.metadata.id, locator:`${doc.metadata.path} · characters ${start}–${end} · ${doc.metadata.parser}`});
+      sourceKind:doc.metadata.provenance, documentId:doc.metadata.id, documentSha256:doc.metadata.sha256,
+      locator:`${doc.metadata.path} · characters ${start}–${end} · ${doc.metadata.parser}`});
     if(end===doc.text.length)break; start=end-240;
   }
   return result;

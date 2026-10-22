@@ -26,7 +26,8 @@
     "browser:worker": "node --import tsx scripts/browser-worker.ts",
     "browser:reap": "node --import tsx scripts/browser-reaper.ts",
     "browser:verify": "node --import tsx scripts/verify-browser-engine.ts",
-    "browser:test": "BROWSER_INTEGRATION=true vitest run tests/browser-store.integration.test.ts tests/browser-contracts.test.ts"
+    "browser:test": "BROWSER_INTEGRATION=true vitest run tests/browser-store.integration.test.ts tests/browser-contracts.test.ts",
+    "research:evaluate": "node --import tsx scripts/evaluate-research-rubric.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
