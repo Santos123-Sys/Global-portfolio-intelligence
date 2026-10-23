@@ -37,7 +37,7 @@ jobs:
       SESSION_SECRET: ci-only-session-secret-with-at-least-32-characters
       MFA_ENCRYPTION_KEY: ci-only-mfa-secret-with-at-least-32-characters
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -58,7 +58,7 @@ jobs:
       - name: Verify native PostgreSQL browser admission, claims and process loss
         run: BROWSER_POSTGRES_TEST_URL="$DATABASE_URL" node --import tsx scripts/verify-browser-postgres.ts
       - name: Check out the pinned FilingLens approval implementation
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Santos123-Sys/FilingLens
           ref: 3e2e896085dd7263da5524210693cbadfa7a4a97
